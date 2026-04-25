@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── CSS Custom Properties ─────────────────────────────────────────── */
+:root {
+  --crimson:       #8B0000;
+  --crimson-dark:  #5C0000;
+  --gold:          #C9A227;
+  --gold-light:    #F5D060;
+  --gold-dark:     #8B6914;
+  --cream:         #FFF8E7;
+  --dark:          #0A0000;
+  --dark-2:        #150000;
+}
+
+/* ── Base ───────────────────────────────────────────────────────────── */
+html { scroll-behavior: smooth; }
+
+body {
+  background-color: var(--dark);
+  color: var(--cream);
+  font-family: var(--font-inter), sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: rgba(201, 162, 39, 0.3);
+  color: var(--cream);
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────── */
+::-webkit-scrollbar               { width: 6px; }
+::-webkit-scrollbar-track         { background: var(--dark); }
+::-webkit-scrollbar-thumb         { background: var(--gold-dark); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover   { background: var(--gold); }
+
+/* ── Gold text gradient ─────────────────────────────────────────────── */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #C9A227 0%, #F5D060 40%, #E8B820 60%, #C9A227 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Shimmer overlay on logo ────────────────────────────────────────── */
+.logo-shimmer-wrap {
+  position: relative;
+  display: inline-block;
+}
+.logo-shimmer-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(245, 208, 96, 0.35) 50%,
+    transparent 100%
+  );
+  border-radius: 50%;
+  animation: shimmer 3.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ── Decorative border for cards ────────────────────────────────────── */
+.gold-border {
+  border: 1px solid rgba(201, 162, 39, 0.25);
+}
+.gold-border:hover {
+  border-color: rgba(201, 162, 39, 0.6);
+  box-shadow: 0 0 20px rgba(201, 162, 39, 0.15);
+}
+
+/* ── Section divider ────────────────────────────────────────────────── */
+.divider-gold {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  opacity: 0.4;
+}
+
+/* ── Page transitions ───────────────────────────────────────────────── */
+@layer utilities {
+  .perspective-800  { perspective: 800px; }
+  .perspective-1000 { perspective: 1000px; }
+  .preserve-3d      { transform-style: preserve-3d; }
+}
+
+/* ── Prose overrides for Hindi text ─────────────────────────────────── */
+.hindi-text {
+  font-family: var(--font-devanagari), serif;
+  line-height: 1.9;
+}
+
+/* ── Book cover gradient presets (by category) ──────────────────────── */
+.cover-instrumental { background: linear-gradient(145deg, #1A0A00 0%, #3D0800 40%, #8B0000 100%); }
+.cover-vocal        { background: linear-gradient(145deg, #000A1A 0%, #08003D 40%, #000080 100%); }
+.cover-raag-theory  { background: linear-gradient(145deg, #001A0A 0%, #003D1A 40%, #006400 100%); }
+.cover-kathak       { background: linear-gradient(145deg, #1A001A 0%, #3D0040 40%, #6B0080 100%); }
+.cover-research     { background: linear-gradient(145deg, #0A0A00 0%, #2A2000 40%, #5C4000 100%); }
+.cover-cbse         { background: linear-gradient(145deg, #00101A 0%, #002035 40%, #003D5C 100%); }
+.cover-bundle       { background: linear-gradient(145deg, #1A0000 0%, #5C0000 40%, #8B0000 100%); }
+
+/* ── Floating animation for hero elements ───────────────────────────── */
+.hero-float {
+  animation: float 5s ease-in-out infinite;
+}
+
+/* ── Input styles ───────────────────────────────────────────────────── */
+.input-gold {
+  background: rgba(255, 248, 231, 0.05);
+  border: 1px solid rgba(201, 162, 39, 0.3);
+  border-radius: 0.5rem;
+  color: var(--cream);
+  padding: 0.625rem 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+}
+.input-gold:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.15);
+}
+.input-gold::placeholder { color: rgba(255, 248, 231, 0.35); }
