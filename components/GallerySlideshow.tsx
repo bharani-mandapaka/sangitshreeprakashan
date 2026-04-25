@@ -64,10 +64,10 @@ export default function GallerySlideshow() {
           </p>
         </div>
 
-        {/* Slideshow */}
+        {/* Slideshow — fixed height, object-contain so images are never cropped */}
         <div
-          className="relative w-full rounded-2xl overflow-hidden border border-gold/20 shadow-[0_0_60px_rgba(0,0,0,0.8),0_0_30px_rgba(201,162,39,0.08)]"
-          style={{ aspectRatio: '16/9' }}
+          className="relative w-full rounded-2xl overflow-hidden border border-gold/20 bg-[#040000] shadow-[0_0_60px_rgba(0,0,0,0.8),0_0_30px_rgba(201,162,39,0.08)]"
+          style={{ height: '560px' }}
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => setPaused(false)}
         >
@@ -80,18 +80,18 @@ export default function GallerySlideshow() {
               animate="center"
               exit="exit"
               transition={{ duration: 0.55, ease: [0.4, 0, 0.2, 1] }}
-              className="absolute inset-0"
+              className="absolute inset-0 flex items-center justify-center"
             >
               <Image
                 src={SLIDES[current]}
                 alt={`Gallery photo ${current + 1} - Pt. Satish Chandra Srivastava`}
                 fill
-                className="object-cover object-center"
+                className="object-contain"
                 priority={current === 0}
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 90vw, 1200px"
               />
-              {/* Gradient overlay for legibility */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+              {/* Subtle vignette at very bottom only */}
+              <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#040000]/60 to-transparent pointer-events-none" />
             </motion.div>
           </AnimatePresence>
 

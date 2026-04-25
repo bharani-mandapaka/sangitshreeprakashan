@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, BookOpen, Users, Award, MapPin, Star, Quote } from 'lucide-react';
+import TimelineScroll from '@/components/TimelineScroll';
 
 export const metadata: Metadata = {
   title: 'About Us',
@@ -272,13 +273,12 @@ export default function AboutPage() {
           </p>
           {/* Scroll hint */}
           <p className="text-cream/25 text-xs font-cinzel mt-4 flex items-center justify-center gap-2">
-            <span>←</span> scroll to explore <span>→</span>
+            <span className="animate-pulse">⟵</span> auto-scrolling · hover to pause <span className="animate-pulse">⟶</span>
           </p>
         </div>
 
-        {/* Horizontally scrollable timeline */}
-        <div className="overflow-x-auto select-none pb-4"
-             style={{ WebkitOverflowScrolling: 'touch' }}>
+        {/* Horizontally scrollable timeline - auto-scrolls via TimelineScroll */}
+        <TimelineScroll speedPx={28}>
           <div
             className="relative flex px-16 sm:px-24"
             style={{
@@ -377,7 +377,7 @@ export default function AboutPage() {
               </div>
             </div>
           </div>
-        </div>
+        </TimelineScroll>
       </div>
 
       {/* ── About the Publisher ─────────────────────────────────────────── */}
