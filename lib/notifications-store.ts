@@ -7,14 +7,21 @@ export type NotificationTrigger =
   | 'weekly_digest'
   | 'cart_abandoned';
 
+export type NotificationChannel = 'email' | 'whatsapp' | 'both';
+
 export interface NotificationRule {
   id: string;
   name: string;
-  description: string;    // original natural-language input
+  description: string;
   trigger: NotificationTrigger;
+  channel: NotificationChannel;
+  // Email
   recipients: string[];
   subject: string;
   body: string;
+  // WhatsApp
+  whatsappNumbers: string[];
+  whatsappMessage: string;
   active: boolean;
   createdAt: string;
 }
@@ -27,8 +34,8 @@ interface NotificationsStore {
   toggleRule: (id: string) => void;
 }
 
-// ── Template generators ────────────────────────────────────────────────────────
-export const TEMPLATES: Record<NotificationTrigger, { subject: string; body: string }> = {
+// ── Email templates ────────────────────────────────────────────────────────────
+export const EMAIL_TEMPLATES: Record<NotificationTrigger, { subject: string; body: string }> = {
   order_placed: {
     subject: 'New Order Received: {{order_id}}',
     body: `Dear Admin,
@@ -57,7 +64,7 @@ Payment     : {{payment_method}}
 Please log in to the admin panel to update the order status.
 
 Regards,
-Sangit Shree Prakashan Notification System`,
+Sangit Shree Prakashan`,
   },
   daily_digest: {
     subject: 'Daily Sales Digest - {{date}}',
@@ -117,13 +124,68 @@ Sangit Shree Prakashan`,
   },
 };
 
+// ── WhatsApp templates (uses *bold* and _italic_ markdown) ─────────────────────
+export const WHATSAPP_TEMPLATES: Record<NotificationTrigger, string> = {
+  order_placed: `*New Order Alert* 🛒
+*Order ID:* {{order_id}}
+*Date:* {{order_date}}
+
+*Customer:* {{customer_name}}
+*Phone:* {{customer_phone}}
+*Email:* {{customer_email}}
+
+*Items Ordered:*
+{{items_list}}
+
+*Ship To:*
+{{shipping_address}}
+
+*Total:* {{order_total}}
+*Payment:* {{payment_method}}
+
+View order: https://sangit-shree-prakashan.vercel.app/admin/orders`,
+
+  daily_digest: `*Daily Sales Report - {{date}}*
+
+*Orders:* {{orders_count}}
+*Revenue:* {{revenue}}
+*Visitors:* {{visitors}}
+*Cart Adds:* {{cart_adds}}
+
+*Top Book:* {{top_book}}
+
+View full report: https://sangit-shree-prakashan.vercel.app/admin`,
+
+  weekly_digest: `*Weekly Summary*
+_Week of {{week_start}} to {{week_end}}_
+
+*Total Orders:* {{orders_count}}
+*Total Revenue:* {{revenue}}
+*New Visitors:* {{visitors}}
+*Top Book:* {{top_book}}
+*Returning Rate:* {{returning_rate}}%
+
+View analytics: https://sangit-shree-prakashan.vercel.app/admin`,
+
+  cart_abandoned: `*Abandoned Cart Alert*
+
+*Items:* {{cart_items}}
+*Value:* {{cart_total}}
+*Time:* {{abandoned_at}}
+
+A visitor left without completing their purchase.`,
+};
+
 // ── NLP parser ────────────────────────────────────────────────────────────────
 export function parseDescription(desc: string): {
-  trigger: NotificationTrigger;
-  name: string;
-  subject: string;
-  body: string;
-  detectedEmails: string[];
+  trigger:          NotificationTrigger;
+  channel:          NotificationChannel;
+  name:             string;
+  subject:          string;
+  body:             string;
+  whatsappMessage:  string;
+  detectedEmails:   string[];
+  detectedPhones:   string[];
 } {
   const lower = desc.toLowerCase();
 
@@ -131,13 +193,24 @@ export function parseDescription(desc: string): {
   const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
   const detectedEmails = desc.match(emailRegex) ?? [];
 
+  // Extract phone numbers (Indian format: +91XXXXXXXXXX or 10-digit)
+  const phoneRegex = /(?:\+91[-\s]?)?[6-9]\d{9}/g;
+  const detectedPhones = (desc.match(phoneRegex) ?? []).map((p) => p.replace(/\s/g, ''));
+
   // Detect trigger
   let trigger: NotificationTrigger = 'order_placed';
-  if (lower.includes('weekly'))         trigger = 'weekly_digest';
-  else if (lower.includes('daily'))     trigger = 'daily_digest';
-  else if (lower.includes('abandon') || lower.includes('cart'))
-                                        trigger = 'cart_abandoned';
-  else if (lower.includes('order'))     trigger = 'order_placed';
+  if (lower.includes('weekly'))                             trigger = 'weekly_digest';
+  else if (lower.includes('daily'))                        trigger = 'daily_digest';
+  else if (lower.includes('abandon') || (lower.includes('cart') && !lower.includes('order')))
+                                                           trigger = 'cart_abandoned';
+  else if (lower.includes('order'))                        trigger = 'order_placed';
+
+  // Detect channel
+  const wantsWhatsapp = lower.includes('whatsapp') || lower.includes('whats app') || lower.includes('wa ') || lower.includes('wa.');
+  const wantsEmail    = lower.includes('email') || lower.includes('mail') || detectedEmails.length > 0;
+  let channel: NotificationChannel = 'email';
+  if (wantsWhatsapp && wantsEmail) channel = 'both';
+  else if (wantsWhatsapp)          channel = 'whatsapp';
 
   const triggerLabels: Record<NotificationTrigger, string> = {
     order_placed:   'Order Placed',
@@ -145,11 +218,17 @@ export function parseDescription(desc: string): {
     weekly_digest:  'Weekly Digest',
     cart_abandoned: 'Abandoned Cart',
   };
+  const channelLabels: Record<NotificationChannel, string> = {
+    email:     'Email',
+    whatsapp:  'WhatsApp',
+    both:      'Email + WhatsApp',
+  };
 
-  const name = `${triggerLabels[trigger]} Notification`;
-  const { subject, body } = TEMPLATES[trigger];
+  const name            = `${triggerLabels[trigger]} (${channelLabels[channel]})`;
+  const { subject, body } = EMAIL_TEMPLATES[trigger];
+  const whatsappMessage   = WHATSAPP_TEMPLATES[trigger];
 
-  return { trigger, name, subject, body, detectedEmails };
+  return { trigger, channel, name, subject, body, whatsappMessage, detectedEmails, detectedPhones };
 }
 
 export const useNotificationsStore = create<NotificationsStore>()(

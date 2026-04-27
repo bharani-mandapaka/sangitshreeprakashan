@@ -1,20 +1,24 @@
 'use client';
 
 import { useState } from 'react';
-import { Bell, Plus, Trash2, Pause, Play, Mail, Edit3, Check, X, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  Bell, Plus, Trash2, Pause, Play, Mail, MessageCircle,
+  Edit3, Check, X, ChevronDown, ChevronUp, Layers,
+} from 'lucide-react';
 import {
   useNotificationsStore,
   parseDescription,
-  TEMPLATES,
   type NotificationRule,
   type NotificationTrigger,
+  type NotificationChannel,
 } from '@/lib/notifications-store';
 
+// ── Constants ──────────────────────────────────────────────────────────────────
 const TRIGGER_LABELS: Record<NotificationTrigger, string> = {
   order_placed:   'Every new order',
   daily_digest:   'Daily at 8:00 AM',
   weekly_digest:  'Every Monday 8:00 AM',
-  cart_abandoned: 'Cart abandoned (1h)',
+  cart_abandoned: 'Cart abandoned (1 h)',
 };
 
 const TRIGGER_COLORS: Record<NotificationTrigger, string> = {
@@ -24,158 +28,268 @@ const TRIGGER_COLORS: Record<NotificationTrigger, string> = {
   cart_abandoned: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
 };
 
+const CHANNEL_META: Record<NotificationChannel, { label: string; icon: React.ReactNode; color: string }> = {
+  email:    { label: 'Email',             icon: <Mail size={11} />,           color: 'text-blue-300' },
+  whatsapp: { label: 'WhatsApp',          icon: <MessageCircle size={11} />,  color: 'text-green-300' },
+  both:     { label: 'Email + WhatsApp',  icon: <Layers size={11} />,         color: 'text-gold' },
+};
+
+// ── Email preview ──────────────────────────────────────────────────────────────
 function EmailPreview({ subject, body }: { subject: string; body: string }) {
   return (
     <div className="rounded-xl overflow-hidden border border-gray-200 text-sm font-sans">
-      {/* Email client chrome */}
-      <div className="bg-gray-100 px-4 py-2.5 border-b border-gray-200">
-        <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-          <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
-          <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
-          <span className="ml-2 text-gray-500 text-xs font-medium">Email Preview</span>
-        </div>
+      <div className="bg-gray-100 px-4 py-2 border-b border-gray-200 flex items-center gap-1.5">
+        <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+        <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+        <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
+        <span className="ml-2 text-gray-400 text-[10px] font-medium flex items-center gap-1">
+          <Mail size={9} /> Email Preview
+        </span>
       </div>
-      {/* Header */}
       <div className="bg-white px-5 py-3 border-b border-gray-100">
-        <div className="flex items-baseline gap-2 mb-1">
-          <span className="text-gray-400 text-xs w-16">From:</span>
-          <span className="text-gray-700 text-xs">Sangit Shree Prakashan &lt;noreply@sangitshreeprakashan.com&gt;</span>
+        <div className="flex gap-2 mb-1">
+          <span className="text-gray-400 text-xs w-14">From:</span>
+          <span className="text-gray-600 text-xs">Sangit Shree Prakashan &lt;noreply@sangitshreeprakashan.com&gt;</span>
         </div>
-        <div className="flex items-baseline gap-2">
-          <span className="text-gray-400 text-xs w-16">Subject:</span>
+        <div className="flex gap-2">
+          <span className="text-gray-400 text-xs w-14">Subject:</span>
           <span className="text-gray-900 text-xs font-semibold">{subject}</span>
         </div>
       </div>
-      {/* Body */}
-      <div className="bg-white px-5 py-4 min-h-[160px]">
+      <div className="bg-white px-5 py-4">
         <pre className="text-gray-700 text-xs leading-relaxed whitespace-pre-wrap font-sans">{body}</pre>
       </div>
-      {/* Footer */}
-      <div className="bg-gray-50 px-5 py-2.5 border-t border-gray-100">
-        <p className="text-gray-400 text-[10px]">Sangit Shree Prakashan, Kanpur, UP - 208002, India</p>
+      <div className="bg-gray-50 px-5 py-2 border-t border-gray-100">
+        <p className="text-gray-400 text-[10px]">Sangit Shree Prakashan, Kanpur, UP 208002, India</p>
       </div>
     </div>
   );
 }
 
+// ── WhatsApp preview ───────────────────────────────────────────────────────────
+function WhatsAppPreview({ message }: { message: string }) {
+  // Render *bold* and _italic_ as styled spans
+  const renderLine = (line: string, idx: number) => {
+    // bold: *text*
+    const parts = line.split(/(\*[^*]+\*)/g);
+    return (
+      <span key={idx}>
+        {parts.map((p, i) =>
+          p.startsWith('*') && p.endsWith('*')
+            ? <strong key={i} className="font-semibold">{p.slice(1, -1)}</strong>
+            : p.startsWith('_') && p.endsWith('_')
+              ? <em key={i}>{p.slice(1, -1)}</em>
+              : <span key={i}>{p}</span>
+        )}
+      </span>
+    );
+  };
+
+  const lines = message.split('\n');
+
+  return (
+    <div className="rounded-xl overflow-hidden border border-[#1a1a1a] font-sans">
+      {/* WA top bar */}
+      <div className="bg-[#075E54] px-4 py-2.5 flex items-center gap-2.5">
+        <div className="w-7 h-7 rounded-full bg-[#25D366] flex items-center justify-center flex-shrink-0">
+          <svg className="w-4 h-4" fill="white" viewBox="0 0 24 24">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+            <path d="M12 2C6.477 2 2 6.477 2 12c0 1.771.469 3.53 1.36 5.07L2.05 22l5.077-1.29A10.01 10.01 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a8 8 0 01-4.378-1.232l-.314-.187-3.012.765.793-2.93-.203-.328A8 8 0 1112 20z" />
+          </svg>
+        </div>
+        <div>
+          <p className="text-white text-xs font-semibold">Sangit Shree Prakashan</p>
+          <p className="text-[#b2dfdb] text-[10px]">WhatsApp Business</p>
+        </div>
+        <span className="ml-auto text-[#b2dfdb] text-[10px]">Preview</span>
+      </div>
+
+      {/* Chat area */}
+      <div className="bg-[#ECE5DD] px-4 py-4 min-h-[160px]"
+           style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23d4c4b0\' fill-opacity=\'0.3\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }}>
+        {/* Message bubble */}
+        <div className="flex justify-end">
+          <div className="bg-[#DCF8C6] rounded-tl-xl rounded-bl-xl rounded-tr-sm rounded-br-xl px-3.5 py-2.5 max-w-xs shadow-sm">
+            <p className="text-[#111] text-xs leading-relaxed whitespace-pre-wrap">
+              {lines.map((line, i) => (
+                <span key={i}>{renderLine(line, i)}{i < lines.length - 1 ? '\n' : ''}</span>
+              ))}
+            </p>
+            <div className="flex items-center justify-end gap-1 mt-1.5">
+              <span className="text-[#8d9fa0] text-[9px]">
+                {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+              <svg className="w-3 h-2.5" viewBox="0 0 16 11" fill="none">
+                <path d="M1 5.5L5 9.5L10 1M6 9.5L15 1" stroke="#4FC3F7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Channel badge ──────────────────────────────────────────────────────────────
+function ChannelBadge({ channel }: { channel: NotificationChannel }) {
+  const m = CHANNEL_META[channel];
+  return (
+    <span className={`flex items-center gap-1 text-[9px] font-cinzel font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border border-white/10 bg-white/5 ${m.color}`}>
+      {m.icon} {m.label}
+    </span>
+  );
+}
+
+// ── Rule card ──────────────────────────────────────────────────────────────────
 function RuleCard({ rule }: { rule: NotificationRule }) {
   const { updateRule, deleteRule, toggleRule } = useNotificationsStore();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded,   setExpanded]   = useState(false);
+  const [editing,    setEditing]    = useState(false);
   const [editSubject, setEditSubject] = useState(rule.subject);
   const [editBody,    setEditBody]    = useState(rule.body);
+  const [editWaMsg,   setEditWaMsg]   = useState(rule.whatsappMessage);
   const [editEmails,  setEditEmails]  = useState(rule.recipients.join(', '));
-  const [editing,     setEditing]     = useState(false);
+  const [editPhones,  setEditPhones]  = useState(rule.whatsappNumbers.join(', '));
 
   const saveEdit = () => {
     updateRule(rule.id, {
-      subject:    editSubject,
-      body:       editBody,
-      recipients: editEmails.split(',').map((e) => e.trim()).filter(Boolean),
+      subject:         editSubject,
+      body:            editBody,
+      whatsappMessage: editWaMsg,
+      recipients:      editEmails.split(',').map((e) => e.trim()).filter(Boolean),
+      whatsappNumbers: editPhones.split(',').map((p) => p.trim()).filter(Boolean),
     });
     setEditing(false);
   };
 
+  const showEmail     = rule.channel === 'email'    || rule.channel === 'both';
+  const showWhatsApp  = rule.channel === 'whatsapp' || rule.channel === 'both';
+
   return (
     <div className={`bg-[#0A0000] border rounded-2xl transition-colors ${rule.active ? 'border-gold/15' : 'border-white/5 opacity-60'}`}>
-      {/* Summary row */}
+      {/* Summary */}
       <div className="flex items-center gap-3 px-5 py-4">
         <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${rule.active ? 'bg-gold/15' : 'bg-white/5'}`}>
           <Bell size={14} className={rule.active ? 'text-gold' : 'text-cream/30'} />
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-cinzel text-cream text-sm font-semibold truncate">{rule.name}</p>
-          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          <div className="flex flex-wrap items-center gap-2 mt-0.5">
             <span className={`text-[9px] font-cinzel font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${TRIGGER_COLORS[rule.trigger]}`}>
               {TRIGGER_LABELS[rule.trigger]}
             </span>
-            <span className="text-cream/35 text-[10px] flex items-center gap-1">
-              <Mail size={9} /> {rule.recipients.length} recipient{rule.recipients.length !== 1 ? 's' : ''}
-            </span>
+            <ChannelBadge channel={rule.channel} />
+            {showEmail && rule.recipients.length > 0 && (
+              <span className="text-cream/35 text-[10px] flex items-center gap-1">
+                <Mail size={9} /> {rule.recipients.length}
+              </span>
+            )}
+            {showWhatsApp && rule.whatsappNumbers.length > 0 && (
+              <span className="text-cream/35 text-[10px] flex items-center gap-1">
+                <MessageCircle size={9} /> {rule.whatsappNumbers.length}
+              </span>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <button
-            onClick={() => toggleRule(rule.id)}
-            title={rule.active ? 'Pause' : 'Activate'}
-            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${rule.active ? 'text-gold/60 hover:text-yellow-400 hover:bg-yellow-400/10' : 'text-green-400/60 hover:text-green-400 hover:bg-green-400/10'}`}
-          >
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <button onClick={() => toggleRule(rule.id)} title={rule.active ? 'Pause' : 'Activate'}
+            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${rule.active ? 'text-gold/60 hover:text-yellow-400 hover:bg-yellow-400/10' : 'text-green-400/60 hover:text-green-400 hover:bg-green-400/10'}`}>
             {rule.active ? <Pause size={12} /> : <Play size={12} />}
           </button>
-          <button
-            onClick={() => setExpanded((p) => !p)}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-cream/30 hover:text-cream transition-colors"
-          >
+          <button onClick={() => setExpanded((p) => !p)}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-cream/30 hover:text-cream transition-colors">
             {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
-          <button
-            onClick={() => deleteRule(rule.id)}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-red-400/40 hover:text-red-400 hover:bg-red-400/10 transition-colors"
-          >
+          <button onClick={() => deleteRule(rule.id)}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-red-400/40 hover:text-red-400 hover:bg-red-400/10 transition-colors">
             <Trash2 size={12} />
           </button>
         </div>
       </div>
 
-      {/* Expanded detail */}
+      {/* Expanded */}
       {expanded && (
-        <div className="px-5 pb-5 border-t border-gold/8 pt-4 space-y-4">
+        <div className="px-5 pb-5 border-t border-gold/8 pt-4 space-y-5">
           {!editing ? (
             <>
-              <EmailPreview subject={rule.subject} body={rule.body} />
-              <div className="flex items-center justify-between flex-wrap gap-2">
+              {/* Email preview */}
+              {showEmail && (
                 <div>
-                  <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-1">Recipients</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {rule.recipients.map((email) => (
-                      <span key={email} className="border border-gold/20 rounded-full px-2.5 py-0.5 text-cream/60 text-[11px] font-cinzel">
-                        {email}
-                      </span>
-                    ))}
-                  </div>
+                  <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                    <Mail size={10} /> Email Template
+                  </p>
+                  <EmailPreview subject={rule.subject} body={rule.body} />
+                  {rule.recipients.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {rule.recipients.map((e) => (
+                        <span key={e} className="border border-blue-500/20 bg-blue-500/5 rounded-full px-2.5 py-0.5 text-blue-300 text-[11px] font-cinzel">
+                          {e}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <button
-                  onClick={() => { setEditing(true); setEditSubject(rule.subject); setEditBody(rule.body); setEditEmails(rule.recipients.join(', ')); }}
-                  className="flex items-center gap-1.5 border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-1.5 rounded-lg transition-all"
-                >
-                  <Edit3 size={11} /> Edit Template
-                </button>
-              </div>
+              )}
+
+              {/* WhatsApp preview */}
+              {showWhatsApp && (
+                <div>
+                  <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                    <MessageCircle size={10} /> WhatsApp Message
+                  </p>
+                  <WhatsAppPreview message={rule.whatsappMessage} />
+                  {rule.whatsappNumbers.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {rule.whatsappNumbers.map((p) => (
+                        <span key={p} className="border border-green-500/20 bg-green-500/5 rounded-full px-2.5 py-0.5 text-green-300 text-[11px] font-cinzel">
+                          {p}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button onClick={() => { setEditing(true); setEditSubject(rule.subject); setEditBody(rule.body); setEditWaMsg(rule.whatsappMessage); setEditEmails(rule.recipients.join(', ')); setEditPhones(rule.whatsappNumbers.join(', ')); }}
+                className="flex items-center gap-1.5 border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-1.5 rounded-lg transition-all">
+                <Edit3 size={11} /> Edit Templates
+              </button>
             </>
           ) : (
-            <div className="space-y-3">
-              <div>
-                <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1">Subject</label>
-                <input
-                  className="input-gold text-sm"
-                  value={editSubject}
-                  onChange={(e) => setEditSubject(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1">
-                  Body <span className="normal-case text-cream/25">(use {'{{variables}}'} as placeholders)</span>
-                </label>
-                <textarea
-                  className="input-gold text-sm h-52 resize-none font-mono text-xs leading-relaxed"
-                  value={editBody}
-                  onChange={(e) => setEditBody(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1">
-                  Recipients (comma separated)
-                </label>
-                <input
-                  className="input-gold text-sm"
-                  value={editEmails}
-                  onChange={(e) => setEditEmails(e.target.value)}
-                  placeholder="owner@example.com, backup@example.com"
-                />
-              </div>
+            <div className="space-y-4">
+              {showEmail && (
+                <div className="space-y-3">
+                  <p className="text-blue-300/70 text-[10px] font-cinzel uppercase tracking-widest flex items-center gap-1.5"><Mail size={10} /> Email</p>
+                  <div>
+                    <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1">Subject</label>
+                    <input className="input-gold text-sm" value={editSubject} onChange={(e) => setEditSubject(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1">Body</label>
+                    <textarea className="input-gold text-xs h-44 resize-none font-mono leading-relaxed" value={editBody} onChange={(e) => setEditBody(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1">Recipients</label>
+                    <input className="input-gold text-sm" value={editEmails} onChange={(e) => setEditEmails(e.target.value)} placeholder="a@b.com, c@d.com" />
+                  </div>
+                </div>
+              )}
+              {showWhatsApp && (
+                <div className="space-y-3">
+                  <p className="text-green-300/70 text-[10px] font-cinzel uppercase tracking-widest flex items-center gap-1.5"><MessageCircle size={10} /> WhatsApp</p>
+                  <div>
+                    <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1">Message <span className="normal-case text-cream/25">(use *bold* _italic_)</span></label>
+                    <textarea className="input-gold text-xs h-44 resize-none font-mono leading-relaxed" value={editWaMsg} onChange={(e) => setEditWaMsg(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1">Phone Numbers</label>
+                    <input className="input-gold text-sm" value={editPhones} onChange={(e) => setEditPhones(e.target.value)} placeholder="+919876543210, +917408452828" />
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2">
                 <button onClick={saveEdit} className="flex items-center gap-1.5 bg-gold hover:bg-gold-300 text-dark font-cinzel font-bold text-xs px-4 py-2 rounded-lg transition-colors">
-                  <Check size={12} /> Save Changes
+                  <Check size={12} /> Save
                 </button>
                 <button onClick={() => setEditing(false)} className="flex items-center gap-1.5 border border-white/10 text-cream/50 hover:text-cream font-cinzel text-xs px-4 py-2 rounded-lg transition-colors">
                   <X size={12} /> Cancel
@@ -189,81 +303,102 @@ function RuleCard({ rule }: { rule: NotificationRule }) {
   );
 }
 
+// ── Main page ──────────────────────────────────────────────────────────────────
 export default function NotificationsPage() {
   const { rules, addRule } = useNotificationsStore();
 
-  const [desc,      setDesc]      = useState('');
-  const [parsed,    setParsed]    = useState<ReturnType<typeof parseDescription> | null>(null);
-  const [subject,   setSubject]   = useState('');
-  const [body,      setBody]      = useState('');
-  const [emails,    setEmails]    = useState('');
-  const [newEmail,  setNewEmail]  = useState('');
-  const [saved,     setSaved]     = useState(false);
+  const [desc,     setDesc]     = useState('');
+  const [parsed,   setParsed]   = useState<ReturnType<typeof parseDescription> | null>(null);
+  // Channel toggle (can override parsed)
+  const [channel,  setChannel]  = useState<NotificationChannel>('email');
+  // Email fields
+  const [subject,  setSubject]  = useState('');
+  const [body,     setBody]     = useState('');
+  const [emails,   setEmails]   = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  // WhatsApp fields
+  const [waMsg,    setWaMsg]    = useState('');
+  const [phones,   setPhones]   = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [saved,    setSaved]    = useState(false);
 
   const handleParse = () => {
     if (!desc.trim()) return;
-    const result = parseDescription(desc);
-    setParsed(result);
-    setSubject(result.subject);
-    setBody(result.body);
-    setEmails(result.detectedEmails.join(', '));
+    const r = parseDescription(desc);
+    setParsed(r);
+    setChannel(r.channel);
+    setSubject(r.subject);
+    setBody(r.body);
+    setWaMsg(r.whatsappMessage);
+    setEmails(r.detectedEmails.join(', '));
+    setPhones(r.detectedPhones.join(', '));
     setSaved(false);
   };
 
-  const handleAddEmail = () => {
-    if (!newEmail.trim()) return;
-    const existing = emails.split(',').map((e) => e.trim()).filter(Boolean);
-    if (!existing.includes(newEmail.trim())) {
-      setEmails([...existing, newEmail.trim()].join(', '));
-    }
-    setNewEmail('');
+  const addChip = (
+    list: string, setter: (v: string) => void,
+    newVal: string, clearNew: (v: string) => void
+  ) => {
+    if (!newVal.trim()) return;
+    const arr = list.split(',').map((x) => x.trim()).filter(Boolean);
+    if (!arr.includes(newVal.trim())) setter([...arr, newVal.trim()].join(', '));
+    clearNew('');
   };
+
+  const removeChip = (list: string, setter: (v: string) => void, val: string) =>
+    setter(list.split(',').map((x) => x.trim()).filter((x) => x && x !== val).join(', '));
+
+  const showEmail    = channel === 'email'    || channel === 'both';
+  const showWhatsApp = channel === 'whatsapp' || channel === 'both';
 
   const handleCreate = () => {
     if (!parsed) return;
-    const rule: NotificationRule = {
-      id:          `notif-${Date.now()}`,
-      name:        parsed.name,
-      description: desc,
-      trigger:     parsed.trigger,
-      recipients:  emails.split(',').map((e) => e.trim()).filter(Boolean),
+    addRule({
+      id:              `notif-${Date.now()}`,
+      name:            parsed.name.replace(/\(.*\)/, `(${CHANNEL_META[channel].label})`),
+      description:     desc,
+      trigger:         parsed.trigger,
+      channel,
+      recipients:      emails.split(',').map((e) => e.trim()).filter(Boolean),
       subject,
       body,
-      active:      true,
-      createdAt:   new Date().toISOString(),
-    };
-    addRule(rule);
+      whatsappNumbers: phones.split(',').map((p) => p.trim()).filter(Boolean),
+      whatsappMessage: waMsg,
+      active:          true,
+      createdAt:       new Date().toISOString(),
+    });
     setSaved(true);
-    setDesc('');
-    setParsed(null);
-    setSubject('');
-    setBody('');
-    setEmails('');
+    setDesc(''); setParsed(null);
+    setSubject(''); setBody(''); setEmails('');
+    setWaMsg(''); setPhones('');
   };
+
+  const hasRecipients =
+    (showEmail    && emails.trim()) ||
+    (showWhatsApp && phones.trim());
 
   return (
     <div className="space-y-8 max-w-5xl">
-      {/* Header */}
       <div>
         <h1 className="font-cinzel text-2xl font-bold text-cream">Notifications</h1>
         <p className="text-cream/40 text-sm mt-1">Define when and how you want to be notified about store activity.</p>
       </div>
 
-      {/* Creator */}
+      {/* Creator card */}
       <div className="bg-[#0A0000] border border-gold/15 rounded-2xl p-6 space-y-5">
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2">
           <Plus size={15} className="text-gold" />
           <h2 className="font-cinzel text-cream font-semibold text-sm">Create a Notification</h2>
         </div>
 
-        {/* Natural language input */}
+        {/* NL input */}
         <div>
           <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-2">
             Describe what you want
           </label>
           <textarea
             className="input-gold h-24 resize-none text-sm leading-relaxed"
-            placeholder={`Examples:\n"Email me every time an order is placed with full order details"\n"Send a daily digest every morning at 8 AM to owner@shop.com"`}
+            placeholder={`Examples:\n"Email me every time an order is placed with full order details"\n"WhatsApp +919876543210 every new order"\n"Send daily digest via both email and whatsapp"`}
             value={desc}
             onChange={(e) => { setDesc(e.target.value); setParsed(null); setSaved(false); }}
           />
@@ -276,111 +411,137 @@ export default function NotificationsPage() {
           </button>
         </div>
 
-        {/* Parsed result + preview */}
         {parsed && (
-          <div className="space-y-4 pt-2 border-t border-gold/10">
-            {/* Detected */}
-            <div className="flex flex-wrap gap-3 items-center">
+          <div className="space-y-5 pt-2 border-t border-gold/10">
+
+            {/* Detected info */}
+            <div className="flex flex-wrap gap-4 items-start">
               <div>
-                <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-1">Detected Trigger</p>
+                <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">Trigger</p>
                 <span className={`text-[10px] font-cinzel font-bold uppercase tracking-widest px-2 py-1 rounded-full border ${TRIGGER_COLORS[parsed.trigger]}`}>
                   {TRIGGER_LABELS[parsed.trigger]}
                 </span>
               </div>
+              {/* Channel override */}
               <div>
-                <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-1">Notification Name</p>
-                <p className="text-cream/70 text-xs font-cinzel">{parsed.name}</p>
+                <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">Delivery Channel</p>
+                <div className="flex gap-1.5">
+                  {(['email', 'whatsapp', 'both'] as NotificationChannel[]).map((ch) => {
+                    const m = CHANNEL_META[ch];
+                    return (
+                      <button
+                        key={ch}
+                        onClick={() => setChannel(ch)}
+                        className={`flex items-center gap-1.5 text-[10px] font-cinzel font-bold uppercase tracking-widest px-3 py-1.5 rounded-xl border transition-all ${
+                          channel === ch
+                            ? 'bg-gold/15 border-gold/40 text-gold'
+                            : 'border-white/10 text-cream/40 hover:text-cream hover:border-white/20'
+                        }`}
+                      >
+                        {m.icon} {m.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
-            {/* Subject edit */}
-            <div>
-              <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">Email Subject</label>
-              <input
-                className="input-gold text-sm"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-              />
-            </div>
-
-            {/* Body edit */}
-            <div>
-              <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">
-                Email Body <span className="normal-case text-cream/25 ml-1">(edit if needed)</span>
-              </label>
-              <textarea
-                className="input-gold h-52 resize-none font-mono text-xs leading-relaxed"
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-              />
-            </div>
-
-            {/* Preview */}
-            <div>
-              <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-2">Preview</p>
-              <EmailPreview subject={subject} body={body} />
-            </div>
-
-            {/* Recipients */}
-            <div>
-              <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">
-                Recipients
-              </label>
-              <div className="flex gap-2 flex-wrap mb-2">
-                {emails.split(',').map((e) => e.trim()).filter(Boolean).map((email) => (
-                  <span key={email} className="flex items-center gap-1.5 border border-gold/20 rounded-full px-2.5 py-0.5 text-cream/60 text-xs font-cinzel">
-                    <Mail size={9} className="text-gold/50" /> {email}
-                    <button
-                      onClick={() => setEmails(emails.split(',').map((e) => e.trim()).filter((e) => e !== email).join(', '))}
-                      className="text-cream/30 hover:text-red-400 ml-0.5"
-                    >
-                      <X size={9} />
-                    </button>
-                  </span>
-                ))}
+            {/* Email section */}
+            {showEmail && (
+              <div className="space-y-3 bg-blue-950/10 border border-blue-500/10 rounded-xl p-4">
+                <p className="text-blue-300/80 text-[10px] font-cinzel uppercase tracking-widest flex items-center gap-1.5">
+                  <Mail size={10} /> Email
+                </p>
+                <div>
+                  <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1">Subject</label>
+                  <input className="input-gold text-sm" value={subject} onChange={(e) => setSubject(e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1">Body</label>
+                  <textarea className="input-gold h-40 resize-none font-mono text-xs leading-relaxed" value={body} onChange={(e) => setBody(e.target.value)} />
+                </div>
+                <div>
+                  <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">Preview</p>
+                  <EmailPreview subject={subject} body={body} />
+                </div>
+                {/* Recipients */}
+                <div>
+                  <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">Recipients</label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {emails.split(',').map((e) => e.trim()).filter(Boolean).map((email) => (
+                      <span key={email} className="flex items-center gap-1.5 border border-blue-500/20 bg-blue-500/5 rounded-full px-2.5 py-0.5 text-blue-300 text-[11px] font-cinzel">
+                        <Mail size={9} /> {email}
+                        <button onClick={() => removeChip(emails, setEmails, email)} className="text-cream/30 hover:text-red-400 ml-0.5"><X size={9} /></button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input className="input-gold text-sm flex-1" type="email" placeholder="Add email..." value={newEmail} onChange={(e) => setNewEmail(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addChip(emails, setEmails, newEmail, setNewEmail)} />
+                    <button onClick={() => addChip(emails, setEmails, newEmail, setNewEmail)} className="border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-4 py-2 rounded-xl transition-all flex-shrink-0">+ Add</button>
+                  </div>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <input
-                  className="input-gold text-sm flex-1"
-                  type="email"
-                  placeholder="Add email address..."
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddEmail()}
-                />
-                <button
-                  onClick={handleAddEmail}
-                  className="border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-4 py-2 rounded-xl transition-all flex-shrink-0"
-                >
-                  + Add
-                </button>
+            )}
+
+            {/* WhatsApp section */}
+            {showWhatsApp && (
+              <div className="space-y-3 bg-green-950/10 border border-green-500/10 rounded-xl p-4">
+                <p className="text-green-300/80 text-[10px] font-cinzel uppercase tracking-widest flex items-center gap-1.5">
+                  <MessageCircle size={10} /> WhatsApp
+                </p>
+                <div>
+                  <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1">
+                    Message <span className="normal-case text-cream/25">(use *bold* and _italic_ for formatting)</span>
+                  </label>
+                  <textarea className="input-gold h-40 resize-none font-mono text-xs leading-relaxed" value={waMsg} onChange={(e) => setWaMsg(e.target.value)} />
+                </div>
+                <div>
+                  <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">Preview</p>
+                  <WhatsAppPreview message={waMsg} />
+                </div>
+                {/* Phone numbers */}
+                <div>
+                  <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">WhatsApp Numbers</label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {phones.split(',').map((p) => p.trim()).filter(Boolean).map((ph) => (
+                      <span key={ph} className="flex items-center gap-1.5 border border-green-500/20 bg-green-500/5 rounded-full px-2.5 py-0.5 text-green-300 text-[11px] font-cinzel">
+                        <MessageCircle size={9} /> {ph}
+                        <button onClick={() => removeChip(phones, setPhones, ph)} className="text-cream/30 hover:text-red-400 ml-0.5"><X size={9} /></button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input className="input-gold text-sm flex-1" type="tel" placeholder="+919876543210" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addChip(phones, setPhones, newPhone, setNewPhone)} />
+                    <button onClick={() => addChip(phones, setPhones, newPhone, setNewPhone)} className="border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-4 py-2 rounded-xl transition-all flex-shrink-0">+ Add</button>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Create button */}
             <button
               onClick={handleCreate}
-              disabled={!emails.trim() || saved}
+              disabled={!hasRecipients || saved}
               className="w-full bg-gold hover:bg-gold-300 disabled:opacity-50 text-dark font-cinzel font-bold py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
-              {saved ? <><Check size={16} /> Notification Created!</> : <><Bell size={15} /> Create Notification</>}
+              {saved
+                ? <><Check size={16} /> Notification Created!</>
+                : <><Bell size={15} /> Create Notification</>
+              }
             </button>
           </div>
         )}
       </div>
 
-      {/* Active notifications */}
+      {/* Active rules */}
       <div>
         <h2 className="font-cinzel text-cream font-semibold text-sm mb-4 flex items-center gap-2">
           <Bell size={14} className="text-gold" />
           Active Notifications
           {rules.length > 0 && (
-            <span className="bg-gold/15 text-gold text-[10px] font-bold px-2 py-0.5 rounded-full border border-gold/20">
-              {rules.length}
-            </span>
+            <span className="bg-gold/15 text-gold text-[10px] font-bold px-2 py-0.5 rounded-full border border-gold/20">{rules.length}</span>
           )}
         </h2>
-
         {rules.length === 0 ? (
           <div className="bg-[#0A0000] border border-gold/8 rounded-2xl p-12 text-center">
             <Bell size={32} className="text-cream/15 mx-auto mb-3" />
