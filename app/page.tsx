@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, Star } from 'lucide-react';
+import { ArrowRight, Star, Package } from 'lucide-react';
 import HeroScroll from '@/components/HeroScroll';
 import BookCard from '@/components/BookCard';
 import GallerySlideshow from '@/components/GallerySlideshow';
@@ -59,7 +59,7 @@ export default function HomePage() {
                   href={`/books?category=${cat}`}
                   className="group gold-border rounded-2xl p-6 bg-[#0A0000] hover:bg-[#150000] transition-all duration-300 flex flex-col items-center text-center gap-3"
                 >
-                  <span className="text-4xl">{meta.icon}</span>
+                  <span className="font-devanagari text-4xl text-gold/80 group-hover:text-gold transition-colors leading-none">{meta.icon}</span>
                   <div>
                     <h3 className="font-cinzel text-cream font-semibold text-sm group-hover:text-gold transition-colors">
                       {meta.label}
@@ -83,7 +83,7 @@ export default function HomePage() {
             className="mt-6 flex items-center justify-between p-5 rounded-2xl border border-gold/25 bg-gradient-to-r from-crimson-900/40 to-[#0A0000] hover:border-gold/50 transition-all duration-300 group"
           >
             <div className="flex items-center gap-4">
-              <span className="text-3xl">📦</span>
+              <Package size={24} className="text-gold/70 group-hover:text-gold transition-colors flex-shrink-0" />
               <div>
                 <h3 className="font-cinzel text-gold font-semibold">
                   {categoryMeta.bundle.label}

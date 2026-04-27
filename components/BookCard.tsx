@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ShoppingCart, Eye } from 'lucide-react';
+import { ShoppingCart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import BookCover from './BookCover';
 import { useCartStore } from '@/lib/cart-store';
@@ -46,19 +46,18 @@ export default function BookCard({ book }: BookCardProps) {
               isBundle={book.isBundle}
               size="md"
             />
-            {/* Hover overlay */}
-            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3">
-              <button
-                onClick={handleAddToCart}
-                className="bg-gold text-dark font-semibold px-4 py-2 rounded-lg flex items-center gap-2 text-sm hover:bg-gold-300 transition-colors"
-              >
-                <ShoppingCart size={15} />
-                Add to Cart
-              </button>
-              <div className="bg-white/10 backdrop-blur-sm p-2 rounded-lg">
-                <Eye size={18} className="text-cream" />
+            {/* Hover overlay — full cover Add to Cart */}
+            <button
+              onClick={handleAddToCart}
+              className="absolute inset-0 w-full h-full bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-2.5"
+            >
+              <div className="w-10 h-10 rounded-full border border-gold/60 flex items-center justify-center">
+                <ShoppingCart size={18} className="text-gold" />
               </div>
-            </div>
+              <span className="font-cinzel text-gold text-xs font-bold tracking-[0.15em] uppercase">
+                Add to Cart
+              </span>
+            </button>
             {/* Bundle badge */}
             {book.isBundle && (
               <span className="absolute top-2 left-2 bg-gold text-dark text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">

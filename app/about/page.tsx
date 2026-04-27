@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, BookOpen, Users, Award, MapPin, Star, Quote } from 'lucide-react';
+import {
+  ArrowRight, BookOpen, Users, Award, MapPin, Star, Quote,
+  Sun, Music, Music2, Radio, Tv, GraduationCap, Medal,
+  BookMarked, Microscope, Target, Eye,
+} from 'lucide-react';
 import TimelineScroll from '@/components/TimelineScroll';
 
 export const metadata: Metadata = {
@@ -29,7 +33,7 @@ const stats = [
 const founderTimeline = [
   {
     year: '1938',
-    icon: '🌟',
+    icon: <Sun size={18} className="text-red-300" />,
     iconBg: 'linear-gradient(135deg,#3D0800,#8B0000)',
     tag: 'Birth',
     tagClass: 'bg-red-900/40 text-red-300 border border-red-800/30',
@@ -38,7 +42,7 @@ const founderTimeline = [
   },
   {
     year: 'Early 1950s',
-    icon: '🎸',
+    icon: <Music size={18} className="text-amber-300" />,
     iconBg: 'linear-gradient(135deg,#1A0A00,#4A1500)',
     tag: 'Education',
     tagClass: 'bg-amber-900/30 text-amber-300 border border-amber-800/30',
@@ -47,7 +51,7 @@ const founderTimeline = [
   },
   {
     year: '1960',
-    icon: '🏛️',
+    icon: <BookOpen size={18} className="text-green-300" />,
     iconBg: 'linear-gradient(135deg,#001A0A,#003D1A)',
     tag: 'Career',
     tagClass: 'bg-green-900/30 text-green-300 border border-green-800/30',
@@ -56,7 +60,7 @@ const founderTimeline = [
   },
   {
     year: '1963',
-    icon: '🎶',
+    icon: <Music2 size={18} className="text-yellow-200" />,
     iconBg: 'linear-gradient(135deg,#2A1A00,#6B4500)',
     tag: 'Mentorship',
     tagClass: 'bg-yellow-900/30 text-yellow-200 border border-yellow-700/30',
@@ -65,7 +69,7 @@ const founderTimeline = [
   },
   {
     year: '1960s–70s',
-    icon: '📻',
+    icon: <Radio size={18} className="text-cyan-300" />,
     iconBg: 'linear-gradient(135deg,#001A1A,#003D3D)',
     tag: 'Recognition',
     tagClass: 'bg-cyan-900/30 text-cyan-300 border border-cyan-800/30',
@@ -74,7 +78,7 @@ const founderTimeline = [
   },
   {
     year: '1970s–80s',
-    icon: '📺',
+    icon: <Tv size={18} className="text-cyan-300" />,
     iconBg: 'linear-gradient(135deg,#001A00,#004000)',
     tag: 'Recognition',
     tagClass: 'bg-cyan-900/30 text-cyan-300 border border-cyan-800/30',
@@ -83,7 +87,7 @@ const founderTimeline = [
   },
   {
     year: '1980s',
-    icon: '🎓',
+    icon: <GraduationCap size={18} className="text-purple-300" />,
     iconBg: 'linear-gradient(135deg,#1A001A,#3D003D)',
     tag: 'Leadership',
     tagClass: 'bg-purple-900/30 text-purple-300 border border-purple-800/30',
@@ -92,7 +96,7 @@ const founderTimeline = [
   },
   {
     year: 'Career-long',
-    icon: '🏆',
+    icon: <Award size={18} className="text-gold" />,
     iconBg: 'linear-gradient(135deg,#2A1A00,#8B6914)',
     tag: 'Awards',
     tagClass: 'bg-gold/10 text-gold border border-gold/20',
@@ -101,7 +105,7 @@ const founderTimeline = [
   },
   {
     year: '1999',
-    icon: '🎖️',
+    icon: <Medal size={18} className="text-red-300" />,
     iconBg: 'linear-gradient(135deg,#1A0000,#5C0000)',
     tag: 'Retirement',
     tagClass: 'bg-red-900/30 text-red-300 border border-red-800/30',
@@ -110,7 +114,7 @@ const founderTimeline = [
   },
   {
     year: '2000s–2010s',
-    icon: '📚',
+    icon: <BookMarked size={18} className="text-emerald-300" />,
     iconBg: 'linear-gradient(135deg,#001A0A,#004020)',
     tag: 'Publications',
     tagClass: 'bg-emerald-900/30 text-emerald-300 border border-emerald-800/30',
@@ -119,7 +123,7 @@ const founderTimeline = [
   },
   {
     year: '2024',
-    icon: '🔬',
+    icon: <Microscope size={18} className="text-lime-300" />,
     iconBg: 'linear-gradient(135deg,#1A1A00,#404000)',
     tag: 'Legacy',
     tagClass: 'bg-lime-900/30 text-lime-300 border border-lime-700/30',
@@ -437,7 +441,7 @@ export default function AboutPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-left">
             <div className="gold-border rounded-2xl p-6 bg-[#0A0000]">
               <h3 className="font-cinzel text-gold font-semibold text-base mb-3 flex items-center gap-2">
-                <span className="text-xl">🎯</span> Our Mission
+                <Target size={17} className="text-gold/70 flex-shrink-0" /> Our Mission
               </h3>
               <p className="text-cream/65 text-sm leading-relaxed">
                 To bridge the gap between traditional music knowledge and modern learning needs  - 
@@ -447,7 +451,7 @@ export default function AboutPage() {
             </div>
             <div className="gold-border rounded-2xl p-6 bg-[#0A0000]">
               <h3 className="font-cinzel text-gold font-semibold text-base mb-3 flex items-center gap-2">
-                <span className="text-xl">🌟</span> Our Vision
+                <Eye size={17} className="text-gold/70 flex-shrink-0" /> Our Vision
               </h3>
               <p className="text-cream/65 text-sm leading-relaxed">
                 To nurture a new generation of musicians who cherish classical music as a lifelong
