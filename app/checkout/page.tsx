@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, CheckCircle, Lock, CreditCard, Smartphone, Building2, ChevronRight } from 'lucide-react';
 import { useCartStore } from '@/lib/cart-store';
+import { useOrdersStore } from '@/lib/orders-store';
+import { useAnalyticsStore } from '@/lib/analytics-store';
 import { formatPrice, generateOrderId } from '@/lib/utils';
 import BookCover from '@/components/BookCover';
 
@@ -15,6 +17,8 @@ type CheckoutStep = 'details' | 'payment' | 'processing' | 'success';
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, clearCart } = useCartStore();
+  const addOrder     = useOrdersStore((s) => s.addOrder);
+  const trackCartAdd = useAnalyticsStore((s) => s.trackCartAdd);
 
   const [step,      setStep]      = useState<CheckoutStep>('details');
   const [method,    setMethod]    = useState<PayMethod>('upi');
@@ -38,8 +42,31 @@ export default function CheckoutPage() {
     setStep('processing');
     const id = generateOrderId();
     setOrderId(id);
-    // Simulate payment processing
     setTimeout(() => {
+      // Persist order to admin store
+      addOrder({
+        id,
+        createdAt: new Date().toISOString(),
+        customer: { name: form.name, email: form.email, phone: form.phone },
+        billingAddress: {
+          line1:   form.address,
+          city:    form.city,
+          state:   form.state,
+          pincode: form.pincode,
+        },
+        items: items.map(({ book, quantity }) => ({
+          bookId:       book.id,
+          sku:          `SSP-${book.id.toUpperCase().slice(0, 6)}`,
+          titleEnglish: book.titleEnglish,
+          titleHindi:   book.titleHindi,
+          qty:          quantity,
+          price:        book.price,
+        })),
+        subtotal: subtotal(),
+        status:   'confirmed',
+        paymentMethod: method,
+      });
+      trackCartAdd();
       clearCart();
       setStep('success');
     }, 2800);
