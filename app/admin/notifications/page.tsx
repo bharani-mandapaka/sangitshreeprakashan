@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Bell, Plus, Trash2, Pause, Play, Mail, MessageCircle,
-  Edit3, Check, X, ChevronDown, ChevronUp, Layers,
+  Edit3, Check, X, ChevronDown, ChevronUp, Layers, Users,
+  CheckCircle, Phone,
 } from 'lucide-react';
 import {
   useNotificationsStore,
@@ -12,6 +13,7 @@ import {
   type NotificationTrigger,
   type NotificationChannel,
 } from '@/lib/notifications-store';
+import { useUsersStore, initials, type AppUser } from '@/lib/users-store';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const TRIGGER_LABELS: Record<NotificationTrigger, string> = {
@@ -29,9 +31,9 @@ const TRIGGER_COLORS: Record<NotificationTrigger, string> = {
 };
 
 const CHANNEL_META: Record<NotificationChannel, { label: string; icon: React.ReactNode; color: string }> = {
-  email:    { label: 'Email',             icon: <Mail size={11} />,           color: 'text-blue-300' },
-  whatsapp: { label: 'WhatsApp',          icon: <MessageCircle size={11} />,  color: 'text-green-300' },
-  both:     { label: 'Email + WhatsApp',  icon: <Layers size={11} />,         color: 'text-gold' },
+  email:    { label: 'Email',            icon: <Mail size={11} />,          color: 'text-blue-300' },
+  whatsapp: { label: 'WhatsApp',         icon: <MessageCircle size={11} />, color: 'text-green-300' },
+  both:     { label: 'Email + WhatsApp', icon: <Layers size={11} />,        color: 'text-gold' },
 };
 
 // ── Email preview ──────────────────────────────────────────────────────────────
@@ -68,9 +70,7 @@ function EmailPreview({ subject, body }: { subject: string; body: string }) {
 
 // ── WhatsApp preview ───────────────────────────────────────────────────────────
 function WhatsAppPreview({ message }: { message: string }) {
-  // Render *bold* and _italic_ as styled spans
   const renderLine = (line: string, idx: number) => {
-    // bold: *text*
     const parts = line.split(/(\*[^*]+\*)/g);
     return (
       <span key={idx}>
@@ -89,7 +89,6 @@ function WhatsAppPreview({ message }: { message: string }) {
 
   return (
     <div className="rounded-xl overflow-hidden border border-[#1a1a1a] font-sans">
-      {/* WA top bar */}
       <div className="bg-[#075E54] px-4 py-2.5 flex items-center gap-2.5">
         <div className="w-7 h-7 rounded-full bg-[#25D366] flex items-center justify-center flex-shrink-0">
           <svg className="w-4 h-4" fill="white" viewBox="0 0 24 24">
@@ -103,11 +102,8 @@ function WhatsAppPreview({ message }: { message: string }) {
         </div>
         <span className="ml-auto text-[#b2dfdb] text-[10px]">Preview</span>
       </div>
-
-      {/* Chat area */}
       <div className="bg-[#ECE5DD] px-4 py-4 min-h-[160px]"
            style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23d4c4b0\' fill-opacity=\'0.3\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }}>
-        {/* Message bubble */}
         <div className="flex justify-end">
           <div className="bg-[#DCF8C6] rounded-tl-xl rounded-bl-xl rounded-tr-sm rounded-br-xl px-3.5 py-2.5 max-w-xs shadow-sm">
             <p className="text-[#111] text-xs leading-relaxed whitespace-pre-wrap">
@@ -140,16 +136,116 @@ function ChannelBadge({ channel }: { channel: NotificationChannel }) {
   );
 }
 
+// ── User picker dropdown ───────────────────────────────────────────────────────
+type PickerMode = 'email' | 'phone';
+
+function UserPicker({
+  mode,
+  onSelect,
+}: {
+  mode: PickerMode;
+  onSelect: (value: string) => void;
+}) {
+  const users = useUsersStore((s) => s.users);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const eligible = users.filter((u) =>
+    mode === 'email' ? !!u.email : !!u.phone
+  );
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((p) => !p)}
+        className="flex items-center gap-1.5 border border-gold/20 hover:border-gold/40 text-gold/60 hover:text-gold font-cinzel text-xs px-3 py-2 rounded-xl transition-all flex-shrink-0"
+        title="Select from users"
+      >
+        <Users size={11} />
+        Users
+        <ChevronDown size={9} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 w-64 bg-[#0F0000] border border-gold/20 rounded-xl shadow-2xl overflow-hidden">
+          <div className="px-3 py-2 border-b border-gold/10">
+            <p className="text-[10px] font-cinzel text-cream/40 uppercase tracking-widest">
+              Select {mode === 'email' ? 'email recipient' : 'WhatsApp number'}
+            </p>
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            {eligible.length === 0 ? (
+              <p className="px-3 py-4 text-center text-cream/25 text-xs font-cinzel">No users with {mode === 'email' ? 'email' : 'phone'}</p>
+            ) : (
+              eligible.map((user) => {
+                const value = mode === 'email' ? user.email : user.phone;
+                const verified = mode === 'email' ? user.emailVerified : user.phoneVerified;
+                return (
+                  <button
+                    key={user.id}
+                    type="button"
+                    onClick={() => { onSelect(value); setOpen(false); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"
+                  >
+                    {/* Mini avatar */}
+                    <div
+                      className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 font-cinzel font-bold text-white"
+                      style={{ background: user.color, fontSize: 8 }}
+                    >
+                      {initials(user.name)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-cream text-xs font-cinzel truncate">{user.name}</p>
+                      <p className="text-cream/40 text-[10px] truncate">{value}</p>
+                    </div>
+                    {verified && <CheckCircle size={10} className="text-green-400 flex-shrink-0" />}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Rule card ──────────────────────────────────────────────────────────────────
 function RuleCard({ rule }: { rule: NotificationRule }) {
   const { updateRule, deleteRule, toggleRule } = useNotificationsStore();
-  const [expanded,   setExpanded]   = useState(false);
-  const [editing,    setEditing]    = useState(false);
+  const [expanded,    setExpanded]    = useState(false);
+  const [editing,     setEditing]     = useState(false);
   const [editSubject, setEditSubject] = useState(rule.subject);
   const [editBody,    setEditBody]    = useState(rule.body);
   const [editWaMsg,   setEditWaMsg]   = useState(rule.whatsappMessage);
   const [editEmails,  setEditEmails]  = useState(rule.recipients.join(', '));
   const [editPhones,  setEditPhones]  = useState(rule.whatsappNumbers.join(', '));
+  const [newEmail,    setNewEmail]    = useState('');
+  const [newPhone,    setNewPhone]    = useState('');
+
+  const addChip = (
+    list: string, setter: (v: string) => void,
+    newVal: string, clearNew: (v: string) => void,
+  ) => {
+    if (!newVal.trim()) return;
+    const arr = list.split(',').map((x) => x.trim()).filter(Boolean);
+    if (!arr.includes(newVal.trim())) setter([...arr, newVal.trim()].join(', '));
+    clearNew('');
+  };
+
+  const removeChip = (list: string, setter: (v: string) => void, val: string) =>
+    setter(list.split(',').map((x) => x.trim()).filter((x) => x && x !== val).join(', '));
 
   const saveEdit = () => {
     updateRule(rule.id, {
@@ -162,8 +258,8 @@ function RuleCard({ rule }: { rule: NotificationRule }) {
     setEditing(false);
   };
 
-  const showEmail     = rule.channel === 'email'    || rule.channel === 'both';
-  const showWhatsApp  = rule.channel === 'whatsapp' || rule.channel === 'both';
+  const showEmail    = rule.channel === 'email'    || rule.channel === 'both';
+  const showWhatsApp = rule.channel === 'whatsapp' || rule.channel === 'both';
 
   return (
     <div className={`bg-[#0A0000] border rounded-2xl transition-colors ${rule.active ? 'border-gold/15' : 'border-white/5 opacity-60'}`}>
@@ -212,7 +308,6 @@ function RuleCard({ rule }: { rule: NotificationRule }) {
         <div className="px-5 pb-5 border-t border-gold/8 pt-4 space-y-5">
           {!editing ? (
             <>
-              {/* Email preview */}
               {showEmail && (
                 <div>
                   <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-2 flex items-center gap-1.5">
@@ -231,7 +326,6 @@ function RuleCard({ rule }: { rule: NotificationRule }) {
                 </div>
               )}
 
-              {/* WhatsApp preview */}
               {showWhatsApp && (
                 <div>
                   <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-2 flex items-center gap-1.5">
@@ -250,7 +344,14 @@ function RuleCard({ rule }: { rule: NotificationRule }) {
                 </div>
               )}
 
-              <button onClick={() => { setEditing(true); setEditSubject(rule.subject); setEditBody(rule.body); setEditWaMsg(rule.whatsappMessage); setEditEmails(rule.recipients.join(', ')); setEditPhones(rule.whatsappNumbers.join(', ')); }}
+              <button onClick={() => {
+                setEditing(true);
+                setEditSubject(rule.subject);
+                setEditBody(rule.body);
+                setEditWaMsg(rule.whatsappMessage);
+                setEditEmails(rule.recipients.join(', '));
+                setEditPhones(rule.whatsappNumbers.join(', '));
+              }}
                 className="flex items-center gap-1.5 border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-1.5 rounded-lg transition-all">
                 <Edit3 size={11} /> Edit Templates
               </button>
@@ -269,8 +370,22 @@ function RuleCard({ rule }: { rule: NotificationRule }) {
                     <textarea className="input-gold text-xs h-44 resize-none font-mono leading-relaxed" value={editBody} onChange={(e) => setEditBody(e.target.value)} />
                   </div>
                   <div>
-                    <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1">Recipients</label>
-                    <input className="input-gold text-sm" value={editEmails} onChange={(e) => setEditEmails(e.target.value)} placeholder="a@b.com, c@d.com" />
+                    <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">Recipients</label>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {editEmails.split(',').map((e) => e.trim()).filter(Boolean).map((em) => (
+                        <span key={em} className="flex items-center gap-1.5 border border-blue-500/20 bg-blue-500/5 rounded-full px-2.5 py-0.5 text-blue-300 text-[11px] font-cinzel">
+                          <Mail size={9} /> {em}
+                          <button onClick={() => removeChip(editEmails, setEditEmails, em)} className="text-cream/30 hover:text-red-400 ml-0.5"><X size={9} /></button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <input className="input-gold text-sm flex-1" type="email" placeholder="Add email..." value={newEmail}
+                        onChange={(e) => setNewEmail(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && addChip(editEmails, setEditEmails, newEmail, setNewEmail)} />
+                      <button onClick={() => addChip(editEmails, setEditEmails, newEmail, setNewEmail)} className="border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-2 rounded-xl transition-all flex-shrink-0">+ Add</button>
+                      <UserPicker mode="email" onSelect={(v) => addChip(editEmails, setEditEmails, v, () => {})} />
+                    </div>
                   </div>
                 </div>
               )}
@@ -282,8 +397,22 @@ function RuleCard({ rule }: { rule: NotificationRule }) {
                     <textarea className="input-gold text-xs h-44 resize-none font-mono leading-relaxed" value={editWaMsg} onChange={(e) => setEditWaMsg(e.target.value)} />
                   </div>
                   <div>
-                    <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1">Phone Numbers</label>
-                    <input className="input-gold text-sm" value={editPhones} onChange={(e) => setEditPhones(e.target.value)} placeholder="+919876543210, +917408452828" />
+                    <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">Phone Numbers</label>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {editPhones.split(',').map((p) => p.trim()).filter(Boolean).map((ph) => (
+                        <span key={ph} className="flex items-center gap-1.5 border border-green-500/20 bg-green-500/5 rounded-full px-2.5 py-0.5 text-green-300 text-[11px] font-cinzel">
+                          <MessageCircle size={9} /> {ph}
+                          <button onClick={() => removeChip(editPhones, setEditPhones, ph)} className="text-cream/30 hover:text-red-400 ml-0.5"><X size={9} /></button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <input className="input-gold text-sm flex-1" type="tel" placeholder="+919876543210" value={newPhone}
+                        onChange={(e) => setNewPhone(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && addChip(editPhones, setEditPhones, newPhone, setNewPhone)} />
+                      <button onClick={() => addChip(editPhones, setEditPhones, newPhone, setNewPhone)} className="border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-2 rounded-xl transition-all flex-shrink-0">+ Add</button>
+                      <UserPicker mode="phone" onSelect={(v) => addChip(editPhones, setEditPhones, v, () => {})} />
+                    </div>
                   </div>
                 </div>
               )}
@@ -306,10 +435,10 @@ function RuleCard({ rule }: { rule: NotificationRule }) {
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function NotificationsPage() {
   const { rules, addRule } = useNotificationsStore();
+  const users              = useUsersStore((s) => s.users);
 
   const [desc,     setDesc]     = useState('');
   const [parsed,   setParsed]   = useState<ReturnType<typeof parseDescription> | null>(null);
-  // Channel toggle (can override parsed)
   const [channel,  setChannel]  = useState<NotificationChannel>('email');
   // Email fields
   const [subject,  setSubject]  = useState('');
@@ -321,23 +450,75 @@ export default function NotificationsPage() {
   const [phones,   setPhones]   = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [saved,    setSaved]    = useState(false);
+  // User-group auto-detect
+  const [autoGroups, setAutoGroups] = useState<string[]>([]);
 
+  // ── User-aware NLP parse ─────────────────────────────────────────────────────
   const handleParse = () => {
     if (!desc.trim()) return;
     const r = parseDescription(desc);
+    const lower = desc.toLowerCase();
+
+    let autoEmails: string[] = [...r.detectedEmails];
+    let autoPhones: string[] = [...r.detectedPhones];
+    const detected: string[] = [];
+
+    const addUser = (u: AppUser) => {
+      if (u.email && !autoEmails.includes(u.email)) autoEmails.push(u.email);
+      if (u.phone && !autoPhones.includes(u.phone)) autoPhones.push(u.phone);
+    };
+
+    // "me" / "my" → the admin user (matched by stored email or first admin)
+    if (/\bme\b/.test(lower) || /\bmy\b/.test(lower)) {
+      const me = users.find((u) => u.email === 'meetbharani91@gmail.com')
+               ?? users.find((u) => u.role === 'admin');
+      if (me) { addUser(me); detected.push('me (you)'); }
+    }
+
+    // "all users" / "everyone" / "all"
+    if (/\ball users\b/.test(lower) || /\beveryone\b/.test(lower) || /\ball\b/.test(lower)) {
+      users.forEach(addUser);
+      detected.push('all users');
+    }
+
+    // "admin" / "admins" (but not when already matched by "all")
+    else if (/\badmins?\b/.test(lower)) {
+      users.filter((u) => u.role === 'admin').forEach(addUser);
+      detected.push('admins');
+    }
+
+    // "staff"
+    if (/\bstaff\b/.test(lower) && !/\ball\b/.test(lower)) {
+      users.filter((u) => u.role === 'staff').forEach(addUser);
+      detected.push('staff');
+    }
+
+    // "viewer" / "viewers"
+    if (/\bviewers?\b/.test(lower) && !/\ball\b/.test(lower)) {
+      users.filter((u) => u.role === 'viewer').forEach(addUser);
+      detected.push('viewers');
+    }
+
+    // "users" (without "all") → add all users' info
+    if (/\busers\b/.test(lower) && !/\ball users\b/.test(lower) && !/\ball\b/.test(lower)) {
+      users.forEach(addUser);
+      if (!detected.includes('all users')) detected.push('users');
+    }
+
     setParsed(r);
     setChannel(r.channel);
     setSubject(r.subject);
     setBody(r.body);
     setWaMsg(r.whatsappMessage);
-    setEmails(r.detectedEmails.join(', '));
-    setPhones(r.detectedPhones.join(', '));
+    setEmails(autoEmails.join(', '));
+    setPhones(autoPhones.filter(Boolean).join(', '));
+    setAutoGroups(detected);
     setSaved(false);
   };
 
   const addChip = (
     list: string, setter: (v: string) => void,
-    newVal: string, clearNew: (v: string) => void
+    newVal: string, clearNew: (v: string) => void,
   ) => {
     if (!newVal.trim()) return;
     const arr = list.split(',').map((x) => x.trim()).filter(Boolean);
@@ -368,7 +549,7 @@ export default function NotificationsPage() {
       createdAt:       new Date().toISOString(),
     });
     setSaved(true);
-    setDesc(''); setParsed(null);
+    setDesc(''); setParsed(null); setAutoGroups([]);
     setSubject(''); setBody(''); setEmails('');
     setWaMsg(''); setPhones('');
   };
@@ -398,9 +579,9 @@ export default function NotificationsPage() {
           </label>
           <textarea
             className="input-gold h-24 resize-none text-sm leading-relaxed"
-            placeholder={`Examples:\n"Email me every time an order is placed with full order details"\n"WhatsApp +919876543210 every new order"\n"Send daily digest via both email and whatsapp"`}
+            placeholder={`Examples:\n"Send me WhatsApp notifications for every new order"\n"Email all admins daily digest"\n"Notify staff via WhatsApp when cart is abandoned"\n"WhatsApp me and all users for every order"`}
             value={desc}
-            onChange={(e) => { setDesc(e.target.value); setParsed(null); setSaved(false); }}
+            onChange={(e) => { setDesc(e.target.value); setParsed(null); setAutoGroups([]); setSaved(false); }}
           />
           <button
             onClick={handleParse}
@@ -414,7 +595,7 @@ export default function NotificationsPage() {
         {parsed && (
           <div className="space-y-5 pt-2 border-t border-gold/10">
 
-            {/* Detected info */}
+            {/* Detected trigger + channel */}
             <div className="flex flex-wrap gap-4 items-start">
               <div>
                 <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">Trigger</p>
@@ -422,7 +603,6 @@ export default function NotificationsPage() {
                   {TRIGGER_LABELS[parsed.trigger]}
                 </span>
               </div>
-              {/* Channel override */}
               <div>
                 <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">Delivery Channel</p>
                 <div className="flex gap-1.5">
@@ -446,6 +626,19 @@ export default function NotificationsPage() {
               </div>
             </div>
 
+            {/* Auto-detected user groups */}
+            {autoGroups.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <Users size={11} className="text-gold/60" />
+                <span className="text-[10px] font-cinzel text-cream/40 uppercase tracking-widest">Auto-detected:</span>
+                {autoGroups.map((g) => (
+                  <span key={g} className="text-[10px] font-cinzel font-bold text-gold bg-gold/10 border border-gold/20 px-2 py-0.5 rounded-full">
+                    {g}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {/* Email section */}
             {showEmail && (
               <div className="space-y-3 bg-blue-950/10 border border-blue-500/10 rounded-xl p-4">
@@ -468,16 +661,24 @@ export default function NotificationsPage() {
                 <div>
                   <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">Recipients</label>
                   <div className="flex flex-wrap gap-1.5 mb-2">
-                    {emails.split(',').map((e) => e.trim()).filter(Boolean).map((email) => (
-                      <span key={email} className="flex items-center gap-1.5 border border-blue-500/20 bg-blue-500/5 rounded-full px-2.5 py-0.5 text-blue-300 text-[11px] font-cinzel">
-                        <Mail size={9} /> {email}
-                        <button onClick={() => removeChip(emails, setEmails, email)} className="text-cream/30 hover:text-red-400 ml-0.5"><X size={9} /></button>
+                    {emails.split(',').map((e) => e.trim()).filter(Boolean).map((em) => (
+                      <span key={em} className="flex items-center gap-1.5 border border-blue-500/20 bg-blue-500/5 rounded-full px-2.5 py-0.5 text-blue-300 text-[11px] font-cinzel">
+                        <Mail size={9} /> {em}
+                        <button onClick={() => removeChip(emails, setEmails, em)} className="text-cream/30 hover:text-red-400 ml-0.5"><X size={9} /></button>
                       </span>
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    <input className="input-gold text-sm flex-1" type="email" placeholder="Add email..." value={newEmail} onChange={(e) => setNewEmail(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addChip(emails, setEmails, newEmail, setNewEmail)} />
-                    <button onClick={() => addChip(emails, setEmails, newEmail, setNewEmail)} className="border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-4 py-2 rounded-xl transition-all flex-shrink-0">+ Add</button>
+                    <input
+                      className="input-gold text-sm flex-1"
+                      type="email"
+                      placeholder="Add email..."
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && addChip(emails, setEmails, newEmail, setNewEmail)}
+                    />
+                    <button onClick={() => addChip(emails, setEmails, newEmail, setNewEmail)} className="border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-2 rounded-xl transition-all flex-shrink-0">+ Add</button>
+                    <UserPicker mode="email" onSelect={(v) => addChip(emails, setEmails, v, () => {})} />
                   </div>
                 </div>
               </div>
@@ -505,14 +706,22 @@ export default function NotificationsPage() {
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {phones.split(',').map((p) => p.trim()).filter(Boolean).map((ph) => (
                       <span key={ph} className="flex items-center gap-1.5 border border-green-500/20 bg-green-500/5 rounded-full px-2.5 py-0.5 text-green-300 text-[11px] font-cinzel">
-                        <MessageCircle size={9} /> {ph}
+                        <Phone size={9} /> {ph}
                         <button onClick={() => removeChip(phones, setPhones, ph)} className="text-cream/30 hover:text-red-400 ml-0.5"><X size={9} /></button>
                       </span>
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    <input className="input-gold text-sm flex-1" type="tel" placeholder="+919876543210" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addChip(phones, setPhones, newPhone, setNewPhone)} />
-                    <button onClick={() => addChip(phones, setPhones, newPhone, setNewPhone)} className="border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-4 py-2 rounded-xl transition-all flex-shrink-0">+ Add</button>
+                    <input
+                      className="input-gold text-sm flex-1"
+                      type="tel"
+                      placeholder="+919876543210"
+                      value={newPhone}
+                      onChange={(e) => setNewPhone(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && addChip(phones, setPhones, newPhone, setNewPhone)}
+                    />
+                    <button onClick={() => addChip(phones, setPhones, newPhone, setNewPhone)} className="border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-2 rounded-xl transition-all flex-shrink-0">+ Add</button>
+                    <UserPicker mode="phone" onSelect={(v) => addChip(phones, setPhones, v, () => {})} />
                   </div>
                 </div>
               </div>

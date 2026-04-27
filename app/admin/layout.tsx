@@ -5,13 +5,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import {
-  LayoutDashboard, ShoppingBag, Bell, LogOut, Menu, X, Lock,
+  LayoutDashboard, ShoppingBag, Bell, Users, LogOut, Menu, X, Lock,
 } from 'lucide-react';
 
 const NAV = [
   { href: '/admin',               icon: LayoutDashboard, label: 'Dashboard'     },
   { href: '/admin/orders',        icon: ShoppingBag,     label: 'Orders'        },
   { href: '/admin/notifications', icon: Bell,            label: 'Notifications' },
+  { href: '/admin/users',         icon: Users,           label: 'Users'         },
 ];
 
 const ADMIN_PASSWORD = 'ssp@admin';
