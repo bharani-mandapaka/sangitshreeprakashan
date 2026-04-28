@@ -38,38 +38,52 @@ export default function CheckoutPage() {
     setStep('payment');
   };
 
-  const handlePay = () => {
+  const handlePay = async () => {
     setStep('processing');
-    const id = generateOrderId();
+    const id        = generateOrderId();
+    const createdAt = new Date().toISOString();
     setOrderId(id);
-    setTimeout(() => {
-      // Persist order to admin store
-      addOrder({
-        id,
-        createdAt: new Date().toISOString(),
-        customer: { name: form.name, email: form.email, phone: form.phone },
-        billingAddress: {
-          line1:   form.address,
-          city:    form.city,
-          state:   form.state,
-          pincode: form.pincode,
-        },
-        items: items.map(({ book, quantity }) => ({
-          bookId:       book.id,
-          sku:          `SSP-${book.id.toUpperCase().slice(0, 6)}`,
-          titleEnglish: book.titleEnglish,
-          titleHindi:   book.titleHindi,
-          qty:          quantity,
-          price:        book.price,
-        })),
-        subtotal: subtotal(),
-        status:   'confirmed',
-        paymentMethod: method,
-      });
-      trackCartAdd();
-      clearCart();
-      setStep('success');
-    }, 2800);
+
+    const orderPayload = {
+      id,
+      createdAt,
+      customer: { name: form.name, email: form.email, phone: form.phone },
+      billingAddress: {
+        line1:   form.address,
+        city:    form.city,
+        state:   form.state,
+        pincode: form.pincode,
+      },
+      items: items.map(({ book, quantity }) => ({
+        bookId:       book.id,
+        sku:          `SSP-${book.id.toUpperCase().slice(0, 6)}`,
+        titleEnglish: book.titleEnglish,
+        titleHindi:   book.titleHindi,
+        qty:          quantity,
+        price:        book.price,
+      })),
+      subtotal: subtotal(),
+      paymentMethod: method,
+    };
+
+    // Run API call + minimum spinner delay in parallel
+    await Promise.all([
+      // Save to Supabase + send confirmation email
+      fetch('/api/orders/create', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(orderPayload),
+      }).catch((err) => console.error('[checkout] API error:', err)),
+
+      // Minimum 2.8 s processing UX
+      new Promise((resolve) => setTimeout(resolve, 2800)),
+    ]);
+
+    // Also keep local store in sync (used by dashboard analytics)
+    addOrder({ ...orderPayload, status: 'confirmed' });
+    trackCartAdd();
+    clearCart();
+    setStep('success');
   };
 
   if (items.length === 0 && step !== 'success') {
