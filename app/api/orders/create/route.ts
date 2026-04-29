@@ -69,9 +69,7 @@ export async function POST(req: NextRequest) {
 
   try {
     await resend.emails.send({
-      // Phase 1: using Resend sandbox sender. Switch to your verified domain in Phase 2.
-      // Verify sangitshreeprakashan.com in Resend dashboard → Domains to send from your own address.
-      from: 'Sangit Shree Prakashan <onboarding@resend.dev>',
+      from: 'Sangit Shree Prakashan <orders@sangitshreeprakashan.com>',
       to:   customer.email,
       subject: `Order Confirmed — ${id} | Sangit Shree Prakashan`,
       html: `
