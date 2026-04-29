@@ -234,6 +234,8 @@ function RuleCard({
 }) {
   const [expanded,    setExpanded]    = useState(false);
   const [editing,     setEditing]     = useState(false);
+  const [testing,     setTesting]     = useState(false);
+  const [testResults, setTestResults] = useState<string[]>([]);
   const [editSubject, setEditSubject] = useState(rule.subject);
   const [editBody,    setEditBody]    = useState(rule.body);
   const [editWaMsg,   setEditWaMsg]   = useState(rule.whatsapp_message);
@@ -254,6 +256,23 @@ function RuleCard({
 
   const removeChip = (list: string, setter: (v: string) => void, val: string) =>
     setter(list.split(',').map((x) => x.trim()).filter((x) => x && x !== val).join(', '));
+
+  const handleTest = async () => {
+    setTesting(true);
+    setTestResults([]);
+    try {
+      const res  = await fetch('/api/notifications/test', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ ruleId: rule.id }),
+      });
+      const data = await res.json();
+      setTestResults(data.results ?? [data.error ?? 'Unknown error']);
+    } catch (err) {
+      setTestResults([`Network error: ${String(err)}`]);
+    }
+    setTesting(false);
+  };
 
   const saveEdit = () => {
     onUpdate(rule.id, {
@@ -361,19 +380,48 @@ function RuleCard({
                   )}
                 </div>
               )}
-              <button
-                onClick={() => {
-                  setEditing(true);
-                  setEditSubject(rule.subject);
-                  setEditBody(rule.body);
-                  setEditWaMsg(rule.whatsapp_message);
-                  setEditEmails(rule.recipients.join(', '));
-                  setEditPhones(rule.whatsapp_numbers.join(', '));
-                }}
-                className="flex items-center gap-1.5 border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-1.5 rounded-lg transition-all"
-              >
-                <Edit3 size={11} /> Edit Templates
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    setEditing(true);
+                    setTestResults([]);
+                    setEditSubject(rule.subject);
+                    setEditBody(rule.body);
+                    setEditWaMsg(rule.whatsapp_message);
+                    setEditEmails(rule.recipients.join(', '));
+                    setEditPhones(rule.whatsapp_numbers.join(', '));
+                  }}
+                  className="flex items-center gap-1.5 border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-1.5 rounded-lg transition-all"
+                >
+                  <Edit3 size={11} /> Edit Templates
+                </button>
+                <button
+                  onClick={handleTest}
+                  disabled={testing}
+                  className="flex items-center gap-1.5 border border-blue-500/30 hover:border-blue-400/60 text-blue-400/70 hover:text-blue-400 font-cinzel text-xs px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
+                >
+                  {testing
+                    ? <><RefreshCw size={11} className="animate-spin" /> Sending…</>
+                    : <><Bell size={11} /> Send Test</>
+                  }
+                </button>
+              </div>
+
+              {/* Test results */}
+              {testResults.length > 0 && (
+                <div className="bg-[#060000] border border-gold/10 rounded-xl p-3 space-y-1">
+                  <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-2">Test Result</p>
+                  {testResults.map((r, i) => (
+                    <p key={i} className={`text-xs font-mono ${
+                      r.startsWith('✓') ? 'text-green-400' :
+                      r.startsWith('⚠') ? 'text-yellow-400' :
+                      'text-red-400'
+                    }`}>
+                      {r}
+                    </p>
+                  ))}
+                </div>
+              )}
             </>
           ) : (
             <div className="space-y-4">
