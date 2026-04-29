@@ -7,7 +7,9 @@ E-commerce site for a classical Indian music book publisher based in Kanpur, UP.
 - Next.js 14 App Router, TypeScript
 - Tailwind CSS with custom design tokens
 - Framer Motion for animations
-- Zustand v4 + persist middleware (localStorage) for all state — no real backend yet
+- Zustand v4 + persist middleware (localStorage) for client-side state
+- Supabase (Postgres) for orders database — live
+- Resend for transactional email — live (domain verified)
 - Lucide React icons
 - Deployed on Vercel, source on GitHub
 
@@ -39,16 +41,30 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 | Feature | Status |
 |---------|--------|
 | Book catalog UI | Real |
+| Book detail pages | Real — server component passes book to `BookDetailClient` |
 | Cart + checkout UI | Real |
 | Payments | Mock — no Razorpay yet |
-| Orders | Mock — localStorage only, not from real transactions |
+| Orders saved to DB | Real — `POST /api/orders/create` writes to Supabase on checkout |
+| Order confirmation email | Real — Resend sends from `orders@sangitshreeprakashan.com` |
+| Admin dashboard | Real — reads orders from Supabase |
+| Admin orders page | Real — reads from Supabase, status updates write back |
+| Admin analytics | localStorage — visits/clicks tracked client-side via analytics-store |
 | OTP verification | Mock — code shown on screen |
 | WhatsApp notifications | UI only — no Meta/Twilio API |
-| Email sending | Templates exist — no SMTP/SendGrid |
 | Google OAuth | Simulated UI — no real token |
-| Database | None — everything is localStorage |
 | Book images | Placeholders |
 | Admin auth | localStorage password gate (`ssp@admin`) |
+
+---
+
+## Environment variables
+Stored in `.env.local` locally and in Vercel project settings (set via `npx vercel env add`).
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://kypqmrfgxeybqzkawogb.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
+RESEND_API_KEY=<resend key>
+```
 
 ---
 
@@ -59,26 +75,41 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 - Sidebar pages: Dashboard, Orders, Notifications, Users
 
 ## Data stores (`lib/`)
-All stores use Zustand + `persist` to localStorage. Each will be replaced with Supabase calls in Phase 1/2.
+Zustand + `persist` to localStorage for client-side state. Orders are also written to Supabase on every checkout.
 
 | File | localStorage key | What it holds |
 |------|-----------------|---------------|
 | `cart-store.ts` | `ssp-cart` | Cart items |
-| `orders-store.ts` | `ssp-orders` | Orders (8 seed orders) |
+| `orders-store.ts` | `ssp-orders` | Local order log (analytics use only — source of truth is Supabase) |
 | `analytics-store.ts` | `ssp-analytics` | Visit/click/cart tracking |
 | `notifications-store.ts` | `ssp-notifications` | Notification rules |
 | `users-store.ts` | `ssp-users` | Admin users (3 seed users) |
 
+## Supabase schema (live)
+```sql
+orders (id, created_at, status, customer_name, customer_email, customer_phone,
+        address_line1, address_city, address_state, address_pincode,
+        subtotal, payment_method)
+
+order_items (id, order_id, book_id, sku, title_english, title_hindi, qty, price)
+```
+RLS is permissive (anon can insert + select + update) — to be tightened in Phase 2 with auth.
+
+## API routes (live)
+- `POST /api/orders/create` — inserts order + items to Supabase, sends Resend confirmation email
+
 ## Book catalog
-All books are a static array in `lib/books.ts`. Each book has: `id`, `slug`, `title`, `author`, `price`, `mrp`, `category`, `description`, `pages`, `edition`, `isbn`, `coverImage`, `inStock`.
+All books are a static array in `lib/books.ts`. Each book has: `id`, `slug`, `titleEnglish`, `titleHindi`, `authors`, `price`, `category`, `level`, `language`, `description`, `tags`, `series`, `part`, `isBundle`.
 
 Categories: `instrumental` (व), `vocal` (ग), `raag-theory` (र), `kathak` (क), `research` (श), `cbse` (प), `bundle` (सं). Icons are single Devanagari characters styled with `font-devanagari text-gold`.
 
 ## Key component patterns
 - **BookCard** — persistent View + Add to Cart buttons below cover image
+- **BookDetailClient** — `'use client'` component; receives `book` as prop from server component page `app/books/[slug]/page.tsx`
 - **Admin layout** (`app/admin/layout.tsx`) — password gate + sidebar, wraps all `/admin/*` pages
-- **Zustand selectors** — always destructure what you need: `const { addOrder } = useOrdersStore()`
+- **Zustand selectors** — always destructure what you need: `const addItem = useCartStore((s) => s.addItem)`
 - **No `<img>` tags** — use Next.js `<Image>` with `fill` + `object-contain` for book covers
+- **Next.js 14 params** — params is a plain sync object in page components. Do NOT use `use(params)` — that's Next.js 15 only. Pattern: server component page reads `params.slug`, fetches data, passes as prop to client child.
 
 ## Seed users (users-store)
 | Name | Email | Role |
@@ -93,27 +124,23 @@ Categories: `instrumental` (व), `vocal` (ग), `raag-theory` (र), `kathak` (
 
 **Goal:** A customer can browse, pay, and receive confirmation. Orders appear in the database.
 
-**Critical path:** Supabase setup → Razorpay integration → order confirmation email.
-Everything else in Phase 1 is parallel to this chain.
+**Critical path:** ~~Supabase setup~~ ✓ → ~~confirmation email~~ ✓ → Razorpay integration (remaining blocker).
 
-### Services to integrate
-| What | Service | Notes |
-|------|---------|-------|
-| Database | Supabase (Postgres) | Also handles file storage for book covers |
-| Payments | Razorpay | Needs GST/PAN — start account verification early |
-| Transactional email | Resend | Simplest to set up, generous free tier |
+### Services status
+| What | Service | Status |
+|------|---------|--------|
+| Database | Supabase (Postgres) | Live — orders + order_items tables exist |
+| Transactional email | Resend | Live — domain `sangitshreeprakashan.com` verified, sending from `orders@sangitshreeprakashan.com` |
+| Payments | Razorpay | Not started — needs GST/PAN account verification |
 
 ### API routes to build
 - `POST /api/checkout/create-order` — creates Razorpay order, returns order ID to frontend
 - `POST /api/checkout/verify` — verifies Razorpay payment signature, writes order to Supabase
-- `POST /api/email/send` — sends confirmation email via Resend
 
-### Supabase schema (Phase 1)
-```sql
-books        (id, slug, title, author, price, mrp, category, description, pages, edition, isbn, cover_url, in_stock)
-orders       (id, created_at, razorpay_order_id, razorpay_payment_id, status, customer_name, customer_email, customer_phone, shipping_address, subtotal, payment_method)
-order_items  (id, order_id, book_id, title, qty, price)
-```
+### Remaining Phase 1 work
+- Razorpay account approval + payment integration
+- Real book cover images
+- SEO — meta tags, OG images, sitemap
 
 ---
 
@@ -135,4 +162,5 @@ order_items  (id, order_id, book_id, title, qty, price)
 admin_users        (id, name, email, phone, role, auth_provider, created_at)
 notification_rules (id, name, trigger, channel, recipients, subject, body, whatsapp_numbers, whatsapp_message, active, created_at)
 notification_logs  (id, rule_id, sent_at, channel, recipients, status)
+books              (id, slug, title_english, title_hindi, authors, price, category, level, language, description, tags, series, part, is_bundle, cover_url, in_stock)
 ```

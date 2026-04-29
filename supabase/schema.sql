@@ -51,3 +51,40 @@ create policy "read_order_items" on order_items for select using (true);
 
 -- Anyone can update status (admin panel — will be restricted in Phase 2)
 create policy "update_orders" on orders for update using (true);
+
+-- ── Notification Rules ────────────────────────────────────────────────────────
+create table if not exists notification_rules (
+  id               text primary key,
+  name             text not null,
+  description      text not null default '',
+  trigger          text not null check (trigger in ('order_placed','daily_digest','weekly_digest','cart_abandoned')),
+  channel          text not null check (channel in ('email','whatsapp','both')),
+  recipients       text[] not null default '{}',
+  subject          text not null default '',
+  body             text not null default '',
+  whatsapp_numbers text[] not null default '{}',
+  whatsapp_message text not null default '',
+  active           boolean not null default true,
+  created_at       timestamptz not null default now()
+);
+
+-- ── Notification Logs ─────────────────────────────────────────────────────────
+create table if not exists notification_logs (
+  id         uuid primary key default gen_random_uuid(),
+  rule_id    text,
+  rule_name  text,
+  trigger    text,
+  channel    text,
+  recipients text[],
+  status     text not null,   -- 'sent' | 'failed' | 'partial'
+  error      text,
+  sent_at    timestamptz not null default now()
+);
+
+create index if not exists notif_logs_sent_at_idx on notification_logs(sent_at desc);
+
+alter table notification_rules enable row level security;
+alter table notification_logs  enable row level security;
+
+create policy "anon_all_notification_rules" on notification_rules for all to anon using (true) with check (true);
+create policy "anon_all_notification_logs"  on notification_logs  for all to anon using (true) with check (true);

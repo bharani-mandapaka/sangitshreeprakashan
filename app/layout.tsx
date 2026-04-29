@@ -1,10 +1,7 @@
 import type { Metadata } from 'next';
 import { Cinzel, Inter, Noto_Serif_Devanagari } from 'next/font/google';
 import './globals.css';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
-import WhatsAppButton from '@/components/WhatsAppButton';
-import CartDrawer from '@/components/CartDrawer';
+import SiteShell from '@/components/SiteShell';
 
 const cinzel = Cinzel({
   subsets: ['latin'],
@@ -55,11 +52,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${cinzel.variable} ${inter.variable} ${devanagari.variable}`}>
       <body className="bg-dark text-cream antialiased">
-        <Navbar />
-        <main>{children}</main>
-        <Footer />
-        <WhatsAppButton />
-        <CartDrawer />
+        <SiteShell>
+          {children}
+        </SiteShell>
       </body>
     </html>
   );

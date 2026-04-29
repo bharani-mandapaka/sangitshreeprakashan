@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Bell, Plus, Trash2, Pause, Play, Mail, MessageCircle,
   Edit3, Check, X, ChevronDown, ChevronUp, Layers, Users,
-  CheckCircle, Phone,
+  CheckCircle, Phone, RefreshCw, History, AlertCircle,
 } from 'lucide-react';
+import { supabase, type DbNotificationRule, type DbNotificationLog } from '@/lib/supabase';
 import {
-  useNotificationsStore,
   parseDescription,
-  type NotificationRule,
   type NotificationTrigger,
   type NotificationChannel,
 } from '@/lib/notifications-store';
@@ -36,6 +35,18 @@ const CHANNEL_META: Record<NotificationChannel, { label: string; icon: React.Rea
   both:     { label: 'Email + WhatsApp', icon: <Layers size={11} />,        color: 'text-gold' },
 };
 
+const LOG_STATUS_COLORS: Record<string, string> = {
+  sent:    'bg-green-500/15 text-green-300 border-green-500/30',
+  failed:  'bg-red-500/15 text-red-300 border-red-500/30',
+  partial: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
+};
+
+function fmtDateTime(iso: string) {
+  return new Date(iso).toLocaleString('en-IN', {
+    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  });
+}
+
 // ── Email preview ──────────────────────────────────────────────────────────────
 function EmailPreview({ subject, body }: { subject: string; body: string }) {
   return (
@@ -51,7 +62,7 @@ function EmailPreview({ subject, body }: { subject: string; body: string }) {
       <div className="bg-white px-5 py-3 border-b border-gray-100">
         <div className="flex gap-2 mb-1">
           <span className="text-gray-400 text-xs w-14">From:</span>
-          <span className="text-gray-600 text-xs">Sangit Shree Prakashan &lt;noreply@sangitshreeprakashan.com&gt;</span>
+          <span className="text-gray-600 text-xs">Sangit Shree Prakashan &lt;orders@sangitshreeprakashan.com&gt;</span>
         </div>
         <div className="flex gap-2">
           <span className="text-gray-400 text-xs w-14">Subject:</span>
@@ -70,6 +81,7 @@ function EmailPreview({ subject, body }: { subject: string; body: string }) {
 
 // ── WhatsApp preview ───────────────────────────────────────────────────────────
 function WhatsAppPreview({ message }: { message: string }) {
+  const lines = message.split('\n');
   const renderLine = (line: string, idx: number) => {
     const parts = line.split(/(\*[^*]+\*)/g);
     return (
@@ -77,15 +89,11 @@ function WhatsAppPreview({ message }: { message: string }) {
         {parts.map((p, i) =>
           p.startsWith('*') && p.endsWith('*')
             ? <strong key={i} className="font-semibold">{p.slice(1, -1)}</strong>
-            : p.startsWith('_') && p.endsWith('_')
-              ? <em key={i}>{p.slice(1, -1)}</em>
-              : <span key={i}>{p}</span>
+            : <span key={i}>{p}</span>
         )}
       </span>
     );
   };
-
-  const lines = message.split('\n');
 
   return (
     <div className="rounded-xl overflow-hidden border border-[#1a1a1a] font-sans">
@@ -102,8 +110,7 @@ function WhatsAppPreview({ message }: { message: string }) {
         </div>
         <span className="ml-auto text-[#b2dfdb] text-[10px]">Preview</span>
       </div>
-      <div className="bg-[#ECE5DD] px-4 py-4 min-h-[160px]"
-           style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23d4c4b0\' fill-opacity=\'0.3\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }}>
+      <div className="bg-[#ECE5DD] px-4 py-4 min-h-[160px]">
         <div className="flex justify-end">
           <div className="bg-[#DCF8C6] rounded-tl-xl rounded-bl-xl rounded-tr-sm rounded-br-xl px-3.5 py-2.5 max-w-xs shadow-sm">
             <p className="text-[#111] text-xs leading-relaxed whitespace-pre-wrap">
@@ -127,8 +134,8 @@ function WhatsAppPreview({ message }: { message: string }) {
 }
 
 // ── Channel badge ──────────────────────────────────────────────────────────────
-function ChannelBadge({ channel }: { channel: NotificationChannel }) {
-  const m = CHANNEL_META[channel];
+function ChannelBadge({ channel }: { channel: string }) {
+  const m = CHANNEL_META[channel as NotificationChannel] ?? CHANNEL_META.email;
   return (
     <span className={`flex items-center gap-1 text-[9px] font-cinzel font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border border-white/10 bg-white/5 ${m.color}`}>
       {m.icon} {m.label}
@@ -139,18 +146,11 @@ function ChannelBadge({ channel }: { channel: NotificationChannel }) {
 // ── User picker dropdown ───────────────────────────────────────────────────────
 type PickerMode = 'email' | 'phone';
 
-function UserPicker({
-  mode,
-  onSelect,
-}: {
-  mode: PickerMode;
-  onSelect: (value: string) => void;
-}) {
+function UserPicker({ mode, onSelect }: { mode: PickerMode; onSelect: (value: string) => void }) {
   const users = useUsersStore((s) => s.users);
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const ref  = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -160,9 +160,7 @@ function UserPicker({
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const eligible = users.filter((u) =>
-    mode === 'email' ? !!u.email : !!u.phone
-  );
+  const eligible = users.filter((u) => mode === 'email' ? !!u.email : !!u.phone);
 
   return (
     <div className="relative" ref={ref}>
@@ -186,10 +184,12 @@ function UserPicker({
           </div>
           <div className="max-h-52 overflow-y-auto">
             {eligible.length === 0 ? (
-              <p className="px-3 py-4 text-center text-cream/25 text-xs font-cinzel">No users with {mode === 'email' ? 'email' : 'phone'}</p>
+              <p className="px-3 py-4 text-center text-cream/25 text-xs font-cinzel">
+                No users with {mode === 'email' ? 'email' : 'phone'}
+              </p>
             ) : (
               eligible.map((user) => {
-                const value = mode === 'email' ? user.email : user.phone;
+                const value    = mode === 'email' ? user.email : user.phone;
                 const verified = mode === 'email' ? user.emailVerified : user.phoneVerified;
                 return (
                   <button
@@ -198,7 +198,6 @@ function UserPicker({
                     onClick={() => { onSelect(value); setOpen(false); }}
                     className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"
                   >
-                    {/* Mini avatar */}
                     <div
                       className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 font-cinzel font-bold text-white"
                       style={{ background: user.color, fontSize: 8 }}
@@ -222,15 +221,24 @@ function UserPicker({
 }
 
 // ── Rule card ──────────────────────────────────────────────────────────────────
-function RuleCard({ rule }: { rule: NotificationRule }) {
-  const { updateRule, deleteRule, toggleRule } = useNotificationsStore();
+function RuleCard({
+  rule,
+  onToggle,
+  onDelete,
+  onUpdate,
+}: {
+  rule:     DbNotificationRule;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+  onUpdate: (id: string, patch: Partial<DbNotificationRule>) => void;
+}) {
   const [expanded,    setExpanded]    = useState(false);
   const [editing,     setEditing]     = useState(false);
   const [editSubject, setEditSubject] = useState(rule.subject);
   const [editBody,    setEditBody]    = useState(rule.body);
-  const [editWaMsg,   setEditWaMsg]   = useState(rule.whatsappMessage);
+  const [editWaMsg,   setEditWaMsg]   = useState(rule.whatsapp_message);
   const [editEmails,  setEditEmails]  = useState(rule.recipients.join(', '));
-  const [editPhones,  setEditPhones]  = useState(rule.whatsappNumbers.join(', '));
+  const [editPhones,  setEditPhones]  = useState(rule.whatsapp_numbers.join(', '));
   const [newEmail,    setNewEmail]    = useState('');
   const [newPhone,    setNewPhone]    = useState('');
 
@@ -248,12 +256,12 @@ function RuleCard({ rule }: { rule: NotificationRule }) {
     setter(list.split(',').map((x) => x.trim()).filter((x) => x && x !== val).join(', '));
 
   const saveEdit = () => {
-    updateRule(rule.id, {
-      subject:         editSubject,
-      body:            editBody,
-      whatsappMessage: editWaMsg,
-      recipients:      editEmails.split(',').map((e) => e.trim()).filter(Boolean),
-      whatsappNumbers: editPhones.split(',').map((p) => p.trim()).filter(Boolean),
+    onUpdate(rule.id, {
+      subject:          editSubject,
+      body:             editBody,
+      whatsapp_message: editWaMsg,
+      recipients:       editEmails.split(',').map((e) => e.trim()).filter(Boolean),
+      whatsapp_numbers: editPhones.split(',').map((p) => p.trim()).filter(Boolean),
     });
     setEditing(false);
   };
@@ -263,47 +271,58 @@ function RuleCard({ rule }: { rule: NotificationRule }) {
 
   return (
     <div className={`bg-[#0A0000] border rounded-2xl transition-colors ${rule.active ? 'border-gold/15' : 'border-white/5 opacity-60'}`}>
-      {/* Summary */}
-      <div className="flex items-center gap-3 px-5 py-4">
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${rule.active ? 'bg-gold/15' : 'bg-white/5'}`}>
+      {/* Summary row */}
+      <div className="flex items-start gap-3 px-4 py-4">
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${rule.active ? 'bg-gold/15' : 'bg-white/5'}`}>
           <Bell size={14} className={rule.active ? 'text-gold' : 'text-cream/30'} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-cinzel text-cream text-sm font-semibold truncate">{rule.name}</p>
-          <div className="flex flex-wrap items-center gap-2 mt-0.5">
-            <span className={`text-[9px] font-cinzel font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${TRIGGER_COLORS[rule.trigger]}`}>
-              {TRIGGER_LABELS[rule.trigger]}
+          <p className="font-cinzel text-cream text-sm font-semibold truncate pr-1">{rule.name}</p>
+          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+            <span className={`text-[9px] font-cinzel font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border whitespace-nowrap ${TRIGGER_COLORS[rule.trigger as NotificationTrigger] ?? TRIGGER_COLORS.order_placed}`}>
+              {TRIGGER_LABELS[rule.trigger as NotificationTrigger] ?? rule.trigger}
             </span>
             <ChannelBadge channel={rule.channel} />
             {showEmail && rule.recipients.length > 0 && (
-              <span className="text-cream/35 text-[10px] flex items-center gap-1">
+              <span className="text-cream/35 text-[10px] flex items-center gap-1 whitespace-nowrap">
                 <Mail size={9} /> {rule.recipients.length}
               </span>
             )}
-            {showWhatsApp && rule.whatsappNumbers.length > 0 && (
-              <span className="text-cream/35 text-[10px] flex items-center gap-1">
-                <MessageCircle size={9} /> {rule.whatsappNumbers.length}
+            {showWhatsApp && rule.whatsapp_numbers.length > 0 && (
+              <span className="text-cream/35 text-[10px] flex items-center gap-1 whitespace-nowrap">
+                <MessageCircle size={9} /> {rule.whatsapp_numbers.length}
               </span>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <button onClick={() => toggleRule(rule.id)} title={rule.active ? 'Pause' : 'Activate'}
-            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${rule.active ? 'text-gold/60 hover:text-yellow-400 hover:bg-yellow-400/10' : 'text-green-400/60 hover:text-green-400 hover:bg-green-400/10'}`}>
+        <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+          <button
+            onClick={() => onToggle(rule.id)}
+            title={rule.active ? 'Pause' : 'Activate'}
+            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+              rule.active
+                ? 'text-gold/60 hover:text-yellow-400 hover:bg-yellow-400/10'
+                : 'text-green-400/60 hover:text-green-400 hover:bg-green-400/10'
+            }`}
+          >
             {rule.active ? <Pause size={12} /> : <Play size={12} />}
           </button>
-          <button onClick={() => setExpanded((p) => !p)}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-cream/30 hover:text-cream transition-colors">
+          <button
+            onClick={() => setExpanded((p) => !p)}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-cream/30 hover:text-cream transition-colors"
+          >
             {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
-          <button onClick={() => deleteRule(rule.id)}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-red-400/40 hover:text-red-400 hover:bg-red-400/10 transition-colors">
+          <button
+            onClick={() => onDelete(rule.id)}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-red-400/40 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+          >
             <Trash2 size={12} />
           </button>
         </div>
       </div>
 
-      {/* Expanded */}
+      {/* Expanded content */}
       {expanded && (
         <div className="px-5 pb-5 border-t border-gold/8 pt-4 space-y-5">
           {!editing ? (
@@ -325,16 +344,15 @@ function RuleCard({ rule }: { rule: NotificationRule }) {
                   )}
                 </div>
               )}
-
               {showWhatsApp && (
                 <div>
                   <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-2 flex items-center gap-1.5">
                     <MessageCircle size={10} /> WhatsApp Message
                   </p>
-                  <WhatsAppPreview message={rule.whatsappMessage} />
-                  {rule.whatsappNumbers.length > 0 && (
+                  <WhatsAppPreview message={rule.whatsapp_message} />
+                  {rule.whatsapp_numbers.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
-                      {rule.whatsappNumbers.map((p) => (
+                      {rule.whatsapp_numbers.map((p) => (
                         <span key={p} className="border border-green-500/20 bg-green-500/5 rounded-full px-2.5 py-0.5 text-green-300 text-[11px] font-cinzel">
                           {p}
                         </span>
@@ -343,16 +361,17 @@ function RuleCard({ rule }: { rule: NotificationRule }) {
                   )}
                 </div>
               )}
-
-              <button onClick={() => {
-                setEditing(true);
-                setEditSubject(rule.subject);
-                setEditBody(rule.body);
-                setEditWaMsg(rule.whatsappMessage);
-                setEditEmails(rule.recipients.join(', '));
-                setEditPhones(rule.whatsappNumbers.join(', '));
-              }}
-                className="flex items-center gap-1.5 border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-1.5 rounded-lg transition-all">
+              <button
+                onClick={() => {
+                  setEditing(true);
+                  setEditSubject(rule.subject);
+                  setEditBody(rule.body);
+                  setEditWaMsg(rule.whatsapp_message);
+                  setEditEmails(rule.recipients.join(', '));
+                  setEditPhones(rule.whatsapp_numbers.join(', '));
+                }}
+                className="flex items-center gap-1.5 border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-1.5 rounded-lg transition-all"
+              >
                 <Edit3 size={11} /> Edit Templates
               </button>
             </>
@@ -360,7 +379,9 @@ function RuleCard({ rule }: { rule: NotificationRule }) {
             <div className="space-y-4">
               {showEmail && (
                 <div className="space-y-3">
-                  <p className="text-blue-300/70 text-[10px] font-cinzel uppercase tracking-widest flex items-center gap-1.5"><Mail size={10} /> Email</p>
+                  <p className="text-blue-300/70 text-[10px] font-cinzel uppercase tracking-widest flex items-center gap-1.5">
+                    <Mail size={10} /> Email
+                  </p>
                   <div>
                     <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1">Subject</label>
                     <input className="input-gold text-sm" value={editSubject} onChange={(e) => setEditSubject(e.target.value)} />
@@ -383,7 +404,10 @@ function RuleCard({ rule }: { rule: NotificationRule }) {
                       <input className="input-gold text-sm flex-1" type="email" placeholder="Add email..." value={newEmail}
                         onChange={(e) => setNewEmail(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && addChip(editEmails, setEditEmails, newEmail, setNewEmail)} />
-                      <button onClick={() => addChip(editEmails, setEditEmails, newEmail, setNewEmail)} className="border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-2 rounded-xl transition-all flex-shrink-0">+ Add</button>
+                      <button onClick={() => addChip(editEmails, setEditEmails, newEmail, setNewEmail)}
+                        className="border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-2 rounded-xl transition-all flex-shrink-0">
+                        + Add
+                      </button>
                       <UserPicker mode="email" onSelect={(v) => addChip(editEmails, setEditEmails, v, () => {})} />
                     </div>
                   </div>
@@ -391,9 +415,13 @@ function RuleCard({ rule }: { rule: NotificationRule }) {
               )}
               {showWhatsApp && (
                 <div className="space-y-3">
-                  <p className="text-green-300/70 text-[10px] font-cinzel uppercase tracking-widest flex items-center gap-1.5"><MessageCircle size={10} /> WhatsApp</p>
+                  <p className="text-green-300/70 text-[10px] font-cinzel uppercase tracking-widest flex items-center gap-1.5">
+                    <MessageCircle size={10} /> WhatsApp
+                  </p>
                   <div>
-                    <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1">Message <span className="normal-case text-cream/25">(use *bold* _italic_)</span></label>
+                    <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1">
+                      Message <span className="normal-case text-cream/25">(use *bold* _italic_)</span>
+                    </label>
                     <textarea className="input-gold text-xs h-44 resize-none font-mono leading-relaxed" value={editWaMsg} onChange={(e) => setEditWaMsg(e.target.value)} />
                   </div>
                   <div>
@@ -410,17 +438,22 @@ function RuleCard({ rule }: { rule: NotificationRule }) {
                       <input className="input-gold text-sm flex-1" type="tel" placeholder="+919876543210" value={newPhone}
                         onChange={(e) => setNewPhone(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && addChip(editPhones, setEditPhones, newPhone, setNewPhone)} />
-                      <button onClick={() => addChip(editPhones, setEditPhones, newPhone, setNewPhone)} className="border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-2 rounded-xl transition-all flex-shrink-0">+ Add</button>
+                      <button onClick={() => addChip(editPhones, setEditPhones, newPhone, setNewPhone)}
+                        className="border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-2 rounded-xl transition-all flex-shrink-0">
+                        + Add
+                      </button>
                       <UserPicker mode="phone" onSelect={(v) => addChip(editPhones, setEditPhones, v, () => {})} />
                     </div>
                   </div>
                 </div>
               )}
               <div className="flex gap-2">
-                <button onClick={saveEdit} className="flex items-center gap-1.5 bg-gold hover:bg-gold-300 text-dark font-cinzel font-bold text-xs px-4 py-2 rounded-lg transition-colors">
+                <button onClick={saveEdit}
+                  className="flex items-center gap-1.5 bg-gold hover:bg-gold-300 text-dark font-cinzel font-bold text-xs px-4 py-2 rounded-lg transition-colors">
                   <Check size={12} /> Save
                 </button>
-                <button onClick={() => setEditing(false)} className="flex items-center gap-1.5 border border-white/10 text-cream/50 hover:text-cream font-cinzel text-xs px-4 py-2 rounded-lg transition-colors">
+                <button onClick={() => setEditing(false)}
+                  className="flex items-center gap-1.5 border border-white/10 text-cream/50 hover:text-cream font-cinzel text-xs px-4 py-2 rounded-lg transition-colors">
                   <X size={12} /> Cancel
                 </button>
               </div>
@@ -434,29 +467,66 @@ function RuleCard({ rule }: { rule: NotificationRule }) {
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function NotificationsPage() {
-  const { rules, addRule } = useNotificationsStore();
-  const users              = useUsersStore((s) => s.users);
+  const users = useUsersStore((s) => s.users);
 
-  const [desc,     setDesc]     = useState('');
-  const [parsed,   setParsed]   = useState<ReturnType<typeof parseDescription> | null>(null);
-  const [channel,  setChannel]  = useState<NotificationChannel>('email');
-  // Email fields
-  const [subject,  setSubject]  = useState('');
-  const [body,     setBody]     = useState('');
-  const [emails,   setEmails]   = useState('');
-  const [newEmail, setNewEmail] = useState('');
-  // WhatsApp fields
-  const [waMsg,    setWaMsg]    = useState('');
-  const [phones,   setPhones]   = useState('');
-  const [newPhone, setNewPhone] = useState('');
-  const [saved,    setSaved]    = useState(false);
-  // User-group auto-detect
+  // ── Supabase state ───────────────────────────────────────────────────────────
+  const [rules,    setRules]    = useState<DbNotificationRule[]>([]);
+  const [logs,     setLogs]     = useState<DbNotificationLog[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [dbError,  setDbError]  = useState('');
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setDbError('');
+    const [rulesRes, logsRes] = await Promise.all([
+      supabase.from('notification_rules').select('*').order('created_at', { ascending: false }),
+      supabase.from('notification_logs').select('*').order('sent_at', { ascending: false }).limit(30),
+    ]);
+    if (rulesRes.error) setDbError(rulesRes.error.message);
+    setRules((rulesRes.data as DbNotificationRule[]) ?? []);
+    setLogs((logsRes.data  as DbNotificationLog[])  ?? []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // ── Rule mutations ───────────────────────────────────────────────────────────
+  const handleToggle = async (id: string) => {
+    const rule = rules.find((r) => r.id === id);
+    if (!rule) return;
+    setRules((prev) => prev.map((r) => r.id === id ? { ...r, active: !r.active } : r));
+    await supabase.from('notification_rules').update({ active: !rule.active }).eq('id', id);
+  };
+
+  const handleDelete = async (id: string) => {
+    setRules((prev) => prev.filter((r) => r.id !== id));
+    await supabase.from('notification_rules').delete().eq('id', id);
+  };
+
+  const handleUpdate = async (id: string, patch: Partial<DbNotificationRule>) => {
+    setRules((prev) => prev.map((r) => r.id === id ? { ...r, ...patch } : r));
+    await supabase.from('notification_rules').update(patch).eq('id', id);
+  };
+
+  // ── NLP create form state ────────────────────────────────────────────────────
+  const [desc,       setDesc]       = useState('');
+  const [parsed,     setParsed]     = useState<ReturnType<typeof parseDescription> | null>(null);
+  const [channel,    setChannel]    = useState<NotificationChannel>('email');
+  const [subject,    setSubject]    = useState('');
+  const [body,       setBody]       = useState('');
+  const [emails,     setEmails]     = useState('');
+  const [newEmail,   setNewEmail]   = useState('');
+  const [waMsg,      setWaMsg]      = useState('');
+  const [phones,     setPhones]     = useState('');
+  const [newPhone,   setNewPhone]   = useState('');
+  const [saved,      setSaved]      = useState(false);
   const [autoGroups, setAutoGroups] = useState<string[]>([]);
 
   // ── User-aware NLP parse ─────────────────────────────────────────────────────
   const handleParse = () => {
     if (!desc.trim()) return;
-    const r = parseDescription(desc);
+    const r     = parseDescription(desc);
     const lower = desc.toLowerCase();
 
     let autoEmails: string[] = [...r.detectedEmails];
@@ -468,41 +538,35 @@ export default function NotificationsPage() {
       if (u.phone && !autoPhones.includes(u.phone)) autoPhones.push(u.phone);
     };
 
-    // "me" / "my" → the admin user (matched by stored email or first admin)
     if (/\bme\b/.test(lower) || /\bmy\b/.test(lower)) {
-      const me = users.find((u) => u.email === 'meetbharani91@gmail.com')
-               ?? users.find((u) => u.role === 'admin');
+      const me = users.find((u) => u.email === 'meetbharani91@gmail.com') ?? users.find((u) => u.role === 'admin');
       if (me) { addUser(me); detected.push('me (you)'); }
     }
-
-    // "all users" / "everyone" / "all"
     if (/\ball users\b/.test(lower) || /\beveryone\b/.test(lower) || /\ball\b/.test(lower)) {
       users.forEach(addUser);
       detected.push('all users');
-    }
-
-    // "admin" / "admins" (but not when already matched by "all")
-    else if (/\badmins?\b/.test(lower)) {
+    } else if (/\badmins?\b/.test(lower)) {
       users.filter((u) => u.role === 'admin').forEach(addUser);
       detected.push('admins');
     }
-
-    // "staff"
     if (/\bstaff\b/.test(lower) && !/\ball\b/.test(lower)) {
       users.filter((u) => u.role === 'staff').forEach(addUser);
       detected.push('staff');
     }
-
-    // "viewer" / "viewers"
     if (/\bviewers?\b/.test(lower) && !/\ball\b/.test(lower)) {
       users.filter((u) => u.role === 'viewer').forEach(addUser);
       detected.push('viewers');
     }
-
-    // "users" (without "all") → add all users' info
     if (/\busers\b/.test(lower) && !/\ball users\b/.test(lower) && !/\ball\b/.test(lower)) {
       users.forEach(addUser);
       if (!detected.includes('all users')) detected.push('users');
+    }
+
+    // "customer" → dynamic placeholders resolved from order data at send time
+    if (/\bcustomer\b/.test(lower)) {
+      if (!autoEmails.includes('{{customer_email}}')) autoEmails.push('{{customer_email}}');
+      if (!autoPhones.includes('{{customer_phone}}')) autoPhones.push('{{customer_phone}}');
+      detected.push('customer (from order)');
     }
 
     setParsed(r);
@@ -532,54 +596,73 @@ export default function NotificationsPage() {
   const showEmail    = channel === 'email'    || channel === 'both';
   const showWhatsApp = channel === 'whatsapp' || channel === 'both';
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!parsed) return;
-    addRule({
-      id:              `notif-${Date.now()}`,
-      name:            parsed.name.replace(/\(.*\)/, `(${CHANNEL_META[channel].label})`),
-      description:     desc,
-      trigger:         parsed.trigger,
+    setCreating(true);
+
+    const newRule: Omit<DbNotificationRule, 'created_at'> & { created_at: string } = {
+      id:               crypto.randomUUID(),
+      name:             parsed.name.replace(/\(.*\)/, `(${CHANNEL_META[channel].label})`),
+      description:      desc,
+      trigger:          parsed.trigger,
       channel,
-      recipients:      emails.split(',').map((e) => e.trim()).filter(Boolean),
+      recipients:       emails.split(',').map((e) => e.trim()).filter(Boolean),
       subject,
       body,
-      whatsappNumbers: phones.split(',').map((p) => p.trim()).filter(Boolean),
-      whatsappMessage: waMsg,
-      active:          true,
-      createdAt:       new Date().toISOString(),
-    });
-    setSaved(true);
-    setDesc(''); setParsed(null); setAutoGroups([]);
-    setSubject(''); setBody(''); setEmails('');
-    setWaMsg(''); setPhones('');
+      whatsapp_numbers: phones.split(',').map((p) => p.trim()).filter(Boolean),
+      whatsapp_message: waMsg,
+      active:           true,
+      created_at:       new Date().toISOString(),
+    };
+
+    const { error } = await supabase.from('notification_rules').insert(newRule);
+    if (!error) {
+      setRules((prev) => [newRule as DbNotificationRule, ...prev]);
+      setSaved(true);
+      setDesc(''); setParsed(null); setAutoGroups([]);
+      setSubject(''); setBody(''); setEmails('');
+      setWaMsg(''); setPhones('');
+    } else {
+      console.error('[notifications] create error:', error);
+    }
+    setCreating(false);
   };
 
   const hasRecipients =
     (showEmail    && emails.trim()) ||
     (showWhatsApp && phones.trim());
 
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-8 max-w-5xl">
-      <div>
-        <h1 className="font-cinzel text-2xl font-bold text-cream">Notifications</h1>
-        <p className="text-cream/40 text-sm mt-1">Define when and how you want to be notified about store activity.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-cinzel text-2xl font-bold text-cream">Notifications</h1>
+          <p className="text-cream/40 text-sm mt-1">Define when and how you want to be notified about store activity.</p>
+        </div>
+        {loading && <RefreshCw size={15} className="text-gold/40 animate-spin" />}
       </div>
 
-      {/* Creator card */}
+      {dbError && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm font-cinzel flex items-center gap-2">
+          <AlertCircle size={14} /> Database error: {dbError}
+        </div>
+      )}
+
+      {/* ── Creator card ──────────────────────────────────────────────────────── */}
       <div className="bg-[#0A0000] border border-gold/15 rounded-2xl p-6 space-y-5">
         <div className="flex items-center gap-2">
           <Plus size={15} className="text-gold" />
           <h2 className="font-cinzel text-cream font-semibold text-sm">Create a Notification</h2>
         </div>
 
-        {/* NL input */}
         <div>
           <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-2">
             Describe what you want
           </label>
           <textarea
             className="input-gold h-24 resize-none text-sm leading-relaxed"
-            placeholder={`Examples:\n"Send me WhatsApp notifications for every new order"\n"Email all admins daily digest"\n"Notify staff via WhatsApp when cart is abandoned"\n"WhatsApp me and all users for every order"`}
+            placeholder={`Examples:\n"Send me WhatsApp notifications for every new order"\n"Email all admins daily digest"\n"Notify staff via WhatsApp when cart is abandoned"`}
             value={desc}
             onChange={(e) => { setDesc(e.target.value); setParsed(null); setAutoGroups([]); setSaved(false); }}
           />
@@ -595,7 +678,7 @@ export default function NotificationsPage() {
         {parsed && (
           <div className="space-y-5 pt-2 border-t border-gold/10">
 
-            {/* Detected trigger + channel */}
+            {/* Trigger + channel */}
             <div className="flex flex-wrap gap-4 items-start">
               <div>
                 <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">Trigger</p>
@@ -626,7 +709,7 @@ export default function NotificationsPage() {
               </div>
             </div>
 
-            {/* Auto-detected user groups */}
+            {/* Auto-detected groups */}
             {autoGroups.length > 0 && (
               <div className="flex items-center gap-2 flex-wrap">
                 <Users size={11} className="text-gold/60" />
@@ -657,27 +740,26 @@ export default function NotificationsPage() {
                   <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">Preview</p>
                   <EmailPreview subject={subject} body={body} />
                 </div>
-                {/* Recipients */}
                 <div>
                   <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">Recipients</label>
                   <div className="flex flex-wrap gap-1.5 mb-2">
-                    {emails.split(',').map((e) => e.trim()).filter(Boolean).map((em) => (
-                      <span key={em} className="flex items-center gap-1.5 border border-blue-500/20 bg-blue-500/5 rounded-full px-2.5 py-0.5 text-blue-300 text-[11px] font-cinzel">
-                        <Mail size={9} /> {em}
-                        <button onClick={() => removeChip(emails, setEmails, em)} className="text-cream/30 hover:text-red-400 ml-0.5"><X size={9} /></button>
-                      </span>
-                    ))}
+                    {emails.split(',').map((e) => e.trim()).filter(Boolean).map((em) => {
+                      const isDynamic = em.startsWith('{{');
+                      const label = em === '{{customer_email}}' ? 'Customer Email' : em;
+                      return (
+                        <span key={em} className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-cinzel border ${isDynamic ? 'border-gold/30 bg-gold/5 text-gold/80' : 'border-blue-500/20 bg-blue-500/5 text-blue-300'}`}>
+                          {isDynamic ? <Users size={9} /> : <Mail size={9} />} {label}
+                          <button onClick={() => removeChip(emails, setEmails, em)} className="text-cream/30 hover:text-red-400 ml-0.5"><X size={9} /></button>
+                        </span>
+                      );
+                    })}
                   </div>
                   <div className="flex gap-2">
-                    <input
-                      className="input-gold text-sm flex-1"
-                      type="email"
-                      placeholder="Add email..."
-                      value={newEmail}
+                    <input className="input-gold text-sm flex-1" type="email" placeholder="Add email..." value={newEmail}
                       onChange={(e) => setNewEmail(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && addChip(emails, setEmails, newEmail, setNewEmail)}
-                    />
-                    <button onClick={() => addChip(emails, setEmails, newEmail, setNewEmail)} className="border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-2 rounded-xl transition-all flex-shrink-0">+ Add</button>
+                      onKeyDown={(e) => e.key === 'Enter' && addChip(emails, setEmails, newEmail, setNewEmail)} />
+                    <button onClick={() => addChip(emails, setEmails, newEmail, setNewEmail)}
+                      className="border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-2 rounded-xl transition-all flex-shrink-0">+ Add</button>
                     <UserPicker mode="email" onSelect={(v) => addChip(emails, setEmails, v, () => {})} />
                   </div>
                 </div>
@@ -700,49 +782,49 @@ export default function NotificationsPage() {
                   <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">Preview</p>
                   <WhatsAppPreview message={waMsg} />
                 </div>
-                {/* Phone numbers */}
                 <div>
                   <label className="block text-cream/40 text-[10px] font-cinzel uppercase tracking-widest mb-1.5">WhatsApp Numbers</label>
                   <div className="flex flex-wrap gap-1.5 mb-2">
-                    {phones.split(',').map((p) => p.trim()).filter(Boolean).map((ph) => (
-                      <span key={ph} className="flex items-center gap-1.5 border border-green-500/20 bg-green-500/5 rounded-full px-2.5 py-0.5 text-green-300 text-[11px] font-cinzel">
-                        <Phone size={9} /> {ph}
-                        <button onClick={() => removeChip(phones, setPhones, ph)} className="text-cream/30 hover:text-red-400 ml-0.5"><X size={9} /></button>
-                      </span>
-                    ))}
+                    {phones.split(',').map((p) => p.trim()).filter(Boolean).map((ph) => {
+                      const isDynamic = ph.startsWith('{{');
+                      const label = ph === '{{customer_phone}}' ? 'Customer Phone' : ph;
+                      return (
+                        <span key={ph} className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-cinzel border ${isDynamic ? 'border-gold/30 bg-gold/5 text-gold/80' : 'border-green-500/20 bg-green-500/5 text-green-300'}`}>
+                          {isDynamic ? <Users size={9} /> : <Phone size={9} />} {label}
+                          <button onClick={() => removeChip(phones, setPhones, ph)} className="text-cream/30 hover:text-red-400 ml-0.5"><X size={9} /></button>
+                        </span>
+                      );
+                    })}
                   </div>
                   <div className="flex gap-2">
-                    <input
-                      className="input-gold text-sm flex-1"
-                      type="tel"
-                      placeholder="+919876543210"
-                      value={newPhone}
+                    <input className="input-gold text-sm flex-1" type="tel" placeholder="+919876543210" value={newPhone}
                       onChange={(e) => setNewPhone(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && addChip(phones, setPhones, newPhone, setNewPhone)}
-                    />
-                    <button onClick={() => addChip(phones, setPhones, newPhone, setNewPhone)} className="border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-2 rounded-xl transition-all flex-shrink-0">+ Add</button>
+                      onKeyDown={(e) => e.key === 'Enter' && addChip(phones, setPhones, newPhone, setNewPhone)} />
+                    <button onClick={() => addChip(phones, setPhones, newPhone, setNewPhone)}
+                      className="border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-3 py-2 rounded-xl transition-all flex-shrink-0">+ Add</button>
                     <UserPicker mode="phone" onSelect={(v) => addChip(phones, setPhones, v, () => {})} />
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Create button */}
             <button
               onClick={handleCreate}
-              disabled={!hasRecipients || saved}
+              disabled={!hasRecipients || saved || creating}
               className="w-full bg-gold hover:bg-gold-300 disabled:opacity-50 text-dark font-cinzel font-bold py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
-              {saved
-                ? <><Check size={16} /> Notification Created!</>
-                : <><Bell size={15} /> Create Notification</>
+              {creating
+                ? <><RefreshCw size={15} className="animate-spin" /> Saving…</>
+                : saved
+                  ? <><Check size={16} /> Notification Created!</>
+                  : <><Bell size={15} /> Create Notification</>
               }
             </button>
           </div>
         )}
       </div>
 
-      {/* Active rules */}
+      {/* ── Active rules ──────────────────────────────────────────────────────── */}
       <div>
         <h2 className="font-cinzel text-cream font-semibold text-sm mb-4 flex items-center gap-2">
           <Bell size={14} className="text-gold" />
@@ -751,7 +833,12 @@ export default function NotificationsPage() {
             <span className="bg-gold/15 text-gold text-[10px] font-bold px-2 py-0.5 rounded-full border border-gold/20">{rules.length}</span>
           )}
         </h2>
-        {rules.length === 0 ? (
+
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2].map((i) => <div key={i} className="h-16 rounded-2xl bg-white/3 animate-pulse" />)}
+          </div>
+        ) : rules.length === 0 ? (
           <div className="bg-[#0A0000] border border-gold/8 rounded-2xl p-12 text-center">
             <Bell size={32} className="text-cream/15 mx-auto mb-3" />
             <p className="font-cinzel text-cream/30 text-sm">No notifications configured yet.</p>
@@ -759,7 +846,114 @@ export default function NotificationsPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {rules.map((rule) => <RuleCard key={rule.id} rule={rule} />)}
+            {rules.map((rule) => (
+              <RuleCard
+                key={rule.id}
+                rule={rule}
+                onToggle={handleToggle}
+                onDelete={handleDelete}
+                onUpdate={handleUpdate}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Notification log ──────────────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-cinzel text-cream font-semibold text-sm flex items-center gap-2">
+            <History size={14} className="text-gold" />
+            Notification Log
+            {logs.length > 0 && (
+              <span className="bg-gold/15 text-gold text-[10px] font-bold px-2 py-0.5 rounded-full border border-gold/20">{logs.length}</span>
+            )}
+          </h2>
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="flex items-center gap-1.5 border border-gold/15 hover:border-gold/30 text-cream/40 hover:text-cream font-cinzel text-xs px-3 py-1.5 rounded-xl transition-all disabled:opacity-40"
+          >
+            <RefreshCw size={11} className={loading ? 'animate-spin' : ''} /> Refresh
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => <div key={i} className="h-10 rounded-xl bg-white/3 animate-pulse" />)}
+          </div>
+        ) : logs.length === 0 ? (
+          <div className="bg-[#0A0000] border border-gold/8 rounded-2xl p-10 text-center">
+            <History size={28} className="text-cream/10 mx-auto mb-2" />
+            <p className="font-cinzel text-cream/25 text-sm">No notifications sent yet.</p>
+            <p className="text-cream/15 text-xs mt-1">Logs appear here after a rule fires.</p>
+          </div>
+        ) : (
+          <div className="bg-[#0A0000] border border-gold/10 rounded-2xl overflow-hidden">
+
+            {/* Mobile: card list */}
+            <div className="sm:hidden divide-y divide-gold/5">
+              {logs.map((log) => (
+                <div key={log.id} className="px-4 py-3 space-y-1.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-cinzel text-cream/80 text-xs font-semibold leading-snug truncate flex-1">
+                      {log.rule_name}
+                    </p>
+                    <span className={`text-[9px] font-cinzel font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border whitespace-nowrap flex-shrink-0 ${LOG_STATUS_COLORS[log.status] ?? 'border-white/10 text-cream/40'}`}>
+                      {log.status}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-cream/35 text-[10px] whitespace-nowrap">{fmtDateTime(log.sent_at)}</span>
+                    <ChannelBadge channel={log.channel} />
+                    <span className={`text-[9px] font-cinzel font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border whitespace-nowrap ${TRIGGER_COLORS[log.trigger as NotificationTrigger] ?? 'border-white/10 text-cream/40'}`}>
+                      {TRIGGER_LABELS[log.trigger as NotificationTrigger] ?? log.trigger}
+                    </span>
+                  </div>
+                  {log.error && (
+                    <p className="text-red-400/60 text-[10px] truncate" title={log.error}>{log.error}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop: table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gold/10">
+                    {['Time', 'Rule', 'Trigger', 'Channel', 'Recipients', 'Status'].map((h) => (
+                      <th key={h} className="px-4 py-3 text-left text-[10px] font-cinzel uppercase tracking-widest text-cream/30 whitespace-nowrap">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map((log) => (
+                    <tr key={log.id} className="border-b border-gold/5 last:border-0 hover:bg-white/2 transition-colors">
+                      <td className="px-4 py-3 text-cream/40 text-xs whitespace-nowrap">{fmtDateTime(log.sent_at)}</td>
+                      <td className="px-4 py-3 text-cream/80 text-xs font-cinzel font-semibold max-w-[180px] truncate">{log.rule_name}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`text-[9px] font-cinzel font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border whitespace-nowrap ${TRIGGER_COLORS[log.trigger as NotificationTrigger] ?? 'border-white/10 text-cream/40'}`}>
+                          {TRIGGER_LABELS[log.trigger as NotificationTrigger] ?? log.trigger}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3"><ChannelBadge channel={log.channel} /></td>
+                      <td className="px-4 py-3 text-cream/50 text-xs">{log.recipients?.length ?? 0}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-[9px] font-cinzel font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border whitespace-nowrap ${LOG_STATUS_COLORS[log.status] ?? 'border-white/10 text-cream/40'}`}>
+                          {log.status}
+                        </span>
+                        {log.error && (
+                          <p className="text-red-400/60 text-[10px] mt-0.5 max-w-[200px] truncate" title={log.error}>{log.error}</p>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

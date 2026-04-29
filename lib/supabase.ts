@@ -32,3 +32,30 @@ export interface DbOrderItem {
   qty: number;
   price: number;
 }
+
+export interface DbNotificationRule {
+  id: string;
+  name: string;
+  description: string;
+  trigger: string;
+  channel: string;
+  recipients: string[];
+  subject: string;
+  body: string;
+  whatsapp_numbers: string[];
+  whatsapp_message: string;
+  active: boolean;
+  created_at: string;
+}
+
+export interface DbNotificationLog {
+  id: string;
+  rule_id: string | null;
+  rule_name: string;
+  trigger: string;
+  channel: string;
+  recipients: string[];
+  status: string;   // 'sent' | 'failed' | 'partial'
+  error: string | null;
+  sent_at: string;
+}

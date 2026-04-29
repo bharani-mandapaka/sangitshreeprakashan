@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { fireNotifications } from '@/lib/notifications-sender';
 
-// Server-side Supabase client (uses anon key — service-role key added in Phase 2)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
 );
-
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
@@ -49,15 +48,19 @@ export async function POST(req: NextRequest) {
   }));
 
   const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
-  if (itemsError) {
-    console.error('[orders/create] items insert error:', itemsError);
-    // Non-fatal — order is saved, items failed. Log and continue.
-  }
+  if (itemsError) console.error('[orders/create] items insert error:', itemsError);
 
-  // ── 3. Send confirmation email via Resend ───────────────────────────────────
+  // ── 3. Build shared variables ───────────────────────────────────────────────
   const dateStr = new Date(createdAt).toLocaleDateString('en-IN', {
     day: 'numeric', month: 'long', year: 'numeric',
   });
+
+  const itemsListPlain = items
+    .map((i: { titleEnglish: string; qty: number; price: number }) =>
+      `• ${i.titleEnglish} × ${i.qty}  —  ₹${(i.price * i.qty).toLocaleString('en-IN')}`,
+    )
+    .join('\n');
+
   const itemRows = items.map((i: { titleEnglish: string; qty: number; price: number }) => `
     <tr>
       <td style="padding:8px 0;border-bottom:1px solid #C9A84C22;color:#F5ECD7;">${i.titleEnglish}</td>
@@ -67,10 +70,26 @@ export async function POST(req: NextRequest) {
       </td>
     </tr>`).join('');
 
-  try {
-    await resend.emails.send({
-      from: 'Sangit Shree Prakashan <orders@sangitshreeprakashan.com>',
-      to:   customer.email,
+  // Vars for admin notification templates
+  const notifVars: Record<string, string> = {
+    order_id:         id,
+    order_date:       dateStr,
+    customer_name:    customer.name,
+    customer_email:   customer.email,
+    customer_phone:   customer.phone,
+    items_list:       itemsListPlain,
+    shipping_address: `${billingAddress.line1}, ${billingAddress.city}, ${billingAddress.state} — ${billingAddress.pincode}`,
+    order_total:      `₹${subtotal.toLocaleString('en-IN')}`,
+    payment_method:   paymentMethod,
+  };
+
+  // ── 4. Send customer email + fire admin notifications (parallel) ─────────────
+  await Promise.allSettled([
+
+    // Customer confirmation email
+    resend.emails.send({
+      from:    'Sangit Shree Prakashan <orders@sangitshreeprakashan.com>',
+      to:      customer.email,
       subject: `Order Confirmed — ${id} | Sangit Shree Prakashan`,
       html: `
 <!DOCTYPE html>
@@ -145,11 +164,12 @@ export async function POST(req: NextRequest) {
 </div>
 </body>
 </html>`,
-    });
-  } catch (emailErr) {
-    // Email failure is non-fatal — order is already in the database
-    console.error('[orders/create] email error:', emailErr);
-  }
+    }).catch((err) => console.error('[orders/create] customer email error:', err)),
+
+    // Admin notifications (order_placed rules from Supabase)
+    fireNotifications('order_placed', notifVars)
+      .catch((err) => console.error('[orders/create] admin notification error:', err)),
+  ]);
 
   return NextResponse.json({ success: true, orderId: id });
 }
