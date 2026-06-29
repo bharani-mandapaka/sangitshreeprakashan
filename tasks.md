@@ -40,6 +40,7 @@
 - [ ] Handle payment failures gracefully on frontend
 
 ### Book content
+- [x] Add missing books to catalog (Swar Vadan Part 1, Raag Shastra Parichay Part 3, Concepts of Vocal Music Class 9–12, Concepts of Instrumental Music Class 9–12, Sangit Saar Class 11, Bal Sangit Parts 1–3, Treasure of Raags & Taals)
 - [ ] Real book cover images for all titles
 - [ ] Final copy for descriptions, table of contents, author bios
 - [ ] Book detail pages — richer layout with TOC, edition/ISBN, sample pages (currently description-only)
