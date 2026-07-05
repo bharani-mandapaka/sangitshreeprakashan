@@ -26,6 +26,17 @@ const testimonials = [
   },
 ];
 
+export const metadata = {
+  title: 'Sangit Shree Prakashan | Hindustani Classical Music Books',
+  description:
+    'Browse 30+ Hindustani Classical Music books — Swar Vadan, Bhatkhande Notation, Raag Theory, Kathak, CBSE Music. Publisher based in Kanpur, UP, India.',
+  openGraph: {
+    title: 'Sangit Shree Prakashan | Hindustani Classical Music Books',
+    description: 'Browse 30+ Hindustani Classical Music books published in Kanpur, India.',
+    type: 'website',
+  },
+};
+
 export default function HomePage() {
   const featured = getFeaturedBooks().slice(0, 8);
 

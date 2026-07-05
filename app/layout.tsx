@@ -40,11 +40,19 @@ export const metadata: Metadata = {
     'music publisher India',
     'sangit prakashan',
   ],
+metadataBase: new URL('https://sangit-shree-prakashan.vercel.app'),
   openGraph: {
     title: 'Sangit Shree Prakashan',
     description: 'Publisher of Hindustani Classical Music Books, Kanpur, India',
     type: 'website',
     locale: 'en_IN',
+    url: 'https://sangit-shree-prakashan.vercel.app',
+    siteName: 'Sangit Shree Prakashan',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Sangit Shree Prakashan',
+    description: 'Publisher of Hindustani Classical Music Books, Kanpur, India',
   },
 };
 
