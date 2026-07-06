@@ -24,6 +24,15 @@ npm run build       # production build check
 npx vercel --prod   # deploy to Vercel
 ```
 
+## Git workflow (mandatory)
+- NEVER commit or push directly to master
+- Always start work with: `git checkout master && git pull origin master`
+- Always create a feature branch first: `git checkout -b feature/description`
+- Always run `npm run build` before committing — fix any errors first
+- Add files by name only — never use `git add .`
+- Push to the feature branch: `git push origin feature/branch-name`
+- After pushing, open a Pull Request on GitHub and message Bharani
+
 ## Design tokens
 | Token | Value | Usage |
 |-------|-------|-------|
@@ -40,7 +49,7 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 
 | Feature | Status |
 |---------|--------|
-| Book catalog UI | Real |
+| Book catalog UI | Real — 34 books across 7 categories |
 | Book detail pages | Real — server component passes book to `BookDetailClient` |
 | Cart + checkout UI | Real |
 | Payments | Mock — no Razorpay yet |
@@ -54,12 +63,13 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 | Google OAuth | Simulated UI — no real token |
 | Book images | Placeholders |
 | Admin auth | localStorage password gate (`ssp@admin`) |
+| SEO metadata | Real — generateMetadata() on all public pages |
+| Sitemap | Real — auto-generated at /sitemap.xml for all pages + 34 books |
 
 ---
 
 ## Environment variables
 Stored in `.env.local` locally and in Vercel project settings (set via `npx vercel env add`).
-
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://kypqmrfgxeybqzkawogb.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
@@ -99,9 +109,29 @@ RLS is permissive (anon can insert + select + update) — to be tightened in Pha
 - `POST /api/orders/create` — inserts order + items to Supabase, sends Resend confirmation email
 
 ## Book catalog
-All books are a static array in `lib/books.ts`. Each book has: `id`, `slug`, `titleEnglish`, `titleHindi`, `authors`, `price`, `category`, `level`, `language`, `description`, `tags`, `series`, `part`, `isBundle`.
+All books are a static array in `lib/books.ts`. Total: 34 books across 7 categories.
+
+Each book has: `id`, `slug`, `titleEnglish`, `titleHindi`, `authors`, `price`, `category`, `level`, `language`, `description`, `tags`, `series`, `part`, `isBundle`.
 
 Categories: `instrumental` (व), `vocal` (ग), `raag-theory` (र), `kathak` (क), `research` (श), `cbse` (प), `bundle` (सं). Icons are single Devanagari characters styled with `font-devanagari text-gold`.
+
+### Books added by Shreeyanshi (July 2026)
+- Swar Vadan Part 1
+- Raag Shastra Parichay Part 3
+- Concepts of Vocal Music Class IX, X, XI, XII
+- Concepts of Instrumental Music Class IX, X, XI, XII
+- Sangit Saar Gayan Class XI
+- Bal Sangit Sangrah Parts 1, 2, 3 (individual)
+- Treasure of Raags & Taals
+
+## SEO
+- `app/layout.tsx` — site-wide metadata, metadataBase, OG tags, Twitter card
+- `app/page.tsx` — homepage metadata
+- `app/books/layout.tsx` — catalog page metadata
+- `app/books/[slug]/page.tsx` — dynamic per-book metadata via generateMetadata()
+- `app/about/page.tsx` — about page metadata
+- `app/contact/layout.tsx` — contact page metadata
+- `app/sitemap.ts` — auto-generates /sitemap.xml for all pages + all book slugs
 
 ## Key component patterns
 - **BookCard** — persistent View + Add to Cart buttons below cover image
@@ -124,23 +154,24 @@ Categories: `instrumental` (व), `vocal` (ग), `raag-theory` (र), `kathak` (
 
 **Goal:** A customer can browse, pay, and receive confirmation. Orders appear in the database.
 
-**Critical path:** ~~Supabase setup~~ ✓ → ~~confirmation email~~ ✓ → Razorpay integration (remaining blocker).
+**Critical path:** ~~Supabase setup~~ ✓ → ~~confirmation email~~ ✓ → ~~SEO~~ ✓ → Razorpay integration (remaining blocker).
 
 ### Services status
 | What | Service | Status |
 |------|---------|--------|
 | Database | Supabase (Postgres) | Live — orders + order_items tables exist |
-| Transactional email | Resend | Live — domain `sangitshreeprakashan.com` verified, sending from `orders@sangitshreeprakashan.com` |
+| Transactional email | Resend | Live — domain `sangitshreeprakashan.com` verified |
 | Payments | Razorpay | Not started — needs GST/PAN account verification |
+| SEO | Next.js generateMetadata + sitemap | Done — PR feature/seo-metadata pending merge |
 
 ### API routes to build
 - `POST /api/checkout/create-order` — creates Razorpay order, returns order ID to frontend
 - `POST /api/checkout/verify` — verifies Razorpay payment signature, writes order to Supabase
 
 ### Remaining Phase 1 work
-- Razorpay account approval + payment integration
-- Real book cover images
-- SEO — meta tags, OG images, sitemap
+- Razorpay account approval + payment integration (blocked on Bharani)
+- Real book cover images (blocked on Bharani)
+- Founder timeline — real photos, refined content, mobile scroll fix
 
 ---
 
@@ -148,7 +179,7 @@ Categories: `instrumental` (व), `vocal` (ग), `raag-theory` (र), `kathak` (
 
 **Goal:** Admin can manage the catalog, see real orders, send real notifications, and log in securely.
 
-**Depends on:** Phase 1 Supabase being live (orders + books tables already exist).
+**Depends on:** Phase 1 complete.
 
 ### Services to integrate
 | What | Service | Notes |
