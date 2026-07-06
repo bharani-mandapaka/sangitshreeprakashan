@@ -3,13 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { fireNotifications } from '@/lib/notifications-sender';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function POST(req: NextRequest) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
   const body = await req.json();
   const { id, createdAt, customer, billingAddress, items, subtotal, paymentMethod } = body;
 

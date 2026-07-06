@@ -4,7 +4,7 @@ import { useMemo, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Eye, ShoppingCart, Package, TrendingUp, ArrowRight, Circle, RefreshCw } from 'lucide-react';
 import { useAnalyticsStore, getTotals } from '@/lib/analytics-store';
-import { supabase, type DbOrder } from '@/lib/supabase';
+import { getSupabase, type DbOrder } from '@/lib/supabase';
 import { formatPrice } from '@/lib/utils';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -25,7 +25,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetch = async () => {
       setLoading(true);
-      const { data } = await supabase
+      const { data } = await getSupabase()
         .from('orders')
         .select('id, created_at, status, customer_name, subtotal, payment_method')
         .order('created_at', { ascending: false });

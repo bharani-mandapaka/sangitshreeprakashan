@@ -6,7 +6,7 @@ import {
   Edit3, Check, X, ChevronDown, ChevronUp, Layers, Users,
   CheckCircle, Phone, RefreshCw, History, AlertCircle,
 } from 'lucide-react';
-import { supabase, type DbNotificationRule, type DbNotificationLog } from '@/lib/supabase';
+import { getSupabase, type DbNotificationRule, type DbNotificationLog } from '@/lib/supabase';
 import {
   parseDescription,
   type NotificationTrigger,
@@ -528,8 +528,8 @@ export default function NotificationsPage() {
     setLoading(true);
     setDbError('');
     const [rulesRes, logsRes] = await Promise.all([
-      supabase.from('notification_rules').select('*').order('created_at', { ascending: false }),
-      supabase.from('notification_logs').select('*').order('sent_at', { ascending: false }).limit(30),
+      getSupabase().from('notification_rules').select('*').order('created_at', { ascending: false }),
+      getSupabase().from('notification_logs').select('*').order('sent_at', { ascending: false }).limit(30),
     ]);
     if (rulesRes.error) setDbError(rulesRes.error.message);
     setRules((rulesRes.data as DbNotificationRule[]) ?? []);
@@ -544,17 +544,17 @@ export default function NotificationsPage() {
     const rule = rules.find((r) => r.id === id);
     if (!rule) return;
     setRules((prev) => prev.map((r) => r.id === id ? { ...r, active: !r.active } : r));
-    await supabase.from('notification_rules').update({ active: !rule.active }).eq('id', id);
+    await getSupabase().from('notification_rules').update({ active: !rule.active }).eq('id', id);
   };
 
   const handleDelete = async (id: string) => {
     setRules((prev) => prev.filter((r) => r.id !== id));
-    await supabase.from('notification_rules').delete().eq('id', id);
+    await getSupabase().from('notification_rules').delete().eq('id', id);
   };
 
   const handleUpdate = async (id: string, patch: Partial<DbNotificationRule>) => {
     setRules((prev) => prev.map((r) => r.id === id ? { ...r, ...patch } : r));
-    await supabase.from('notification_rules').update(patch).eq('id', id);
+    await getSupabase().from('notification_rules').update(patch).eq('id', id);
   };
 
   // ── NLP create form state ────────────────────────────────────────────────────
@@ -663,7 +663,7 @@ export default function NotificationsPage() {
       created_at:       new Date().toISOString(),
     };
 
-    const { error } = await supabase.from('notification_rules').insert(newRule);
+    const { error } = await getSupabase().from('notification_rules').insert(newRule);
     if (!error) {
       setRules((prev) => [newRule as DbNotificationRule, ...prev]);
       setSaved(true);

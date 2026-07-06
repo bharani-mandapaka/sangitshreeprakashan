@@ -8,12 +8,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 // ── Template interpolation ─────────────────────────────────────────────────────
 function interpolate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `[${key}]`);
@@ -87,6 +81,14 @@ export async function fireNotifications(
   trigger: string,
   vars: Record<string, string>,
 ): Promise<{ sent: number; failed: number; partial: number }> {
+
+  // Created per-invocation (not at module load) so `next build` can import this
+  // file without the Supabase/Resend env vars being present at build time.
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+  const resend = new Resend(process.env.RESEND_API_KEY);
 
   const { data: rules, error } = await supabase
     .from('notification_rules')

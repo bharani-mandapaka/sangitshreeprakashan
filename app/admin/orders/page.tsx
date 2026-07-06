@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Search, ChevronDown, ChevronUp, Download, MapPin, Phone, Mail, Package, RefreshCw } from 'lucide-react';
-import { supabase, type DbOrder } from '@/lib/supabase';
+import { getSupabase, type DbOrder } from '@/lib/supabase';
 import { type OrderStatus } from '@/lib/orders-store';
 import { formatPrice } from '@/lib/utils';
 
@@ -29,7 +29,7 @@ function OrderRow({ order, onStatusChange }: { order: DbOrder; onStatusChange: (
     e.stopPropagation();
     const newStatus = e.target.value as OrderStatus;
     setUpdating(true);
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from('orders')
       .update({ status: newStatus })
       .eq('id', order.id);
@@ -175,7 +175,7 @@ export default function OrdersPage() {
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError('');
-    const { data, error: dbErr } = await supabase
+    const { data, error: dbErr } = await getSupabase()
       .from('orders')
       .select('*, order_items(*)')
       .order('created_at', { ascending: false });

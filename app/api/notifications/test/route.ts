@@ -2,12 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 function interpolate(template: string, vars: Record<string, string>) {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `[${key}]`);
 }
@@ -55,6 +49,12 @@ const TEST_VARS: Record<string, string> = {
 };
 
 export async function POST(req: NextRequest) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
   const { ruleId } = await req.json();
   if (!ruleId) return NextResponse.json({ error: 'ruleId required' }, { status: 400 });
 

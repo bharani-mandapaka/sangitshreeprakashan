@@ -1,9 +1,19 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
+// Lazily instantiated so `next build` can import this module (e.g. while
+// prerendering the admin pages) without the NEXT_PUBLIC_SUPABASE_* env vars
+// being present at build time. The client is created on first use at runtime.
+let client: SupabaseClient | null = null;
+
+export function getSupabase(): SupabaseClient {
+  if (!client) {
+    client = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    );
+  }
+  return client;
+}
 
 // ── Types matching the Supabase schema ─────────────────────────────────────────
 export interface DbOrder {
