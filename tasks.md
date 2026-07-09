@@ -46,10 +46,9 @@
 - [ ] Book detail pages — richer layout with TOC, edition/ISBN, sample pages (currently description-only)
 
 ### SEO
-- [ ] Meta tags and OG images on all pages
-- [ ] Sitemap.xml for Google indexing
+- [x] Meta tags and OG images on all pages — PR feature/seo-metadata pending Bharani's merge
+- [x] Sitemap.xml for Google indexing — auto-generates for all pages and 34 book URLs
 - [ ] Founder timeline — real photos, refined content, mobile scroll fix
-
 ---
 
 ## Phase 2 — Admin (make it fully operational)
