@@ -46,9 +46,12 @@
 - [ ] Book detail pages — richer layout with TOC, edition/ISBN, sample pages (currently description-only)
 
 ### SEO
-- [x] Meta tags and OG images on all pages — PR feature/seo-metadata pending Bharani's merge
-- [x] Sitemap.xml for Google indexing — auto-generates for all pages and 34 book URLs
+- [x] Meta tags and OG images on all pages — PR #2 `feature/seo-metadata`, merged
+- [x] Sitemap.xml for Google indexing — auto-generates for all pages and 39 book URLs
+- [x] Fix `/books` 404 — PR #2 overwrote the catalog listing page with book-detail code; restored in PR #3 `fix/books-listing-page`
+- [x] Restore brand suffix on book detail titles — `app/books/layout.tsx` used a plain-string `title`, which nulled the root layout's title template for all 39 book pages
 - [ ] Founder timeline — real photos, refined content, mobile scroll fix
+- [ ] Prerender book detail pages — add `generateStaticParams()` to `app/books/[slug]`; currently server-rendered per request despite the catalog being a static array
 ---
 
 ## Phase 2 — Admin (make it fully operational)
