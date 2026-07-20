@@ -49,7 +49,7 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 
 | Feature | Status |
 |---------|--------|
-| Book catalog UI | Real — 34 books across 7 categories |
+| Book catalog UI | Real — 38 books across 7 categories |
 | Book detail pages | Real — server component passes book to `BookDetailClient` |
 | Cart + checkout UI | Real |
 | Payments | Mock — no Razorpay yet |
@@ -162,7 +162,7 @@ Categories: `instrumental` (व), `vocal` (ग), `raag-theory` (र), `kathak` (
 | Database | Supabase (Postgres) | Live — orders + order_items tables exist |
 | Transactional email | Resend | Live — domain `sangitshreeprakashan.com` verified |
 | Payments | Razorpay | Not started — needs GST/PAN account verification |
-| SEO | Next.js generateMetadata + sitemap | Done — PR feature/seo-metadata pending merge |
+| SEO | Next.js generateMetadata + sitemap | Live — merged via PR #2 + PR #3 (fix) |
 
 ### API routes to build
 - `POST /api/checkout/create-order` — creates Razorpay order, returns order ID to frontend
