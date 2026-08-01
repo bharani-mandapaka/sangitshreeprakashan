@@ -284,10 +284,10 @@ export default function AboutPage() {
         {/* Horizontally scrollable timeline - auto-scrolls via TimelineScroll */}
         <TimelineScroll speedPx={28}>
           <div
-            className="relative flex px-16 sm:px-24"
+            className="relative flex px-8 sm:px-24"
             style={{
-              height: '480px',
-              minWidth: `${founderTimeline.length * 220 + 192}px`,
+             height: '480px',
+             minWidth: `${founderTimeline.length * 180 + 192}px`,
             }}
           >
             {/* ── Gold horizontal centre line ── */}
@@ -301,14 +301,14 @@ export default function AboutPage() {
                 <div
                   key={item.year}
                   className="relative flex flex-col items-center flex-shrink-0"
-                  style={{ width: '220px' }}
+                  style={{ width: 'clamp(140px, 35vw, 220px)' }}
                 >
                   {/* ── TOP half (220px) ── */}
                   <div className="flex flex-col items-center justify-end w-full" style={{ height: '220px' }}>
                     {isAbove ? (
                       <div className="flex flex-col items-center w-full">
                         {/* Card */}
-                        <div className="w-[178px] bg-[#0D0000] border border-gold/12 hover:border-gold/35 rounded-xl p-3.5 transition-all duration-300 group shadow-lg">
+                        <div className="w-[clamp(120px,30vw,178px)] bg-[#0D0000] border border-gold/12 hover:border-gold/35 rounded-xl p-3.5 transition-all duration-300 group shadow-lg">
                           <span className={`inline-block text-[9px] font-cinzel font-bold uppercase tracking-widest px-2 py-0.5 rounded-full mb-2 ${item.tagClass}`}>
                             {item.tag}
                           </span>
@@ -347,7 +347,7 @@ export default function AboutPage() {
                         {/* Connector down from dot */}
                         <div className="w-px flex-1 min-h-[12px] bg-gradient-to-b from-gold/55 to-gold/20" />
                         {/* Card */}
-                        <div className="w-[178px] bg-[#0D0000] border border-gold/12 hover:border-gold/35 rounded-xl p-3.5 transition-all duration-300 group shadow-lg">
+                        <div className="w-[clamp(120px,30vw,178px)] bg-[#0D0000] border border-gold/12 hover:border-gold/35 rounded-xl p-3.5 transition-all duration-300 group shadow-lg">
                           <span className={`inline-block text-[9px] font-cinzel font-bold uppercase tracking-widest px-2 py-0.5 rounded-full mb-2 ${item.tagClass}`}>
                             {item.tag}
                           </span>
