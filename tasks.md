@@ -33,7 +33,7 @@
 > Supabase ✓ · Resend ✓ · Razorpay — remaining blocker.
 
 ### Payments (main remaining work)
-- [ ] Razorpay business account — needs GST or PAN, takes 1–3 days to verify
+- [ ] Razorpay API keys — migrating from old website, need keys from Bharani (Key ID + Key Secret)
 - [ ] API route `POST /api/checkout/create-order` — creates Razorpay order, returns ID to frontend
 - [ ] Razorpay payment modal wired into checkout page
 - [ ] API route `POST /api/checkout/verify` — verifies signature, writes order to Supabase
@@ -46,9 +46,9 @@
 - [ ] Book detail pages — richer layout with TOC, edition/ISBN, sample pages (currently description-only)
 
 ### SEO
-- [x] Meta tags and OG images on all pages — PR feature/seo-metadata pending Bharani's merge
+- [x] Meta tags and OG images on all pages — merged, SEO metadata on all public pages and per-book detail pages
 - [x] Sitemap.xml for Google indexing — auto-generates for all pages and 34 book URLs
-- [ ] Founder timeline — real photos, refined content, mobile scroll fix
+- [x] Founder timeline — mobile scroll fix done (PR #4 pending merge); real photos and refined content blocked on Bharani
 ---
 
 ## Phase 2 — Admin (make it fully operational)
