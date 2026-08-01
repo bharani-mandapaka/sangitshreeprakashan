@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { useCartStore } from '@/lib/cart-store';
 import { getBooksByCategory, categoryMeta } from '@/lib/books';
 import { formatPrice, WHATSAPP_NUMBER } from '@/lib/utils';
-import BookCover from '@/components/BookCover';
+import BookCoverImage from '@/components/BookCoverImage';
 import BookCard from '@/components/BookCard';
 import type { Book } from '@/lib/books';
 
@@ -70,17 +70,8 @@ export default function BookDetailClient({ book }: { book: Book }) {
                 transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
                 className="preserve-3d w-full"
               >
-                <div className="w-full aspect-[3/4] rounded-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.8),0_0_40px_rgba(139,0,0,0.3)]">
-                  <BookCover
-                    titleEnglish={book.titleEnglish}
-                    titleHindi={book.titleHindi}
-                    category={book.category}
-                    level={book.level}
-                    part={book.part}
-                    series={book.series}
-                    isBundle={book.isBundle}
-                    size="lg"
-                  />
+                <div className="relative w-full aspect-[3/4] rounded-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.8),0_0_40px_rgba(139,0,0,0.3)]">
+                  <BookCoverImage book={book} size="lg" sizes="(max-width: 1024px) 90vw, 400px" priority />
                 </div>
               </motion.div>
             </div>
