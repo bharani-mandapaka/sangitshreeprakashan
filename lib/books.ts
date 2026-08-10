@@ -43,7 +43,7 @@ export const books: Book[] = [
     slug: 'swar-vadan-complete-set',
     titleHindi: 'स्वर वादन भाग (1–5) - सम्पूर्ण सेट',
     titleEnglish: 'Swar Vadan Parts 1–5 (Complete Set)',
-    price: 1685,
+    price: 1658,
     category: 'bundle',
     level: 'bundle',
     language: 'hindi',
