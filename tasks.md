@@ -41,13 +41,16 @@
 
 ### Book content
 - [x] Add missing books to catalog (Swar Vadan Part 1, Raag Shastra Parichay Part 3, Concepts of Vocal Music Class 9–12, Concepts of Instrumental Music Class 9–12, Sangit Saar Class 11, Bal Sangit Parts 1–3, Treasure of Raags & Taals)
-- [ ] Real book cover images for all titles
+- [x] Fixed duplicate catalog entries (sv-1, rsp-3 were listed twice) — 36 unique books, down from 38 array entries
+- [x] Real book cover images — 30 of 36 books have real photos extracted from the print catalogue PDF
+- [ ] Cover photos for the 5 bundle sets + Swar Vadan Part 5 (still placeholder covers)
+- [x] Verified all book/bundle prices against the print catalogue
 - [ ] Final copy for descriptions, table of contents, author bios
 - [ ] Book detail pages — richer layout with TOC, edition/ISBN, sample pages (currently description-only)
 
 ### SEO
 - [x] Meta tags and OG images on all pages — merged, SEO metadata on all public pages and per-book detail pages
-- [x] Sitemap.xml for Google indexing — auto-generates for all pages and 34 book URLs
+- [x] Sitemap.xml for Google indexing — auto-generates for all pages and 36 book URLs
 - [x] Founder timeline — mobile scroll fix done (PR #4 pending merge); real photos and refined content blocked on Bharani
 ---
 

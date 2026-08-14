@@ -49,7 +49,7 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 
 | Feature | Status |
 |---------|--------|
-| Book catalog UI | Real — 38 books across 7 categories |
+| Book catalog UI | Real — 36 books across 7 categories |
 | Book detail pages | Real — server component passes book to `BookDetailClient` |
 | Cart + checkout UI | Real |
 | Payments | Mock — no Razorpay yet |
@@ -61,10 +61,10 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 | OTP verification | Mock — code shown on screen |
 | WhatsApp notifications | UI only — no Meta/Twilio API |
 | Google OAuth | Simulated UI — no real token |
-| Book images | Placeholders |
+| Book images | Real — 30 of 36 books have real cover photos; 5 bundle covers + Swar Vadan Part 5 still use the generated placeholder |
 | Admin auth | localStorage password gate (`ssp@admin`) |
 | SEO metadata | Real — generateMetadata() on all public pages |
-| Sitemap | Real — auto-generated at /sitemap.xml for all pages + 34 books |
+| Sitemap | Real — auto-generated at /sitemap.xml for all pages + 36 books |
 
 ---
 
@@ -109,7 +109,7 @@ RLS is permissive (anon can insert + select + update) — to be tightened in Pha
 - `POST /api/orders/create` — inserts order + items to Supabase, sends Resend confirmation email
 
 ## Book catalog
-All books are a static array in `lib/books.ts`. Total: 34 books across 7 categories.
+All books are a static array in `lib/books.ts`. Total: 36 books across 7 categories.
 
 Each book has: `id`, `slug`, `titleEnglish`, `titleHindi`, `authors`, `price`, `category`, `level`, `language`, `description`, `tags`, `series`, `part`, `isBundle`.
 
@@ -170,8 +170,8 @@ Categories: `instrumental` (व), `vocal` (ग), `raag-theory` (र), `kathak` (
 
 ### Remaining Phase 1 work
 - Razorpay account approval + payment integration (blocked on Bharani)
-- Real book cover images (blocked on Bharani)
-- Founder timeline — real photos, refined content, mobile scroll fix
+- Cover photos for the 5 bundle sets + Swar Vadan Part 5 (still placeholders)
+- Founder timeline — real photos, refined content (mobile scroll fix done in PR #4)
 
 ---
 
