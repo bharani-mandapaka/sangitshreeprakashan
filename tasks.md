@@ -42,8 +42,8 @@
 ### Book content
 - [x] Add missing books to catalog (Swar Vadan Part 1, Raag Shastra Parichay Part 3, Concepts of Vocal Music Class 9–12, Concepts of Instrumental Music Class 9–12, Sangit Saar Class 11, Bal Sangit Parts 1–3, Treasure of Raags & Taals)
 - [x] Fixed duplicate catalog entries (sv-1, rsp-3 were listed twice) — 36 unique books, down from 38 array entries
-- [x] Real book cover images — 30 of 36 books have real photos extracted from the print catalogue PDF
-- [ ] Cover photos for the 5 bundle sets + Swar Vadan Part 5 (still placeholder covers)
+- [x] Real book cover images — 31 of 36 books have real cover photos (30 from the print catalogue PDF, 1 bundle collage supplied directly)
+- [ ] Cover photos for the remaining 4 bundle sets + Swar Vadan Part 5 (still placeholder covers)
 - [x] Verified all book/bundle prices against the print catalogue
 - [ ] Final copy for descriptions, table of contents, author bios
 - [ ] Book detail pages — richer layout with TOC, edition/ISBN, sample pages (currently description-only)

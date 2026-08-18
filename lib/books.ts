@@ -118,6 +118,7 @@ export const books: Book[] = [
     authors: ['पं० सतीश चन्द्र श्रीवास्तव', 'डॉ० अल्पना खरे'],
     description:
       'A complete 5-book set covering 116 ragas with notation for Hindustani Classical Vocal. Includes aaroh-avroh, pakad, alaap, taan, chhota khayal, bada khayal, dhrupad, dhamar and tarana for each raga. Aligned with syllabi from Class 9 through M.A., Prayag Sangit Samiti, Pracheen Kala Kendra and Gandharv Mahavidyalay.',
+    coverImage: '/covers/bhatkhande-notation-1-5-set.jpg',
     series: 'Bhatkhande Notation',
     isBundle: true,
     isFeatured: true,

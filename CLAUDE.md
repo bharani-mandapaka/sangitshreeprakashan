@@ -61,7 +61,7 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 | OTP verification | Mock — code shown on screen |
 | WhatsApp notifications | UI only — no Meta/Twilio API |
 | Google OAuth | Simulated UI — no real token |
-| Book images | Real — 30 of 36 books have real cover photos; 5 bundle covers + Swar Vadan Part 5 still use the generated placeholder |
+| Book images | Real — 31 of 36 books have real cover photos; 4 bundle covers + Swar Vadan Part 5 still use the generated placeholder |
 | Admin auth | localStorage password gate (`ssp@admin`) |
 | SEO metadata | Real — generateMetadata() on all public pages |
 | Sitemap | Real — auto-generated at /sitemap.xml for all pages + 36 books |
@@ -170,7 +170,7 @@ Categories: `instrumental` (व), `vocal` (ग), `raag-theory` (र), `kathak` (
 
 ### Remaining Phase 1 work
 - Razorpay account approval + payment integration (blocked on Bharani)
-- Cover photos for the 5 bundle sets + Swar Vadan Part 5 (still placeholders)
+- Cover photos for the remaining 4 bundle sets + Swar Vadan Part 5 (still placeholders)
 - Founder timeline — real photos, refined content (mobile scroll fix done in PR #4)
 
 ---
