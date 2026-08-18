@@ -64,17 +64,26 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 | Book images | Placeholders |
 | Admin auth | localStorage password gate (`ssp@admin`) |
 | SEO metadata | Real — generateMetadata() on all public pages |
-| Sitemap | Real — auto-generated at /sitemap.xml for all pages + 34 books |
+| Sitemap | Real — auto-generated at /sitemap.xml for all pages + 39 books |
 
 ---
 
 ## Environment variables
 Stored in `.env.local` locally and in Vercel project settings (set via `npx vercel env add`).
+**`.env.example` is the source of truth** — it documents every variable and which Vercel scopes
+each one needs. Keep it updated when adding a variable.
+
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://kypqmrfgxeybqzkawogb.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
-RESEND_API_KEY=<resend key>
+NEXT_PUBLIC_SUPABASE_URL       # required
+NEXT_PUBLIC_SUPABASE_ANON_KEY  # required
+RESEND_API_KEY                 # required
+CRON_SECRET                    # optional — Bearer token for the digest cron routes
+WHATSAPP_PHONE_NUMBER_ID       # optional — unset means WhatsApp sends are skipped
+WHATSAPP_TOKEN                 # optional
 ```
+
+`NEXT_PUBLIC_*` variables are inlined at build time — enable them for Production, Preview **and**
+Development in Vercel, or PR preview deploys build without them.
 
 ---
 
@@ -102,11 +111,24 @@ orders (id, created_at, status, customer_name, customer_email, customer_phone,
         subtotal, payment_method)
 
 order_items (id, order_id, book_id, sku, title_english, title_hindi, qty, price)
+
+notification_rules (id, name, description, trigger, channel, recipients, subject, body,
+                    whatsapp_numbers, whatsapp_message, active, created_at)
+                    -- trigger: order_placed | daily_digest | weekly_digest | cart_abandoned
+                    -- channel: email | whatsapp | both
+
+notification_logs  (id, rule_id, rule_name, trigger, channel, recipients, status, error, sent_at)
+                    -- status: sent | failed | partial
 ```
-RLS is permissive (anon can insert + select + update) — to be tightened in Phase 2 with auth.
+RLS is permissive (anon can do everything on all four tables) — to be tightened in Phase 2 with auth.
+
+Full schema lives in `supabase/schema.sql`.
 
 ## API routes (live)
 - `POST /api/orders/create` — inserts order + items to Supabase, sends Resend confirmation email
+- `POST /api/notifications/test` — sends a test notification for a given rule
+- `GET /api/cron/daily-digest` — daily digest job
+- `GET /api/cron/weekly-digest` — weekly digest job
 
 ## Book catalog
 All books are a static array in `lib/books.ts`. Total: 39 books across 7 categories.
@@ -132,6 +154,23 @@ Categories: `instrumental` (व), `vocal` (ग), `raag-theory` (र), `kathak` (
 - `app/about/page.tsx` — about page metadata
 - `app/contact/layout.tsx` — contact page metadata
 - `app/sitemap.ts` — auto-generates /sitemap.xml for all pages + all book slugs
+
+### Title template — known gotcha
+`app/layout.tsx` defines `title.template = '%s | Sangit Shree Prakashan'`, which appends the
+brand to every child page's title.
+
+**A nested layout that sets `title` as a plain string silently kills that template for all of
+its children.** Next.js resolves a string title to `{ absolute, template: null }`, so the
+template stops at that segment. This is what broke every book detail page — they rendered a bare
+`<title>` with no brand until `app/books/layout.tsx` was changed to:
+
+```ts
+title: { default: 'All Books', template: '%s | Sangit Shree Prakashan' },
+```
+
+If you add a new nested layout with its own `title`, use the `{ default, template }` form, then
+verify with `npm run build && npx next start` and check the `<title>` of a child route — not just
+the layout's own route.
 
 ## Key component patterns
 - **BookCard** — persistent View + Add to Cart buttons below cover image
@@ -159,7 +198,7 @@ Categories: `instrumental` (व), `vocal` (ग), `raag-theory` (र), `kathak` (
 ### Services status
 | What | Service | Status |
 |------|---------|--------|
-| Database | Supabase (Postgres) | Live — orders + order_items tables exist |
+| Database | Supabase (Postgres) | Live — orders, order_items, notification_rules, notification_logs |
 | Transactional email | Resend | Live — domain `sangitshreeprakashan.com` verified |
 | Payments | Razorpay | Not started — needs GST/PAN account verification |
 | SEO | Next.js generateMetadata + sitemap | Live — merged via PR #2 + PR #3 (fix) |
@@ -189,9 +228,9 @@ Categories: `instrumental` (व), `vocal` (ग), `raag-theory` (र), `kathak` (
 | WhatsApp | Meta Cloud API | Start verification early — approval takes 2–4 weeks |
 
 ### Additional Supabase tables (Phase 2)
+`notification_rules` and `notification_logs` already exist — see the live schema above.
+Still to create:
 ```sql
-admin_users        (id, name, email, phone, role, auth_provider, created_at)
-notification_rules (id, name, trigger, channel, recipients, subject, body, whatsapp_numbers, whatsapp_message, active, created_at)
-notification_logs  (id, rule_id, sent_at, channel, recipients, status)
-books              (id, slug, title_english, title_hindi, authors, price, category, level, language, description, tags, series, part, is_bundle, cover_url, in_stock)
+admin_users (id, name, email, phone, role, auth_provider, created_at)
+books       (id, slug, title_english, title_hindi, authors, price, category, level, language, description, tags, series, part, is_bundle, cover_url, in_stock)
 ```

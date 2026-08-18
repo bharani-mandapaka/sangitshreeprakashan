@@ -89,6 +89,7 @@ ANALYTICS
   Notifications:   Full engine built — rules in Supabase, email send, logs, test button
   Deployment:      Vercel + GitHub (auto-deploy on git push)
   Cron jobs:       Daily + weekly digest routes registered in vercel.json
+  SEO:             Meta + OG tags on every page, per-book metadata, /sitemap.xml
 
 ⚠️  PROTOTYPE (UI exists, not wired to real service)
   Payments:        Checkout UI works but no real Razorpay — orders saved as COD
@@ -101,7 +102,7 @@ ANALYTICS
 ❌ NOT STARTED
   Razorpay payment integration
   Real book cover images
-  SEO (meta tags, OG images, sitemap)
+  SEO extras — generated OG images + JSON-LD structured data (base SEO is done)
   Admin catalog management (edit/create books from UI)
   Migrate books from hardcoded file to Supabase database
   Google Analytics 4 integration
@@ -385,13 +386,16 @@ lib/
 ### Config files
 
 ```
+README.md           Repo front door — stack, quick start, structure, docs index
 CLAUDE.md           Project brief for Claude Code — read this first, keep it updated
 tasks.md            Living task list — check off done items, add new ones
+GIT_GUIDE.md        The mandatory git workflow — branch, build, commit, PR
 HANDOVER.md         This file
 vercel.json         Vercel cron job schedule (daily/weekly digest)
 tailwind.config.ts  Design tokens (gold, dark, cream colours + font variables)
 tsconfig.json       TypeScript config
 package.json        Dependencies and scripts
+.env.example        Template listing every required env var — commit this one
 .env.local          Secrets — NEVER commit to git (it's in .gitignore)
 ```
 
@@ -419,7 +423,7 @@ package.json        Dependencies and scripts
 | Book images | ❌ Placeholders | Real photos |
 | Catalog management | ❌ Not built | Phase 2 |
 | Admin users in DB | ❌ localStorage | Phase 2 |
-| SEO | ❌ Not done | Meta tags, sitemap, OG images |
+| SEO | ✅ Real | Meta tags, OG tags, per-book metadata and `/sitemap.xml` all shipped (PRs #2, #3) |
 
 ---
 
@@ -596,15 +600,24 @@ All covers are placeholders. Need actual high-res photos of each book cover.
 3. Update `lib/books.ts` — add `coverUrl` field pointing to Supabase Storage URL
 4. Update `BookCover.tsx` component to use real images
 
-### P1.3 — SEO 🟡
+### P1.3 — SEO 🟢 mostly done
 
-**Tell Claude Code:**
+Shipped in PRs #2 and #3:
+- `generateMetadata()` on every page, including per-book titles and descriptions
+- OG and Twitter tags site-wide
+- `app/sitemap.ts` — `/sitemap.xml` covering all static pages + all 39 book URLs
+
+⚠️ Gotcha worth knowing: a nested layout that sets `title` as a plain string kills the root
+layout's title template for all of its children. This silently stripped the brand suffix from
+every book detail page. Use the `{ default, template }` form in nested layouts — see the
+**Title template** note in `CLAUDE.md`.
+
+**Still outstanding — tell Claude Code:**
 ```
-Add SEO to the Next.js site:
-1. Add generateMetadata() to every page (books/[slug], about, contact, home)
-2. Generate OG images for book detail pages using Next.js ImageResponse
-3. Create app/sitemap.ts that returns all book URLs + static pages
-4. Add JSON-LD structured data to book detail pages (Book schema)
+1. Generate OG images for book detail pages using Next.js ImageResponse
+2. Add JSON-LD structured data to book detail pages (Book schema)
+3. Add generateStaticParams() to app/books/[slug] so the 39 book pages prerender
+   instead of server-rendering on every request
 ```
 
 ### P1.4 — Book Detail Pages — Richer Content 🟢
@@ -840,7 +853,7 @@ WEEK 3 (Strategise with Bharani)
 
 SPRINT 1 (Start of your building phase)
   □ Fix email deliverability (DNS records in Resend)
-  □ SEO foundations (meta tags + sitemap) — high ROI, easy win
+  ☑ SEO foundations (meta tags + sitemap) — done, PRs #2 and #3
   □ Google Analytics 4 wired in
   Priority: these don't need Razorpay and make the site measurably better immediately
 
