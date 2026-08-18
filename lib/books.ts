@@ -50,6 +50,7 @@ export const books: Book[] = [
     authors: ['पं० सतीश चन्द्र श्रीवास्तव', 'रोहित कुमार'],
     description:
       'A complete collection of 5 books for students of Guitar, Sitar, Harmonium, Bansuri, Sarod, Casio, Mandolin, Sarangi and more. Covers raag introductions, alaap, Maseetkhani gat, Razakhani gat, taan and jhala across 130 ragas - aligned with syllabi from Class 9 through Post-Graduation, Prayag Sangit Samiti, Pracheen Kala Kendra, and Gandharv Mahavidyalay Mumbai (Year 1–8 Pravin).',
+    coverImage: '/covers/swar-vadan-complete-set.jpg',
     series: 'Swar Vadan',
     isBundle: true,
     isFeatured: true,
@@ -67,6 +68,7 @@ export const books: Book[] = [
     authors: ['पं० सतीश चन्द्र श्रीवास्तव'],
     description:
       'A 3-book series with photographs of musicians and instruments, basic music knowledge, easy compositions and notations of ragas and talas, orchestra concepts, vandana, prayers, patriotic songs, children\'s songs, English songs, and biographies of renowned musicians. Specially designed for students up to Class 8 and beginners.',
+    coverImage: '/covers/bal-sangit-sangrah-complete-set.jpg',
     series: 'Bal Sangit Sangrah',
     isBundle: true,
     isFeatured: true,
@@ -84,6 +86,7 @@ export const books: Book[] = [
     authors: ['Pt. Satish Chandra Srivastava', 'Rohit Kumar'],
     description:
       'A set of 2 Hindustani Music books in English - useful for students of Class 9 to 12, Prayag Sangit Samiti Allahabad and Pracheen Kala Kendra for first to fourth year. Covers both Theory and Practical.',
+    coverImage: '/covers/introduction-of-raags-complete-set.jpg',
     series: 'Introduction of Raags',
     isBundle: true,
     isFeatured: false,
@@ -101,6 +104,7 @@ export const books: Book[] = [
     authors: ['पं० सतीश चन्द्र श्रीवास्तव', 'डॉ० अल्पना खरे'],
     description:
       'A 3-book set for Hindustani Classical Vocal in Hindi, covering 56 ragas with notation. Each raga includes introduction, aaroh-avroh, pakad, nyaas swar, similar ragas, alaap, taan, chhota khayal, bada khayal, dhrupad, dhamar and tarana. Suitable for Prayag Sangit Samiti, Pracheen Kala Kendra, Gandharv Mahavidyalay and Class 9 to B.A.',
+    coverImage: '/covers/bhatkhande-notation-1-3-set.jpg',
     series: 'Bhatkhande Notation',
     isBundle: true,
     isFeatured: true,
@@ -138,6 +142,7 @@ export const books: Book[] = [
     authors: ['पं० सतीश चन्द्र श्रीवास्तव (सितार वादक)', 'रोहित कुमार'],
     description:
       'For M.A. Sangit Pravin, Sangit Bhaskar and equivalent students. Covers 30 ragas - 15 detailed (Bilaskhani Todi, Megh Malhar, Jogkauns, Nayaki Kanhada, Kaunsi Kanhada, Suha, Hemant, Shyam Kalyan, Gorakh Kalyan, Devgiri Bilawal, Yamani Bilawal, Bhatiyar, Jhinjhoti, Miyan Ki Sarang, Jaitashri) and 15 in brief. Each includes alaap, Maseetkhani gat, Razakhani gat, tihai and jhala.',
+    coverImage: '/covers/swar-vadan-part-5.jpg',
     series: 'Swar Vadan',
     part: 5,
     isFeatured: true,
