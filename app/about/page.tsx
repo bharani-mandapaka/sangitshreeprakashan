@@ -282,7 +282,7 @@ export default function AboutPage() {
         </div>
 
         {/* Horizontally scrollable timeline - auto-scrolls via TimelineScroll */}
-        <TimelineScroll speedPx={28}>
+        <TimelineScroll speedPx={50}>
           <div
             className="relative flex px-8 sm:px-24"
             style={{
