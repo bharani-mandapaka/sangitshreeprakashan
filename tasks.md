@@ -48,9 +48,31 @@
 - [ ] Book detail pages — richer layout with TOC, edition/ISBN, sample pages (currently description-only)
 
 ### SEO
-- [x] Meta tags and OG images on all pages — merged, SEO metadata on all public pages and per-book detail pages
+- [x] Meta tags and OG images on all pages — PR #2 `feature/seo-metadata`, merged; SEO metadata on all public pages and per-book detail pages
 - [x] Sitemap.xml for Google indexing — auto-generates for all pages and 36 book URLs
+- [x] Fix `/books` 404 — PR #2 overwrote the catalog listing page with book-detail code; restored in PR #3 `fix/books-listing-page`
+- [x] Restore brand suffix on book detail titles — `app/books/layout.tsx` used a plain-string `title`, which nulled the root layout's title template for all 36 book pages
 - [x] Founder timeline — mobile scroll fix done (PR #4 pending merge); real photos and refined content blocked on Bharani
+- [ ] Prerender book detail pages — add `generateStaticParams()` to `app/books/[slug]`; currently server-rendered per request despite the catalog being a static array
+
+---
+
+## Security & maintenance
+
+> Not tied to a phase. The dependency patch is the only item here with a live impact today.
+
+- [ ] **Patch the critical Next.js CVE** — `npm audit` flags information exposure in the Next.js
+      dev server due to missing origin verification (currently on 14.2.21). Also high-severity
+      issues in `ws` (uninitialized memory disclosure, DoS) and `glob` (command injection via
+      `-c/--cmd`). Prefer a patch bump within the 14.2.x line — do **not** jump to Next.js 15,
+      which changes the `params` API this codebase relies on.
+- [ ] **Rotate or remove the hardcoded admin password** — `ssp@admin` is committed in `CLAUDE.md`
+      and `HANDOVER.md`, and the GitHub repo is public, so it is publicly readable. It only guards
+      a localStorage gate today, so nothing is genuinely protected either way — but it should not
+      survive into the NextAuth.js work below.
+- [ ] **Tighten Supabase RLS** — policies are currently permissive: anon can insert, select and
+      update on all four tables (`orders`, `order_items`, `notification_rules`,
+      `notification_logs`). Depends on real auth landing first.
 ---
 
 ## Phase 2 — Admin (make it fully operational)

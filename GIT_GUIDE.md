@@ -110,6 +110,7 @@ git push origin feature/your-branch-name
 5. Message Bharani: "PR is ready for review"
 
 Bharani will review, leave comments if needed, and merge when it's good to go.
+Nothing goes live until the PR is approved and merged.
 
 ---
 
@@ -138,3 +139,12 @@ git push origin feature/name     # push to GitHub
 | Committing without building | Always run `npm run build` first |
 | Using `git add .` or `git add -A` | Add specific files by name |
 | Forgetting to pull before starting | Always start with `git pull origin master` |
+| Committing `.env.local` | Never commit it — it holds secrets and must stay off GitHub. Use `.env.example` as the reference for which variables are needed. |
+
+---
+
+## For Claude Code users
+
+The rules above are already encoded in `CLAUDE.md` under **Git workflow (mandatory)**, so
+Claude Code follows them automatically. If you start a new project from this one, copy that
+section across.
