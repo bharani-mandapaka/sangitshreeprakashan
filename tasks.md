@@ -73,6 +73,7 @@
 - [ ] **Tighten Supabase RLS** — policies are currently permissive: anon can insert, select and
       update on all four tables (`orders`, `order_items`, `notification_rules`,
       `notification_logs`). Depends on real auth landing first.
+
 ---
 
 ## Phase 2 — Admin (make it fully operational)
