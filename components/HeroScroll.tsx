@@ -16,10 +16,10 @@ export default function HeroScroll() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_40%_40%_at_50%_50%,_rgba(201,162,39,0.08)_0%,_transparent_70%)]" />
       </div>
 
-      {/* Decorative rings (static) */}
-      <div className="absolute w-[600px] h-[600px] rounded-full border border-gold/5 pointer-events-none" />
-      <div className="absolute w-[420px] h-[420px] rounded-full border border-gold/8 pointer-events-none" />
-      <div className="absolute w-[260px] h-[260px] rounded-full border border-gold/10 pointer-events-none" />
+      {/* Decorative rings (static) — scale with viewport, capped so they never clip or shrink too far */}
+      <div className="absolute rounded-full border border-gold/5 pointer-events-none" style={{ width: 'clamp(280px, 85vw, 600px)', height: 'clamp(280px, 85vw, 600px)' }} />
+      <div className="absolute rounded-full border border-gold/8 pointer-events-none" style={{ width: 'clamp(200px, 62vw, 420px)', height: 'clamp(200px, 62vw, 420px)' }} />
+      <div className="absolute rounded-full border border-gold/10 pointer-events-none" style={{ width: 'clamp(140px, 40vw, 260px)', height: 'clamp(140px, 40vw, 260px)' }} />
 
       {/* Content — fades/slides in once on mount, no scroll-linked animation */}
       <motion.div
