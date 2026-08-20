@@ -43,6 +43,10 @@ export default function TimelineScroll({ children, speedPx = 50 }: Props) {
     el.addEventListener('mouseleave',  resume);
     el.addEventListener('touchstart',  pause,  { passive: true });
     el.addEventListener('touchend',    resume, { passive: true });
+    // iOS Safari fires touchcancel (not touchend) when a touch turns into a
+    // scroll/system gesture — without this, resume() never runs and the
+    // carousel stays paused for the rest of the session after the first touch.
+    el.addEventListener('touchcancel', resume, { passive: true });
 
     return () => {
       cancelAnimationFrame(rafId);
@@ -50,6 +54,7 @@ export default function TimelineScroll({ children, speedPx = 50 }: Props) {
       el.removeEventListener('mouseleave', resume);
       el.removeEventListener('touchstart', pause);
       el.removeEventListener('touchend',   resume);
+      el.removeEventListener('touchcancel', resume);
     };
   }, [speedPx]);
 
