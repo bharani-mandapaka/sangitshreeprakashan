@@ -33,7 +33,7 @@
 > Supabase ✓ · Resend ✓ · Razorpay — remaining blocker.
 
 ### Payments (main remaining work)
-- [ ] Razorpay business account — needs GST or PAN, takes 1–3 days to verify
+- [ ] Razorpay API keys — migrating from old website, need keys from Bharani (Key ID + Key Secret)
 - [ ] API route `POST /api/checkout/create-order` — creates Razorpay order, returns ID to frontend
 - [ ] Razorpay payment modal wired into checkout page
 - [ ] API route `POST /api/checkout/verify` — verifies signature, writes order to Supabase
@@ -46,11 +46,11 @@
 - [ ] Book detail pages — richer layout with TOC, edition/ISBN, sample pages (currently description-only)
 
 ### SEO
-- [x] Meta tags and OG images on all pages — PR #2 `feature/seo-metadata`, merged
+- [x] Meta tags and OG images on all pages — PR #2 `feature/seo-metadata`, merged; SEO metadata on all public pages and per-book detail pages
 - [x] Sitemap.xml for Google indexing — auto-generates for all pages and 39 book URLs
 - [x] Fix `/books` 404 — PR #2 overwrote the catalog listing page with book-detail code; restored in PR #3 `fix/books-listing-page`
 - [x] Restore brand suffix on book detail titles — `app/books/layout.tsx` used a plain-string `title`, which nulled the root layout's title template for all 39 book pages
-- [ ] Founder timeline — real photos, refined content, mobile scroll fix
+- [x] Founder timeline — mobile scroll fix done (PR #4); real photos and refined content still blocked on Bharani
 - [ ] Prerender book detail pages — add `generateStaticParams()` to `app/books/[slug]`; currently server-rendered per request despite the catalog being a static array
 
 ---

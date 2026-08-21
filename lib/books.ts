@@ -422,44 +422,6 @@ export const books: Book[] = [
     tags: ['research', 'malhar', 'raaga', 'scholarly', 'advanced'],
   },
 
-  // ─── INSTRUMENTAL - SWAR VADAN PART 1 ──────────────────────────────────────
-  {
-    id: 'sv-1',
-    slug: 'swar-vadan-part-1',
-    titleHindi: 'स्वर वादन भाग-1',
-    titleEnglish: 'Swar Vadan Part 1',
-    price: 180,
-    category: 'instrumental',
-    level: 'beginner',
-    language: 'hindi',
-    authors: ['पं० सतीश चन्द्र श्रीवास्तव (सितार वादक)', 'रोहित कुमार'],
-    description:
-      'For Class 9–10 students across all boards, Prayag Sangit Samiti and Pracheen Kala Kendra (1st–2nd year). Covers 20 ragas including Bhairav, Alhaya Bilawal, Kafi, Bhupali, Kalyan (Yaman), Bhairavi, Asavari, Vibhas, Vrindavani Sarang, Bhimpalasi, Durga, Desh, Kedar, Bageshri, Bihag, Malkaus, Jaunpuri, Tilak Kamod, Tilang and Pilu. Includes introduction, alaap, Maseetkhani gat, Razakhani gat and jhala.',
-    series: 'Swar Vadan',
-    part: 1,
-    isFeatured: false,
-    tags: ['instrumental', 'sitar', 'harmonium', 'beginner', 'class-9-10'],
-  },
-
-  // ─── RAAG THEORY PART 3 ─────────────────────────────────────────────────────
-  {
-    id: 'rsp-3',
-    slug: 'raag-shastra-parichay-part-3',
-    titleHindi: 'राग शास्त्र परिचय भाग-3',
-    titleEnglish: 'Raag Shastra Parichay Part 3',
-    price: 225,
-    category: 'raag-theory',
-    level: 'intermediate',
-    language: 'hindi',
-    authors: ['पं० सतीश चन्द्र श्रीवास्तव', 'डॉ. अल्पना खरे'],
-    description:
-      'For B.A. Sangit Prabhakar and equivalent students. Covers 35+ ragas including Ramkali, Lalit, Kamod, Shuddh Kalyan, Darbari Kanhada, Adana, Rageshri, Chhayanat, Puriya, Sohni, Basant, Puriya Dhanashri, Shri, Jhinjhoti, Pahari and more. Also includes comparison of ragas, Hindustani and South Indian systems, Indian music history, vocal gharanas and Western notation.',
-    series: 'Raag Shastra Parichay',
-    part: 3,
-    isFeatured: false,
-    tags: ['raag-theory', 'theory', 'intermediate', 'ba', 'prabhakar'],
-  },
-
   // ─── CBSE ENGLISH SERIES ────────────────────────────────────────────────────
   {
     id: 'cbse-vocal-9',

@@ -49,7 +49,7 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 
 | Feature | Status |
 |---------|--------|
-| Book catalog UI | Real — 39 books across 7 categories |
+| Book catalog UI | Real — 36 books across 7 categories |
 | Book detail pages | Real — server component passes book to `BookDetailClient` |
 | Cart + checkout UI | Real |
 | Payments | Mock — no Razorpay yet |
@@ -64,7 +64,7 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 | Book images | Placeholders |
 | Admin auth | localStorage password gate (`ssp@admin`) |
 | SEO metadata | Real — generateMetadata() on all public pages |
-| Sitemap | Real — auto-generated at /sitemap.xml for all pages + 39 books |
+| Sitemap | Real — auto-generated at /sitemap.xml for all pages + 36 books |
 
 ---
 
@@ -131,7 +131,7 @@ Full schema lives in `supabase/schema.sql`.
 - `GET /api/cron/weekly-digest` — weekly digest job
 
 ## Book catalog
-All books are a static array in `lib/books.ts`. Total: 39 books across 7 categories.
+All books are a static array in `lib/books.ts`. Total: 36 books across 7 categories.
 
 Each book has: `id`, `slug`, `titleEnglish`, `titleHindi`, `authors`, `price`, `category`, `level`, `language`, `description`, `tags`, `series`, `part`, `isBundle`.
 
@@ -201,7 +201,7 @@ the layout's own route.
 | Database | Supabase (Postgres) | Live — orders, order_items, notification_rules, notification_logs |
 | Transactional email | Resend | Live — domain `sangitshreeprakashan.com` verified |
 | Payments | Razorpay | Not started — needs GST/PAN account verification |
-| SEO | Next.js generateMetadata + sitemap | Done — merged (PRs #2, #3) |
+| SEO | Next.js generateMetadata + sitemap | Live — merged via PR #2 + PR #3 (fix) |
 
 ### API routes to build
 - `POST /api/checkout/create-order` — creates Razorpay order, returns order ID to frontend

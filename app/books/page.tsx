@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Search, SlidersHorizontal, X } from 'lucide-react';
+import { useState, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { SlidersHorizontal, X, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import BookCard from '@/components/BookCard';
 import {
@@ -38,13 +39,23 @@ const LANGUAGES: { value: BookLanguage | 'all'; label: string }[] = [
   { value: 'bilingual',label: 'Bilingual' },
 ];
 
-export default function BooksPage() {
+// Category links from the homepage (e.g. /books?category=instrumental) were
+// navigating here but landing on the unfiltered "All Books" view — this page
+// never read the URL, it only tracked filters in local state. Reading the
+// `category` param on mount (via useSearchParams, which requires the
+// Suspense wrapper below) fixes that.
+function BooksPageContent() {
+  const searchParams = useSearchParams();
+  const categoryParam = searchParams.get('category') as BookCategory | null;
+  const initialCategory: BookCategory | 'all' =
+    categoryParam && ALL_CATEGORIES.includes(categoryParam) ? categoryParam : 'all';
+
   const [query,    setQuery]    = useState('');
-  const [category, setCategory] = useState<BookCategory | 'all'>('all');
+  const [category, setCategory] = useState<BookCategory | 'all'>(initialCategory);
   const [level,    setLevel]    = useState<BookLevel | 'all'>('all');
   const [language, setLanguage] = useState<BookLanguage | 'all'>('all');
   const [sortBy,   setSortBy]   = useState<'default' | 'price-asc' | 'price-desc'>('default');
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(initialCategory !== 'all');
 
   const filtered = useMemo(() => {
     let result = [...books];
@@ -97,44 +108,54 @@ export default function BooksPage() {
         {/* Search + filter bar */}
         <div className="flex flex-col sm:flex-row gap-3 mb-8">
           {/* Search */}
-          <div className="relative flex-1">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-cream/30" />
+          <div className="flex-1">
             <input
               type="text"
               placeholder="Search books, ragas, series…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="input-gold pl-10"
+              className="input-gold"
+              autoComplete="off"
             />
           </div>
 
           {/* Sort */}
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className="input-gold w-full sm:w-48"
-          >
-            <option value="default">Default Order</option>
-            <option value="price-asc">Price: Low → High</option>
-            <option value="price-desc">Price: High → Low</option>
-          </select>
+          <div className="relative w-full sm:w-48">
+            <ArrowUpDown size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-cream/60 pointer-events-none z-10" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="input-gold w-full text-sm font-cinzel !text-cream/60"
+              style={{ paddingLeft: '2.25rem' }}
+            >
+              <option value="default">Sort</option>
+              <option value="price-asc">Price: Low → High</option>
+              <option value="price-desc">Price: High → Low</option>
+            </select>
+          </div>
 
           {/* Filters toggle */}
           <button
             onClick={() => setFiltersOpen(!filtersOpen)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-colors text-sm font-cinzel ${
+            className={`flex items-center justify-between gap-2 w-full sm:w-48 px-4 py-2.5 rounded-lg border transition-colors text-sm font-cinzel ${
               filtersOpen || hasFilters
                 ? 'border-gold text-gold bg-gold/5'
-                : 'border-gold/20 text-cream/60 hover:border-gold/40'
+                : 'border-gold/30 text-cream/60 hover:border-gold/40'
             }`}
           >
-            <SlidersHorizontal size={15} />
-            Filters
-            {hasFilters && (
-              <span className="bg-gold text-dark text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                !
-              </span>
-            )}
+            <span className="flex items-center gap-2">
+              <SlidersHorizontal size={15} />
+              Filters
+              {hasFilters && (
+                <span className="bg-gold text-dark text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                  !
+                </span>
+              )}
+            </span>
+            <ChevronDown
+              size={15}
+              className={`text-gold/70 transition-transform duration-200 ${filtersOpen ? 'rotate-180' : ''}`}
+            />
           </button>
         </div>
 
@@ -247,5 +268,13 @@ export default function BooksPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function BooksPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-dark pt-20 lg:pt-24" />}>
+      <BooksPageContent />
+    </Suspense>
   );
 }

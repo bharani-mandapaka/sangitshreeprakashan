@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Search, ChevronDown, ChevronUp, Download, MapPin, Phone, Mail, Package, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, MapPin, Phone, Mail, Package, RefreshCw } from 'lucide-react';
 import { getSupabase, type DbOrder } from '@/lib/supabase';
 import { type OrderStatus } from '@/lib/orders-store';
 import { formatPrice } from '@/lib/utils';
@@ -175,17 +175,25 @@ export default function OrdersPage() {
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError('');
-    const { data, error: dbErr } = await getSupabase()
-      .from('orders')
-      .select('*, order_items(*)')
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error: dbErr } = await getSupabase()
+        .from('orders')
+        .select('*, order_items(*)')
+        .order('created_at', { ascending: false });
 
-    if (dbErr) {
-      setError(dbErr.message);
-    } else {
-      setOrders((data as DbOrder[]) ?? []);
+      if (dbErr) {
+        setError(dbErr.message);
+      } else {
+        setOrders((data as DbOrder[]) ?? []);
+      }
+    } catch (err) {
+      // getSupabase() throws synchronously if the Supabase env vars aren't
+      // configured — without this catch the page was stuck on the loading
+      // spinner forever with no indication why.
+      setError(err instanceof Error ? err.message : 'Failed to connect to the database.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
@@ -289,13 +297,13 @@ export default function OrdersPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gold/40" />
+        <div className="flex-1 min-w-[180px]">
           <input
-            className="input-gold pl-8 text-sm py-2"
+            className="input-gold text-sm py-2"
             placeholder="Search order ID, name, city..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            autoComplete="off"
           />
         </div>
         <select
