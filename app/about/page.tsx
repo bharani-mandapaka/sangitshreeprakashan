@@ -263,7 +263,7 @@ export default function AboutPage() {
       {/* ══════════════════════════════════════════════════════════════════
           HORIZONTAL LIFE TIMELINE
       ══════════════════════════════════════════════════════════════════ */}
-      <div className="bg-[#060000] border-y border-gold/10 py-16">
+      <div className="bg-[#060000] border-y border-gold/10 py-16 overflow-x-hidden">
 
         {/* Section heading - constrained width */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-12">
@@ -286,12 +286,12 @@ export default function AboutPage() {
         <TimelineScroll speedPx={50}>
           <div
             className="relative flex px-16 sm:px-24"
-            style={{ height: '480px' }}
+            style={{ height: '560px' }}
           >
             {/* ── Gold horizontal centre line ── */}
-            <div className="absolute left-0 right-0 top-[220px] h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" />
+            <div className="absolute left-0 right-0 top-[260px] h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" />
             {/* Faint extended glow */}
-            <div className="absolute left-0 right-0 top-[219px] h-[3px] bg-gradient-to-r from-transparent via-gold/10 to-transparent blur-sm" />
+            <div className="absolute left-0 right-0 top-[259px] h-[3px] bg-gradient-to-r from-transparent via-gold/10 to-transparent blur-sm" />
 
             {founderTimeline.map((item, i) => {
               const isAbove = i % 2 === 0;
@@ -301,12 +301,12 @@ export default function AboutPage() {
                   className="relative flex flex-col items-center flex-shrink-0"
                   style={{ '--tl-item-w': 'clamp(140px, 35vw, 220px)', width: 'var(--tl-item-w)' } as CSSProperties}
                 >
-                  {/* ── TOP half (220px) ── */}
-                  <div className="flex flex-col items-center justify-end w-full" style={{ height: '220px' }}>
+                  {/* ── TOP half (260px) ── */}
+                  <div className="flex flex-col items-center justify-end w-full" style={{ height: '260px' }}>
                     {isAbove ? (
                       <div className="flex flex-col items-center w-full">
                         {/* Card */}
-                        <div className="w-[calc(var(--tl-item-w)-42px)] bg-[#0D0000] border border-gold/12 hover:border-gold/35 rounded-xl p-3.5 transition-all duration-300 group shadow-lg">
+                        <div className="w-[calc(var(--tl-item-w)-20px)] bg-[#0D0000] border border-gold/12 hover:border-gold/35 rounded-xl p-3.5 transition-all duration-300 group shadow-lg">
                           <span className={`inline-block text-[9px] font-cinzel font-bold uppercase tracking-widest px-2 py-0.5 rounded-full mb-2 ${item.tagClass}`}>
                             {item.tag}
                           </span>
@@ -338,14 +338,14 @@ export default function AboutPage() {
                     {item.icon}
                   </div>
 
-                  {/* ── BOTTOM half (220px) ── */}
-                  <div className="flex flex-col items-center justify-start w-full" style={{ height: '220px' }}>
+                  {/* ── BOTTOM half (260px) ── */}
+                  <div className="flex flex-col items-center justify-start w-full" style={{ height: '260px' }}>
                     {!isAbove ? (
                       <div className="flex flex-col items-center w-full h-full">
                         {/* Connector down from dot */}
                         <div className="w-px flex-1 min-h-[12px] bg-gradient-to-b from-gold/55 to-gold/20" />
                         {/* Card */}
-                        <div className="w-[calc(var(--tl-item-w)-42px)] bg-[#0D0000] border border-gold/12 hover:border-gold/35 rounded-xl p-3.5 transition-all duration-300 group shadow-lg">
+                        <div className="w-[calc(var(--tl-item-w)-20px)] bg-[#0D0000] border border-gold/12 hover:border-gold/35 rounded-xl p-3.5 transition-all duration-300 group shadow-lg">
                           <span className={`inline-block text-[9px] font-cinzel font-bold uppercase tracking-widest px-2 py-0.5 rounded-full mb-2 ${item.tagClass}`}>
                             {item.tag}
                           </span>
@@ -369,7 +369,7 @@ export default function AboutPage() {
             })}
 
             {/* End-cap glyph */}
-            <div className="flex items-center flex-shrink-0 pl-2" style={{ height: '480px' }}>
+            <div className="flex items-center flex-shrink-0 pl-2" style={{ height: '560px' }}>
               <div className="flex flex-col items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-gold/30 ring-4 ring-gold/8" />
                 <p className="font-cinzel text-gold/30 text-[9px] uppercase tracking-widest"

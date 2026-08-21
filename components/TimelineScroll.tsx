@@ -58,11 +58,28 @@ export default function TimelineScroll({ children, speedPx = 50 }: Props) {
     };
   }, [speedPx]);
 
+  // Because this scrolls continuously (not snap-to-card), the leading/trailing
+  // card is mid-scroll at any given moment and gets hard-clipped by the
+  // container edge — reads as a rendering bug ("timeline is cut off") rather
+  // than normal carousel behavior. Fading the edges with a mask makes that
+  // partial card disappear into the background instead of being sliced.
+  const edgeFade = {
+    maskImage:
+      'linear-gradient(to right, transparent 0, black 32px, black calc(100% - 32px), transparent 100%)',
+    WebkitMaskImage:
+      'linear-gradient(to right, transparent 0, black 32px, black calc(100% - 32px), transparent 100%)',
+  };
+
   return (
     <div
       ref={ref}
       className="overflow-x-auto select-none pb-4 cursor-grab active:cursor-grabbing"
-      style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      style={{
+        WebkitOverflowScrolling: 'touch',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+        ...edgeFade,
+      }}
     >
       {children}
     </div>

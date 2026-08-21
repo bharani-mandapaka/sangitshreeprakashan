@@ -527,14 +527,22 @@ export default function NotificationsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     setDbError('');
-    const [rulesRes, logsRes] = await Promise.all([
-      getSupabase().from('notification_rules').select('*').order('created_at', { ascending: false }),
-      getSupabase().from('notification_logs').select('*').order('sent_at', { ascending: false }).limit(30),
-    ]);
-    if (rulesRes.error) setDbError(rulesRes.error.message);
-    setRules((rulesRes.data as DbNotificationRule[]) ?? []);
-    setLogs((logsRes.data  as DbNotificationLog[])  ?? []);
-    setLoading(false);
+    try {
+      const [rulesRes, logsRes] = await Promise.all([
+        getSupabase().from('notification_rules').select('*').order('created_at', { ascending: false }),
+        getSupabase().from('notification_logs').select('*').order('sent_at', { ascending: false }).limit(30),
+      ]);
+      if (rulesRes.error) setDbError(rulesRes.error.message);
+      setRules((rulesRes.data as DbNotificationRule[]) ?? []);
+      setLogs((logsRes.data  as DbNotificationLog[])  ?? []);
+    } catch (err) {
+      // getSupabase() throws synchronously if the Supabase env vars aren't
+      // configured — without this catch the page was stuck on the loading
+      // spinner forever with no indication why.
+      setDbError(err instanceof Error ? err.message : 'Failed to connect to the database.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);

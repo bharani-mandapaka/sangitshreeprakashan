@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import {
-  LayoutDashboard, ShoppingBag, Bell, Users, LogOut, Menu, X, Lock,
+  LayoutDashboard, ShoppingBag, Bell, Users, LogOut, Menu, X,
 } from 'lucide-react';
 
 const NAV = [
@@ -61,17 +61,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">
                 Password
               </label>
-              <div className="relative">
-                <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gold/40" />
-                <input
-                  type="password"
-                  className="input-gold pl-9"
-                  placeholder="Enter admin password"
-                  value={pw}
-                  onChange={(e) => setPw(e.target.value)}
-                  autoFocus
-                />
-              </div>
+              <input
+                type="password"
+                className="input-gold"
+                placeholder="Enter admin password"
+                value={pw}
+                onChange={(e) => setPw(e.target.value)}
+                autoFocus
+              />
               {error && <p className="text-red-400 text-xs mt-1.5">{error}</p>}
             </div>
             <button

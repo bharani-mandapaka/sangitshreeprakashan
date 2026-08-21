@@ -2,7 +2,7 @@
 
 import { useMemo, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Eye, ShoppingCart, Package, TrendingUp, ArrowRight, Circle, RefreshCw } from 'lucide-react';
+import { Eye, ShoppingCart, Package, TrendingUp, ArrowRight, Circle, RefreshCw, AlertCircle } from 'lucide-react';
 import { useAnalyticsStore, getTotals } from '@/lib/analytics-store';
 import { getSupabase, type DbOrder } from '@/lib/supabase';
 import { formatPrice } from '@/lib/utils';
@@ -21,16 +21,27 @@ export default function AdminDashboard() {
 
   const [orders,  setOrders]  = useState<DbOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dbError, setDbError] = useState('');
 
   useEffect(() => {
     const fetch = async () => {
       setLoading(true);
-      const { data } = await getSupabase()
-        .from('orders')
-        .select('id, created_at, status, customer_name, subtotal, payment_method')
-        .order('created_at', { ascending: false });
-      setOrders((data as DbOrder[]) ?? []);
-      setLoading(false);
+      setDbError('');
+      try {
+        const { data, error } = await getSupabase()
+          .from('orders')
+          .select('id, created_at, status, customer_name, subtotal, payment_method')
+          .order('created_at', { ascending: false });
+        if (error) setDbError(error.message);
+        setOrders((data as DbOrder[]) ?? []);
+      } catch (err) {
+        // getSupabase() throws synchronously if the Supabase env vars aren't
+        // configured — without this catch the page was stuck on the loading
+        // spinner forever with no indication why.
+        setDbError(err instanceof Error ? err.message : 'Failed to connect to the database.');
+      } finally {
+        setLoading(false);
+      }
     };
     fetch();
   }, []);
@@ -104,6 +115,12 @@ export default function AdminDashboard() {
         </div>
         {loading && <RefreshCw size={15} className="text-gold/40 animate-spin" />}
       </div>
+
+      {dbError && (
+        <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/25 text-red-300 text-xs font-cinzel px-4 py-3 rounded-xl">
+          <AlertCircle size={14} /> Database error: {dbError}
+        </div>
+      )}
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
