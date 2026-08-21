@@ -610,6 +610,24 @@ export const books: Book[] = [
     isFeatured: false,
     tags: ['vocal', 'cbse', 'class-11', 'intermediate'],
   },
+  {
+    id: 'cbse-gayan-12',
+    slug: 'sangit-saar-gayan-class-12',
+    titleHindi: 'संगीत सार गायन कक्षा-XII',
+    titleEnglish: 'Sangit Saar: Gayan Class XII',
+    price: 125,
+    category: 'cbse',
+    level: 'intermediate',
+    language: 'hindi',
+    authors: ['पं० सतीश चन्द्र श्रीवास्तव', 'डॉ. अल्पना खरे'],
+    description:
+      'Specially written for CBSE Class 12 vocal music students (Subject Code 034). Covers the complete CBSE syllabus with detailed raga notations, theory, and practical guidance for board examinations.',
+    coverImage: '/covers/sangit-saar-gayan-class-12.jpg',
+    series: 'Sangit Saar',
+    part: 12,
+    isFeatured: false,
+    tags: ['vocal', 'cbse', 'class-12', 'intermediate'],
+  },
 
   // ─── BAL SANGIT - INDIVIDUAL BOOKS ──────────────────────────────────────────
   {
@@ -683,25 +701,6 @@ export const books: Book[] = [
     coverImage: '/covers/treasure-of-raags-and-taals.jpg',
     isFeatured: false,
     tags: ['research', 'reference', 'raag', 'taal', 'english', 'scholarly'],
-  },
-  // ─── CBSE ───────────────────────────────────────────────────────────────────
-  {
-    id: 'cbse-gayan-12',
-    slug: 'sangit-saar-gayan-class-12',
-    titleHindi: 'संगीत सार गायन कक्षा-XII',
-    titleEnglish: 'Sangit Saar: Gayan Class XII',
-    price: 125,
-    category: 'cbse',
-    level: 'intermediate',
-    language: 'hindi',
-    authors: ['पं० सतीश चन्द्र श्रीवास्तव', 'डॉ. अल्पना खरे'],
-    description:
-      'Specially written for CBSE Class 12 vocal music students (Subject Code 034). Covers the complete CBSE syllabus with detailed raga notations, theory, and practical guidance for board examinations.',
-    coverImage: '/covers/sangit-saar-gayan-class-12.jpg',
-    series: 'Sangit Saar',
-    part: 12,
-    isFeatured: false,
-    tags: ['vocal', 'cbse', 'class-12', 'intermediate'],
   },
 ];
 

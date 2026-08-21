@@ -26,7 +26,7 @@ export default function BookCoverImage({
         alt={`${book.titleEnglish} cover`}
         fill
         sizes={sizes}
-        className="object-contain"
+        className="object-contain saturate-[0.85]"
         priority={priority}
       />
     );
