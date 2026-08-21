@@ -52,7 +52,7 @@
 - [x] Sitemap.xml for Google indexing — auto-generates for all pages and 36 book URLs
 - [x] Fix `/books` 404 — PR #2 overwrote the catalog listing page with book-detail code; restored in PR #3 `fix/books-listing-page`
 - [x] Restore brand suffix on book detail titles — `app/books/layout.tsx` used a plain-string `title`, which nulled the root layout's title template for all 36 book pages
-- [x] Founder timeline — mobile scroll fix done (PR #4 pending merge); real photos and refined content blocked on Bharani
+- [x] Founder timeline — mobile scroll fix done (PR #4); real photos and refined content still blocked on Bharani
 - [ ] Prerender book detail pages — add `generateStaticParams()` to `app/books/[slug]`; currently server-rendered per request despite the catalog being a static array
 
 ---
