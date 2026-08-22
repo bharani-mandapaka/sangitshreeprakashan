@@ -41,15 +41,17 @@
 
 ### Book content
 - [x] Add missing books to catalog (Swar Vadan Part 1, Raag Shastra Parichay Part 3, Concepts of Vocal Music Class 9–12, Concepts of Instrumental Music Class 9–12, Sangit Saar Class 11, Bal Sangit Parts 1–3, Treasure of Raags & Taals)
-- [ ] Real book cover images for all titles
+- [x] Fixed duplicate catalog entries (sv-1, rsp-3 were listed twice) — 36 unique books, down from 38 array entries
+- [x] Real book cover images for all 36 books (30 from the print catalogue PDF, 6 bundle/individual covers supplied directly)
+- [x] Verified all book/bundle prices against the print catalogue
 - [ ] Final copy for descriptions, table of contents, author bios
 - [ ] Book detail pages — richer layout with TOC, edition/ISBN, sample pages (currently description-only)
 
 ### SEO
 - [x] Meta tags and OG images on all pages — PR #2 `feature/seo-metadata`, merged; SEO metadata on all public pages and per-book detail pages
-- [x] Sitemap.xml for Google indexing — auto-generates for all pages and 39 book URLs
+- [x] Sitemap.xml for Google indexing — auto-generates for all pages and 36 book URLs
 - [x] Fix `/books` 404 — PR #2 overwrote the catalog listing page with book-detail code; restored in PR #3 `fix/books-listing-page`
-- [x] Restore brand suffix on book detail titles — `app/books/layout.tsx` used a plain-string `title`, which nulled the root layout's title template for all 39 book pages
+- [x] Restore brand suffix on book detail titles — `app/books/layout.tsx` used a plain-string `title`, which nulled the root layout's title template for all 36 book pages
 - [x] Founder timeline — mobile scroll fix done (PR #4); real photos and refined content still blocked on Bharani
 - [ ] Prerender book detail pages — add `generateStaticParams()` to `app/books/[slug]`; currently server-rendered per request despite the catalog being a static array
 

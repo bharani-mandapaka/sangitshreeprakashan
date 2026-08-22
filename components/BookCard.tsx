@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ShoppingCart, Eye } from 'lucide-react';
 import { motion } from 'framer-motion';
-import BookCover from './BookCover';
+import BookCoverImage from './BookCoverImage';
 import { useCartStore } from '@/lib/cart-store';
 import { formatPrice } from '@/lib/utils';
 import type { Book } from '@/lib/books';
@@ -37,16 +37,7 @@ export default function BookCard({ book }: BookCardProps) {
 
         {/* Cover — clicking navigates to detail page */}
         <Link href={`/books/${book.slug}`} className="block relative aspect-[3/4] overflow-hidden bg-black flex-shrink-0">
-          <BookCover
-            titleEnglish={book.titleEnglish}
-            titleHindi={book.titleHindi}
-            category={book.category}
-            level={book.level}
-            part={book.part}
-            series={book.series}
-            isBundle={book.isBundle}
-            size="md"
-          />
+          <BookCoverImage book={book} size="md" />
           {/* Subtle hover tint */}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 pointer-events-none" />
           {/* Badges */}

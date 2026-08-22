@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShoppingBag, Plus, Minus, Trash2 } from 'lucide-react';
 import { useCartStore } from '@/lib/cart-store';
 import { formatPrice } from '@/lib/utils';
-import BookCover from './BookCover';
+import BookCoverImage from './BookCoverImage';
 
 export default function CartDrawer() {
   const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal } = useCartStore();
@@ -71,16 +71,8 @@ export default function CartDrawer() {
                     className="flex gap-3 p-3 rounded-xl bg-white/3 border border-gold/8 hover:border-gold/20 transition-colors"
                   >
                     {/* Cover thumbnail */}
-                    <div className="w-14 h-20 flex-shrink-0 rounded-lg overflow-hidden">
-                      <BookCover
-                        titleEnglish={book.titleEnglish}
-                        titleHindi={book.titleHindi}
-                        category={book.category}
-                        part={book.part}
-                        series={book.series}
-                        isBundle={book.isBundle}
-                        size="sm"
-                      />
+                    <div className="relative w-14 h-20 flex-shrink-0 rounded-lg overflow-hidden">
+                      <BookCoverImage book={book} size="sm" sizes="56px" />
                     </div>
 
                     {/* Info */}

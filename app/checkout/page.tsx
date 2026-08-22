@@ -9,7 +9,7 @@ import { useCartStore } from '@/lib/cart-store';
 import { useOrdersStore } from '@/lib/orders-store';
 import { useAnalyticsStore } from '@/lib/analytics-store';
 import { formatPrice, generateOrderId } from '@/lib/utils';
-import BookCover from '@/components/BookCover';
+import BookCoverImage from '@/components/BookCoverImage';
 
 type PayMethod = 'upi' | 'card' | 'netbanking';
 type CheckoutStep = 'details' | 'payment' | 'processing' | 'success';
@@ -443,15 +443,8 @@ export default function CheckoutPage() {
               <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
                 {items.map(({ book, quantity }) => (
                   <div key={book.id} className="flex items-center gap-3">
-                    <div className="w-10 h-14 flex-shrink-0 rounded-md overflow-hidden">
-                      <BookCover
-                        titleEnglish={book.titleEnglish}
-                        titleHindi={book.titleHindi}
-                        category={book.category}
-                        part={book.part}
-                        series={book.series}
-                        size="sm"
-                      />
+                    <div className="relative w-10 h-14 flex-shrink-0 rounded-md overflow-hidden">
+                      <BookCoverImage book={book} size="sm" sizes="40px" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-cream text-xs font-cinzel line-clamp-2 leading-snug">

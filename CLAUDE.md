@@ -61,7 +61,7 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 | OTP verification | Mock — code shown on screen |
 | WhatsApp notifications | UI only — no Meta/Twilio API |
 | Google OAuth | Simulated UI — no real token |
-| Book images | Placeholders |
+| Book images | Real — all 36 books have real cover photos |
 | Admin auth | localStorage password gate (`ssp@admin`) |
 | SEO metadata | Real — generateMetadata() on all public pages |
 | Sitemap | Real — auto-generated at /sitemap.xml for all pages + 36 books |
@@ -209,8 +209,7 @@ the layout's own route.
 
 ### Remaining Phase 1 work
 - Razorpay account approval + payment integration (blocked on Bharani)
-- Real book cover images (blocked on Bharani)
-- Founder timeline — real photos, refined content, mobile scroll fix
+- Founder timeline — real photos, refined content (mobile scroll fix done in PR #4)
 
 ---
 
