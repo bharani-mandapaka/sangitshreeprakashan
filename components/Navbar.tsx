@@ -8,6 +8,7 @@ import { ShoppingCart, Menu, X, Search } from 'lucide-react';
 import { useCartStore } from '@/lib/cart-store';
 
 const navLinks = [
+  { href: '/',        label: 'Home' },
   { href: '/books',   label: 'Books' },
   { href: '/about',   label: 'About' },
   { href: '/contact', label: 'Contact' },
