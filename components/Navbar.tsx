@@ -4,8 +4,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, Menu, X, Search } from 'lucide-react';
+import { ShoppingCart, Menu, X, Search, User } from 'lucide-react';
 import { useCartStore } from '@/lib/cart-store';
+import { useAuthStore } from '@/lib/auth-store';
 
 const navLinks = [
   { href: '/',        label: 'Home' },
@@ -19,6 +20,7 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const itemCount  = useCartStore((s) => s.itemCount);
   const toggleCart = useCartStore((s) => s.toggleCart);
+  const user       = useAuthStore((s) => s.user);
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 60);
@@ -85,6 +87,14 @@ export default function Navbar() {
                 <Search size={18} />
               </Link>
 
+              <Link
+                href={user ? '/profile' : '/login'}
+                className="p-2 text-cream/80 hover:text-gold transition-colors"
+                title={user ? 'My Profile' : 'Sign In'}
+              >
+                <User size={20} />
+              </Link>
+
               <button
                 onClick={toggleCart}
                 className="relative p-2 text-cream/80 hover:text-gold transition-colors"
@@ -143,6 +153,13 @@ export default function Navbar() {
                 onClick={() => setMobileOpen(false)}
               >
                 <Search size={16} /> Search Books
+              </Link>
+              <Link
+                href={user ? '/profile' : '/login'}
+                className="flex items-center gap-2 text-cream/60 hover:text-gold transition-colors"
+                onClick={() => setMobileOpen(false)}
+              >
+                <User size={16} /> {user ? 'My Profile' : 'Sign In'}
               </Link>
             </div>
           </motion.div>

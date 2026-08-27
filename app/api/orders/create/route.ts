@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   const resend = new Resend(process.env.RESEND_API_KEY);
 
   const body = await req.json();
-  const { id, createdAt, customer, billingAddress, items, subtotal, paymentMethod } = body;
+  const { id, createdAt, customer, billingAddress, items, subtotal, paymentMethod, userId } = body;
 
   // ── 1. Save order to Supabase ───────────────────────────────────────────────
   const { error: orderError } = await supabase.from('orders').insert({
@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
     address_pincode: billingAddress.pincode,
     subtotal,
     payment_method:  paymentMethod,
+    user_id:         userId ?? null, // null for guest checkout (no account)
   });
 
   if (orderError) {

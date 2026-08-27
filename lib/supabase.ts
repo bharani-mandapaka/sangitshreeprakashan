@@ -29,6 +29,7 @@ export interface DbOrder {
   address_pincode: string;
   subtotal: number;
   payment_method: string;
+  user_id: string | null;
   order_items: DbOrderItem[];
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,6 +8,7 @@ import { ArrowLeft, CheckCircle, Lock, CreditCard, Smartphone, Building2, Chevro
 import { useCartStore } from '@/lib/cart-store';
 import { useOrdersStore } from '@/lib/orders-store';
 import { useAnalyticsStore } from '@/lib/analytics-store';
+import { useAuthStore } from '@/lib/auth-store';
 import { formatPrice, generateOrderId } from '@/lib/utils';
 import BookCoverImage from '@/components/BookCoverImage';
 
@@ -19,16 +20,27 @@ export default function CheckoutPage() {
   const { items, subtotal, clearCart } = useCartStore();
   const addOrder     = useOrdersStore((s) => s.addOrder);
   const trackCartAdd = useAnalyticsStore((s) => s.trackCartAdd);
+  const user          = useAuthStore((s) => s.user);
 
   const [step,      setStep]      = useState<CheckoutStep>('details');
   const [method,    setMethod]    = useState<PayMethod>('upi');
   const [upiId,     setUpiId]     = useState('');
   const [orderId,   setOrderId]   = useState('');
 
-  // Shipping form
+  // Shipping form — pre-filled from the account when signed in, still editable
+  // and still usable as a guest (no account required to check out).
   const [form, setForm] = useState({
     name: '', email: '', phone: '', address: '', city: '', state: '', pincode: '',
   });
+
+  useEffect(() => {
+    if (!user) return;
+    setForm((f) => ({
+      ...f,
+      name:  f.name  || (user.user_metadata?.full_name as string | undefined) || '',
+      email: f.email || user.email || '',
+    }));
+  }, [user]);
 
   const shipping = 0;   // Free shipping for now
   const total    = subtotal() + shipping;
@@ -64,6 +76,7 @@ export default function CheckoutPage() {
       })),
       subtotal: subtotal(),
       paymentMethod: method,
+      userId: user?.id ?? null,
     };
 
     // Run API call + minimum spinner delay in parallel
