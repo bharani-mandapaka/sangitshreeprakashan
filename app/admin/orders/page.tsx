@@ -20,6 +20,10 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
 // ── Order row ──────────────────────────────────────────────────────────────────
 function OrderRow({ order, onStatusChange }: { order: DbOrder; onStatusChange: (id: string, status: OrderStatus) => void }) {
   const [expanded, setExpanded] = useState(false);
@@ -231,23 +235,58 @@ export default function OrdersPage() {
 
   // CSV export
   const handleExport = () => {
+    // First-order date per customer email, computed from the *full* order list
+    // (not just the filtered/exported rows) so "New vs Returning" is accurate
+    // even when exporting a filtered subset.
+    const firstOrderByEmail = new Map<string, string>();
+    orders.forEach((o) => {
+      const existing = firstOrderByEmail.get(o.customer_email);
+      if (!existing || o.created_at < existing) {
+        firstOrderByEmail.set(o.customer_email, o.created_at);
+      }
+    });
+
+    const now = Date.now();
+
     const rows = [
-      ['Order ID', 'Date', 'Name', 'Email', 'Phone', 'Address', 'City', 'State', 'PIN', 'Items', 'Total', 'Status', 'Payment'],
-      ...filtered.map((o) => [
-        o.id,
-        fmtDate(o.created_at),
-        o.customer_name,
-        o.customer_email,
-        o.customer_phone,
-        o.address_line1 ?? '',
-        o.address_city ?? '',
-        o.address_state ?? '',
-        o.address_pincode ?? '',
-        (o.order_items ?? []).map((i) => `${i.title_english} x${i.qty}`).join(' | '),
-        o.subtotal.toString(),
-        o.status,
-        o.payment_method,
-      ]),
+      [
+        'Order ID', 'Date', 'Time', 'Name', 'Email', 'Customer Type', 'Phone',
+        'Address', 'City', 'State', 'PIN', 'Full Address',
+        'Items', 'Item Count', 'Distinct Books', 'SKUs',
+        'Total', 'Status', 'Payment', 'Days Since Order',
+      ],
+      ...filtered.map((o) => {
+        const items = o.order_items ?? [];
+        const itemCount = items.reduce((sum, i) => sum + i.qty, 0);
+        const isFirstOrder = firstOrderByEmail.get(o.customer_email) === o.created_at;
+        const fullAddress = [o.address_line1, o.address_city, o.address_state, o.address_pincode]
+          .filter(Boolean)
+          .join(', ');
+        const daysSince = Math.floor((now - new Date(o.created_at).getTime()) / 86_400_000);
+
+        return [
+          o.id,
+          fmtDate(o.created_at),
+          fmtTime(o.created_at),
+          o.customer_name,
+          o.customer_email,
+          isFirstOrder ? 'New' : 'Returning',
+          o.customer_phone,
+          o.address_line1 ?? '',
+          o.address_city ?? '',
+          o.address_state ?? '',
+          o.address_pincode ?? '',
+          fullAddress,
+          items.map((i) => `${i.title_english} x${i.qty} @ ${formatPrice(i.price)} = ${formatPrice(i.price * i.qty)}`).join(' | '),
+          itemCount.toString(),
+          items.length.toString(),
+          items.map((i) => i.sku).filter(Boolean).join(', '),
+          o.subtotal.toString(),
+          o.status,
+          o.payment_method,
+          daysSince.toString(),
+        ];
+      }),
     ];
     const csv  = rows.map((r) => r.map((c) => `"${c}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
