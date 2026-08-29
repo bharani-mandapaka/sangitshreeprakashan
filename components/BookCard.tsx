@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { ShoppingCart, Eye, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import BookCoverImage from './BookCoverImage';
@@ -18,6 +18,7 @@ interface BookCardProps {
 
 export default function BookCard({ book }: BookCardProps) {
   const router   = useRouter();
+  const pathname = usePathname();
   const addItem  = useCartStore((s) => s.addItem);
   const openCart = useCartStore((s) => s.openCart);
   const user     = useAuthStore((s) => s.user);
@@ -33,7 +34,7 @@ export default function BookCard({ book }: BookCardProps) {
   const handleWishlist = (e: React.MouseEvent) => {
     e.preventDefault();
     if (!user) {
-      router.push('/login');
+      router.push(`/login?next=${encodeURIComponent(pathname)}`);
       return;
     }
     toggleWishlist(user.id, book.id);

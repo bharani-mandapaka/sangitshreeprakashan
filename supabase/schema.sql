@@ -43,14 +43,20 @@ alter table orders add column if not exists user_id uuid references auth.users(i
 create index if not exists orders_user_id_idx on orders(user_id);
 
 -- ── Row Level Security ────────────────────────────────────────────────────────
--- Orders/order_items SELECT stays fully open (not scoped to auth.uid()) because the
--- admin panel reads all orders via this same anon-key client with no Supabase Auth
--- session of its own (it's still gated by the separate localStorage password, not
--- real auth — see CLAUDE.md Phase 2). Restricting SELECT here would silently break
--- admin. The customer-facing "My Orders" page filters to the signed-in user's own
--- orders with an explicit `.eq('user_id', ...)` query instead of relying on RLS.
--- Once admin gets real Supabase Auth accounts (Phase 2), this should be revisited —
--- tracked in tasks.md under Security & maintenance.
+-- Orders/order_items SELECT used to be fully open (using (true)) so the anon key
+-- could read every order. That was a real hole: the anon key ships in the public
+-- JS bundle, so anyone could pull it out and read every customer's name, email,
+-- phone, and address straight out of Supabase. Fixed 2026-08-29 — SELECT is now
+-- scoped to `auth.uid() = user_id`, so a signed-in customer can only read their
+-- own orders via the anon-key client.
+--
+-- The admin panel does NOT use auth.uid() (it's still gated by the separate
+-- localStorage password, not real Supabase Auth — see CLAUDE.md Phase 2), so it
+-- can no longer read orders through this client. It instead reads through
+-- app/api/admin/* routes, which use a server-only service-role key that bypasses
+-- RLS entirely. That key must never be exposed to the browser (no NEXT_PUBLIC_
+-- prefix). Once admin gets real Supabase Auth accounts (Phase 2), the admin
+-- routes can move to a proper `is_admin`-scoped policy instead of a service key.
 alter table orders      enable row level security;
 alter table order_items enable row level security;
 
@@ -58,9 +64,20 @@ alter table order_items enable row level security;
 create policy "insert_orders"      on orders      for insert with check (true);
 create policy "insert_order_items" on order_items for insert with check (true);
 
--- Anyone can read (admin panel — will be restricted to authenticated admins in Phase 2)
-create policy "read_orders"      on orders      for select using (true);
-create policy "read_order_items" on order_items for select using (true);
+-- Signed-in customers can read only their own orders. Guest orders (user_id is
+-- null) aren't readable through this policy by anyone — guests have no account
+-- to view order history from in the first place, so this matches existing
+-- behavior. order_items has no user_id of its own, so it joins back to orders.
+drop policy if exists "read_orders" on orders;
+drop policy if exists "read_order_items" on order_items;
+create policy "read_orders" on orders for select using (auth.uid() = user_id);
+create policy "read_order_items" on order_items for select using (
+  exists (
+    select 1 from orders
+    where orders.id = order_items.order_id
+      and orders.user_id = auth.uid()
+  )
+);
 
 -- Anyone can update status (admin panel — will be restricted in Phase 2)
 create policy "update_orders" on orders for update using (true);

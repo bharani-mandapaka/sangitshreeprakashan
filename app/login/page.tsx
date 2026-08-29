@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/lib/auth-store';
@@ -17,8 +17,14 @@ function GoogleIcon() {
   );
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Where to send the user after a successful sign-in — e.g. the book detail
+  // page they clicked the wishlist heart from, via /login?next=/books/foo.
+  // Falls back to the profile page for a plain, direct visit to /login.
+  const next = searchParams.get('next') || '/profile';
+
   const user               = useAuthStore((s) => s.user);
   const authLoading        = useAuthStore((s) => s.loading);
   const signInWithPassword = useAuthStore((s) => s.signInWithPassword);
@@ -30,10 +36,10 @@ export default function LoginPage() {
   const [loading,  setLoading]  = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  // Already signed in — bounce straight to the profile page.
+  // Already signed in — bounce straight to wherever they were headed.
   useEffect(() => {
-    if (!authLoading && user) router.replace('/profile');
-  }, [authLoading, user, router]);
+    if (!authLoading && user) router.replace(next);
+  }, [authLoading, user, router, next]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +48,7 @@ export default function LoginPage() {
     const { error: err } = await signInWithPassword(email, password);
     setLoading(false);
     if (err) setError(err);
-    else router.push('/profile');
+    else router.push(next);
   };
 
   const handleGoogle = async () => {
@@ -97,9 +103,14 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-cream/50 text-xs uppercase tracking-widest font-cinzel">
+                  Password
+                </label>
+                <Link href="/forgot-password" className="text-gold/70 hover:text-gold text-xs font-cinzel transition-colors">
+                  Forgot password?
+                </Link>
+              </div>
               <input
                 className="input-gold"
                 type="password"
@@ -134,5 +145,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-dark pt-20 lg:pt-24" />}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

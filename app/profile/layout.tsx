@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'My Account',
+  title: { default: 'My Account', template: '%s | Sangit Shree Prakashan' },
   description: 'Your Sangit Shree Prakashan account — wishlist and order history.',
   robots: { index: false, follow: false },
 };

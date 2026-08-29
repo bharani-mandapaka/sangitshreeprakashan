@@ -42,7 +42,7 @@ export default function BookDetailClient({ book }: { book: Book }) {
 
   const handleWishlist = () => {
     if (!user) {
-      router.push('/login');
+      router.push(`/login?next=${encodeURIComponent(`/books/${book.slug}`)}`);
       return;
     }
     toggleWishlist(user.id, book.id);

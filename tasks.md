@@ -68,10 +68,9 @@
       table, properly scoped to the signed-in user via RLS
 - [x] Order history — `orders` table gained a nullable `user_id` column, set at checkout when the
       customer is signed in; guest checkout (no account) still works exactly as before
-- [ ] **Run the SQL migration** — `supabase/schema.sql` was updated with the `orders.user_id`
-      column and the new `wishlist` table + RLS policies, but it needs to actually be run once in
-      the Supabase SQL Editor against the live project (same manual step as the original Phase 1
-      schema setup)
+- [x] **Run the SQL migration** — `supabase/schema.sql` was updated with the `orders.user_id`
+      column and the new `wishlist` table + RLS policies. Applied to the live Supabase project on
+      2026-08-27.
 - [ ] Confirm-email UX — Supabase's default email templates are used for the sign-up confirmation
       link (not the branded Resend templates used for order confirmations). Fine for now; revisit
       if it needs to match the brand.

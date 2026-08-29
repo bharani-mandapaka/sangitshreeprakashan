@@ -11,7 +11,20 @@ export async function POST(req: NextRequest) {
   const resend = new Resend(process.env.RESEND_API_KEY);
 
   const body = await req.json();
-  const { id, createdAt, customer, billingAddress, items, subtotal, paymentMethod, userId } = body;
+  const { id, createdAt, customer, billingAddress, items, subtotal, paymentMethod } = body;
+
+  // ── 0. Resolve the signed-in user from the request's own bearer token ──────
+  // We never trust a userId sent in the body — the client-supplied value is
+  // discarded (see checkout/page.tsx, which no longer sends one) and instead
+  // we verify the session's access_token ourselves. Guests simply send no
+  // Authorization header, which resolves to a null user_id below.
+  let userId: string | null = null;
+  const authHeader = req.headers.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice('Bearer '.length);
+    const { data: { user: verifiedUser } } = await supabase.auth.getUser(token);
+    userId = verifiedUser?.id ?? null;
+  }
 
   // ── 1. Save order to Supabase ───────────────────────────────────────────────
   const { error: orderError } = await supabase.from('orders').insert({

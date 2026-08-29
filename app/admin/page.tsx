@@ -4,7 +4,7 @@ import { useMemo, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Eye, ShoppingCart, Package, TrendingUp, ArrowRight, Circle, RefreshCw, AlertCircle } from 'lucide-react';
 import { useAnalyticsStore, getTotals } from '@/lib/analytics-store';
-import { getSupabase, type DbOrder } from '@/lib/supabase';
+import { type DbOrder } from '@/lib/supabase';
 import { formatPrice } from '@/lib/utils';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -24,26 +24,25 @@ export default function AdminDashboard() {
   const [dbError, setDbError] = useState('');
 
   useEffect(() => {
-    const fetch = async () => {
+    const load = async () => {
       setLoading(true);
       setDbError('');
       try {
-        const { data, error } = await getSupabase()
-          .from('orders')
-          .select('id, created_at, status, customer_name, subtotal, payment_method')
-          .order('created_at', { ascending: false });
-        if (error) setDbError(error.message);
-        setOrders((data as DbOrder[]) ?? []);
+        // Reads go through a server route backed by the service-role key —
+        // orders SELECT is now scoped to auth.uid() via RLS, so the anon-key
+        // client can no longer see every order on its own. See
+        // app/api/admin/orders/route.ts.
+        const res = await fetch('/api/admin/orders');
+        const body = await res.json();
+        if (!res.ok) setDbError(body.error ?? 'Failed to load orders.');
+        setOrders((body.orders as DbOrder[]) ?? []);
       } catch (err) {
-        // getSupabase() throws synchronously if the Supabase env vars aren't
-        // configured — without this catch the page was stuck on the loading
-        // spinner forever with no indication why.
         setDbError(err instanceof Error ? err.message : 'Failed to connect to the database.');
       } finally {
         setLoading(false);
       }
     };
-    fetch();
+    load();
   }, []);
 
   const totalRevenue = useMemo(

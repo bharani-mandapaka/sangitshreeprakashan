@@ -176,20 +176,18 @@ export default function OrdersPage() {
     setLoading(true);
     setError('');
     try {
-      const { data, error: dbErr } = await getSupabase()
-        .from('orders')
-        .select('*, order_items(*)')
-        .order('created_at', { ascending: false });
-
-      if (dbErr) {
-        setError(dbErr.message);
+      // Reads go through a server route backed by the service-role key —
+      // orders SELECT is now scoped to auth.uid() via RLS, so the anon-key
+      // client used elsewhere on this page (e.g. status updates) can no
+      // longer see every order on its own. See app/api/admin/orders/route.ts.
+      const res = await fetch('/api/admin/orders');
+      const body = await res.json();
+      if (!res.ok) {
+        setError(body.error ?? 'Failed to load orders.');
       } else {
-        setOrders((data as DbOrder[]) ?? []);
+        setOrders((body.orders as DbOrder[]) ?? []);
       }
     } catch (err) {
-      // getSupabase() throws synchronously if the Supabase env vars aren't
-      // configured — without this catch the page was stuck on the loading
-      // spinner forever with no indication why.
       setError(err instanceof Error ? err.message : 'Failed to connect to the database.');
     } finally {
       setLoading(false);

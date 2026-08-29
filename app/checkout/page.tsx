@@ -9,6 +9,7 @@ import { useCartStore } from '@/lib/cart-store';
 import { useOrdersStore } from '@/lib/orders-store';
 import { useAnalyticsStore } from '@/lib/analytics-store';
 import { useAuthStore } from '@/lib/auth-store';
+import { getSupabase } from '@/lib/supabase';
 import { formatPrice, generateOrderId } from '@/lib/utils';
 import BookCoverImage from '@/components/BookCoverImage';
 
@@ -76,15 +77,20 @@ export default function CheckoutPage() {
       })),
       subtotal: subtotal(),
       paymentMethod: method,
-      userId: user?.id ?? null,
     };
+
+    // Signed-in users attach their session token so the server can verify who
+    // they are itself — we never send a raw userId the client could fake.
+    const { data: { session } } = await getSupabase().auth.getSession();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
 
     // Run API call + minimum spinner delay in parallel
     await Promise.all([
       // Save to Supabase + send confirmation email
       fetch('/api/orders/create', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body:    JSON.stringify(orderPayload),
       }).catch((err) => console.error('[checkout] API error:', err)),
 

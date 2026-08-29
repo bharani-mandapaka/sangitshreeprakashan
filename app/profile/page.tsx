@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { User, Heart, Package, LogOut, Loader2 } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '@/lib/auth-store';
 import { useWishlistStore } from '@/lib/wishlist-store';
 import { getSupabase, type DbOrder } from '@/lib/supabase';
@@ -22,7 +23,7 @@ export default function ProfilePage() {
   const user        = useAuthStore((s) => s.user);
   const authLoading = useAuthStore((s) => s.loading);
   const signOut     = useAuthStore((s) => s.signOut);
-  const wishlistIds = useWishlistStore((s) => Array.from(s.bookIds));
+  const wishlistIds = useWishlistStore(useShallow((s) => Array.from(s.bookIds)));
 
   const [tab, setTab] = useState<Tab>('overview');
   const [orders,        setOrders]        = useState<DbOrder[]>([]);
