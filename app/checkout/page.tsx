@@ -36,10 +36,19 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!user) return;
+    // user.email is a real address for Google accounts, but an internal
+    // synthetic one for phone accounts (see lib/phone-auth.ts) — never
+    // pre-fill that. Phone accounts instead prefill their verified phone
+    // number and, if they've added one, their optional real_email.
+    const isPhoneAccount = !!user.user_metadata?.phone;
+    const prefillEmail = isPhoneAccount
+      ? (user.user_metadata?.real_email as string | undefined) ?? ''
+      : user.email ?? '';
     setForm((f) => ({
       ...f,
       name:  f.name  || (user.user_metadata?.full_name as string | undefined) || '',
-      email: f.email || user.email || '',
+      email: f.email || prefillEmail,
+      phone: f.phone || (user.user_metadata?.phone as string | undefined) || '',
     }));
   }, [user]);
 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { User, Heart, Package, LogOut, Loader2 } from 'lucide-react';
+import { User, Heart, Package, LogOut, Loader2, Check } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '@/lib/auth-store';
 import { useWishlistStore } from '@/lib/wishlist-store';
@@ -30,6 +30,16 @@ export default function ProfilePage() {
   const [ordersLoading,  setOrdersLoading] = useState(true);
   const [ordersError,    setOrdersError]   = useState('');
 
+  // Editable profile fields — phone accounts have no real email of their own
+  // (the auth email is an internal synthetic address), so this lets them add
+  // one for order updates. Google accounts already have a real email from
+  // Google, so this form is phone-account only.
+  const [editName,  setEditName]  = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [saving,  setSaving]  = useState(false);
+  const [saved,   setSaved]   = useState(false);
+  const [saveError, setSaveError] = useState('');
+
   // Not signed in — send to login once we're sure (avoid bouncing during the
   // initial session check).
   useEffect(() => {
@@ -54,6 +64,12 @@ export default function ProfilePage() {
     return () => { cancelled = true; };
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+    setEditName((user.user_metadata?.full_name as string | undefined) ?? '');
+    setEditEmail((user.user_metadata?.real_email as string | undefined) ?? '');
+  }, [user]);
+
   if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-dark pt-20 lg:pt-24 flex items-center justify-center">
@@ -71,7 +87,32 @@ export default function ProfilePage() {
     router.push('/');
   };
 
-  const name = (user.user_metadata?.full_name as string | undefined) || user.email?.split('@')[0] || 'Account';
+  const phone = user.user_metadata?.phone as string | undefined;
+  const isPhoneAccount = !!phone;
+  const name = (user.user_metadata?.full_name as string | undefined) || (isPhoneAccount ? phone : user.email) || 'Account';
+  // What to show under the name in the header — the real Google email for
+  // Google accounts, or the phone number for phone accounts. Never the
+  // internal synthetic email.
+  const identity = isPhoneAccount ? phone : user.email;
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setSaveError('');
+    setSaved(false);
+    const { error } = await getSupabase().auth.updateUser({
+      data: {
+        full_name: editName || null,
+        ...(isPhoneAccount ? { real_email: editEmail || null } : {}),
+      },
+    });
+    setSaving(false);
+    if (error) setSaveError(error.message);
+    else {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    }
+  };
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'overview', label: 'Overview',                       icon: <User size={14} /> },
@@ -89,7 +130,7 @@ export default function ProfilePage() {
           </div>
           <div>
             <h1 className="font-cinzel text-2xl font-bold text-cream">{name}</h1>
-            <p className="text-cream/50 text-sm">{user.email}</p>
+            <p className="text-cream/50 text-sm">{identity}</p>
           </div>
         </div>
       </div>
@@ -115,16 +156,61 @@ export default function ProfilePage() {
         {/* Overview */}
         {tab === 'overview' && (
           <div className="max-w-md space-y-6">
-            <div className="gold-border rounded-2xl p-6 bg-[#0A0000] space-y-4">
+            <form onSubmit={handleSaveProfile} className="gold-border rounded-2xl p-6 bg-[#0A0000] space-y-4">
+              {isPhoneAccount && (
+                <div>
+                  <p className="text-cream/40 text-xs uppercase tracking-widest font-cinzel mb-1">Phone Number</p>
+                  <p className="text-cream">{phone}</p>
+                </div>
+              )}
+
               <div>
-                <p className="text-cream/40 text-xs uppercase tracking-widest font-cinzel mb-1">Name</p>
-                <p className="text-cream">{name}</p>
+                <label className="block text-cream/40 text-xs uppercase tracking-widest font-cinzel mb-1.5">
+                  Full Name
+                </label>
+                <input
+                  className="input-gold"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Add your name"
+                />
               </div>
-              <div>
-                <p className="text-cream/40 text-xs uppercase tracking-widest font-cinzel mb-1">Email</p>
-                <p className="text-cream">{user.email}</p>
-              </div>
-            </div>
+
+              {isPhoneAccount ? (
+                <div>
+                  <label className="block text-cream/40 text-xs uppercase tracking-widest font-cinzel mb-1.5">
+                    Email <span className="normal-case text-cream/25">(optional — for order updates)</span>
+                  </label>
+                  <input
+                    className="input-gold"
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    placeholder="you@example.com"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <p className="text-cream/40 text-xs uppercase tracking-widest font-cinzel mb-1">Email</p>
+                  <p className="text-cream">{user.email}</p>
+                </div>
+              )}
+
+              {saveError && (
+                <p className="text-red-400 text-xs font-cinzel bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                  {saveError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex items-center gap-2 bg-gold hover:bg-gold-300 text-dark font-cinzel font-bold text-sm px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+              >
+                {saving ? <Loader2 size={14} className="animate-spin" /> : saved ? <Check size={14} /> : null}
+                {saved ? 'Saved' : 'Save Changes'}
+              </button>
+            </form>
             <button
               onClick={handleSignOut}
               className="flex items-center gap-2 border border-red-500/30 hover:border-red-500/60 text-red-400 hover:text-red-300 font-cinzel text-sm px-5 py-3 rounded-xl transition-all"

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronUp, Download, MapPin, Phone, Mail, Package, RefreshCw } from 'lucide-react';
-import { getSupabase, type DbOrder } from '@/lib/supabase';
+import { type DbOrder } from '@/lib/supabase';
 import { type OrderStatus } from '@/lib/orders-store';
 import { formatPrice } from '@/lib/utils';
 
@@ -29,11 +29,14 @@ function OrderRow({ order, onStatusChange }: { order: DbOrder; onStatusChange: (
     e.stopPropagation();
     const newStatus = e.target.value as OrderStatus;
     setUpdating(true);
-    const { error } = await getSupabase()
-      .from('orders')
-      .update({ status: newStatus })
-      .eq('id', order.id);
-    if (!error) onStatusChange(order.id, newStatus);
+    // Goes through the admin API route (service-role, cookie-gated) instead
+    // of the anon client — see app/api/admin/orders/route.ts.
+    const res = await fetch('/api/admin/orders', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: order.id, status: newStatus }),
+    });
+    if (res.ok) onStatusChange(order.id, newStatus);
     setUpdating(false);
   };
 

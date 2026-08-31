@@ -90,7 +90,7 @@ export default function Navbar() {
               <Link
                 href={user ? '/profile' : '/login'}
                 className="p-2 text-cream/80 hover:text-gold transition-colors"
-                title={user ? 'My Profile' : 'Sign In'}
+                title={user ? 'My Profile' : 'Login'}
               >
                 <User size={20} />
               </Link>
@@ -159,7 +159,7 @@ export default function Navbar() {
                 className="flex items-center gap-2 text-cream/60 hover:text-gold transition-colors"
                 onClick={() => setMobileOpen(false)}
               >
-                <User size={16} /> {user ? 'My Profile' : 'Sign In'}
+                <User size={16} /> {user ? 'My Profile' : 'Login'}
               </Link>
             </div>
           </motion.div>

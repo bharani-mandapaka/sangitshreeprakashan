@@ -43,26 +43,35 @@ alter table orders add column if not exists user_id uuid references auth.users(i
 create index if not exists orders_user_id_idx on orders(user_id);
 
 -- ── Row Level Security ────────────────────────────────────────────────────────
--- Orders/order_items SELECT used to be fully open (using (true)) so the anon key
--- could read every order. That was a real hole: the anon key ships in the public
--- JS bundle, so anyone could pull it out and read every customer's name, email,
--- phone, and address straight out of Supabase. Fixed 2026-08-29 — SELECT is now
--- scoped to `auth.uid() = user_id`, so a signed-in customer can only read their
--- own orders via the anon-key client.
+-- Orders/order_items used to have permissive policies for every operation
+-- (using (true) / with check (true)) so the anon-key client — used directly
+-- by checkout and the admin panel — could read and write freely. That was a
+-- real hole on two fronts, both fixed 2026-08-30:
 --
--- The admin panel does NOT use auth.uid() (it's still gated by the separate
--- localStorage password, not real Supabase Auth — see CLAUDE.md Phase 2), so it
--- can no longer read orders through this client. It instead reads through
--- app/api/admin/* routes, which use a server-only service-role key that bypasses
--- RLS entirely. That key must never be exposed to the browser (no NEXT_PUBLIC_
--- prefix). Once admin gets real Supabase Auth accounts (Phase 2), the admin
--- routes can move to a proper `is_admin`-scoped policy instead of a service key.
+-- 1. SELECT: the anon key ships in the public JS bundle, so anyone could pull
+--    it out and read every customer's name, email, phone, and address
+--    straight out of Supabase with no login at all.
+-- 2. INSERT/UPDATE: an open `with check (true)` on insert meant anyone could
+--    POST straight to Supabase's PostgREST API with the public anon key and
+--    forge orders (bypassing app/api/orders/create/route.ts's own userId
+--    verification entirely). An open `update using (true)` with no `with
+--    check` was worse — it let anyone rewrite ANY column of ANY order,
+--    including reassigning user_id to themselves and then reading that order
+--    back through the SELECT policy below.
+--
+-- The fix: every write now goes through a server route using the
+-- service-role key (which bypasses RLS) instead of the anon-key client —
+-- app/api/orders/create/route.ts for inserts, app/api/admin/orders/route.ts
+-- (PATCH, gated behind the signed admin session cookie — see
+-- lib/admin-auth.ts) for status updates. So RLS on these two tables only
+-- needs to cover SELECT now; insert/update have no policies at all, meaning
+-- the anon key can't write to either table under any circumstance.
 alter table orders      enable row level security;
 alter table order_items enable row level security;
 
--- Anyone can insert (customers placing orders via checkout, logged in or as guest)
-create policy "insert_orders"      on orders      for insert with check (true);
-create policy "insert_order_items" on order_items for insert with check (true);
+drop policy if exists "insert_orders"      on orders;
+drop policy if exists "insert_order_items" on order_items;
+drop policy if exists "update_orders"      on orders;
 
 -- Signed-in customers can read only their own orders. Guest orders (user_id is
 -- null) aren't readable through this policy by anyone — guests have no account
@@ -78,9 +87,6 @@ create policy "read_order_items" on order_items for select using (
       and orders.user_id = auth.uid()
   )
 );
-
--- Anyone can update status (admin panel — will be restricted in Phase 2)
-create policy "update_orders" on orders for update using (true);
 
 -- ── Wishlist ──────────────────────────────────────────────────────────────────
 -- book_id references the static lib/books.ts catalog (no `books` table yet — see
@@ -102,6 +108,27 @@ alter table wishlist enable row level security;
 create policy "select_own_wishlist" on wishlist for select using (auth.uid() = user_id);
 create policy "insert_own_wishlist" on wishlist for insert with check (auth.uid() = user_id);
 create policy "delete_own_wishlist" on wishlist for delete using (auth.uid() = user_id);
+
+-- ── Phone OTPs ────────────────────────────────────────────────────────────────
+-- Mock phone-verification codes for sign-up/login. The code is generated and
+-- checked entirely server-side via the service-role client — no public RLS
+-- policies exist on this table, so the anon key can't read or write it at all.
+-- Swapping the mock (code returned in the API response, shown on screen) for a
+-- real SMS provider later only touches app/api/auth/phone/send-otp/route.ts —
+-- this table and the verify flow don't change.
+create table if not exists phone_otps (
+  id         uuid primary key default gen_random_uuid(),
+  phone      text not null,
+  otp        text not null,
+  expires_at timestamptz not null,
+  attempts   integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists phone_otps_phone_idx on phone_otps(phone);
+
+alter table phone_otps enable row level security;
+-- Intentionally no policies — service role only.
 
 -- ── Notification Rules ────────────────────────────────────────────────────────
 create table if not exists notification_rules (
