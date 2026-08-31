@@ -1,10 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { ShoppingCart, Eye } from 'lucide-react';
+import { useRouter, usePathname } from 'next/navigation';
+import { ShoppingCart, Eye, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import BookCoverImage from './BookCoverImage';
 import { useCartStore } from '@/lib/cart-store';
+import { useAuthStore } from '@/lib/auth-store';
+import { useWishlistStore } from '@/lib/wishlist-store';
 import { formatPrice } from '@/lib/utils';
 import type { Book } from '@/lib/books';
 import { categoryMeta } from '@/lib/books';
@@ -14,13 +17,27 @@ interface BookCardProps {
 }
 
 export default function BookCard({ book }: BookCardProps) {
+  const router   = useRouter();
+  const pathname = usePathname();
   const addItem  = useCartStore((s) => s.addItem);
   const openCart = useCartStore((s) => s.openCart);
+  const user     = useAuthStore((s) => s.user);
+  const isWishlisted   = useWishlistStore((s) => s.has(book.id));
+  const toggleWishlist = useWishlistStore((s) => s.toggle);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     addItem(book);
     openCart();
+  };
+
+  const handleWishlist = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!user) {
+      router.push(`/login?next=${encodeURIComponent(pathname)}`);
+      return;
+    }
+    toggleWishlist(user.id, book.id);
   };
 
   const meta = categoryMeta[book.category];
@@ -65,9 +82,18 @@ export default function BookCard({ book }: BookCardProps) {
             {book.titleEnglish}
           </h3>
 
-          <p className="font-cinzel text-gold font-bold text-base mt-1">
-            {formatPrice(book.price)}
-          </p>
+          <div className="flex items-center justify-between mt-1">
+            <p className="font-cinzel text-gold font-bold text-base">
+              {formatPrice(book.price)}
+            </p>
+            <button
+              onClick={handleWishlist}
+              title={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+              className="p-1 -m-1 text-cream/30 hover:text-gold transition-colors"
+            >
+              <Heart size={16} className={isWishlisted ? 'fill-gold text-gold' : ''} />
+            </button>
+          </div>
 
           {/* Action buttons — always visible */}
           <div className="flex gap-2 mt-2">

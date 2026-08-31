@@ -1,9 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, ShoppingCart, MessageCircle, Package, BookOpen, Award, Globe } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, ShoppingCart, MessageCircle, Package, BookOpen, Award, Globe, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useCartStore } from '@/lib/cart-store';
+import { useAuthStore } from '@/lib/auth-store';
+import { useWishlistStore } from '@/lib/wishlist-store';
 import { getBooksByCategory, categoryMeta } from '@/lib/books';
 import { formatPrice, WHATSAPP_NUMBER } from '@/lib/utils';
 import BookCoverImage from '@/components/BookCoverImage';
@@ -25,12 +28,24 @@ const langLabels: Record<string, string> = {
 };
 
 export default function BookDetailClient({ book }: { book: Book }) {
+  const router   = useRouter();
   const addItem  = useCartStore((s) => s.addItem);
   const openCart = useCartStore((s) => s.openCart);
+  const user     = useAuthStore((s) => s.user);
+  const isWishlisted   = useWishlistStore((s) => s.has(book.id));
+  const toggleWishlist = useWishlistStore((s) => s.toggle);
 
   const handleAddToCart = () => {
     addItem(book);
     openCart();
+  };
+
+  const handleWishlist = () => {
+    if (!user) {
+      router.push(`/login?next=${encodeURIComponent(`/books/${book.slug}`)}`);
+      return;
+    }
+    toggleWishlist(user.id, book.id);
   };
 
   const whatsappMsg = encodeURIComponent(
@@ -172,6 +187,18 @@ export default function BookDetailClient({ book }: { book: Book }) {
                 <MessageCircle size={20} />
                 Enquire on WhatsApp
               </a>
+              <button
+                onClick={handleWishlist}
+                title={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                className={`flex items-center justify-center gap-2.5 sm:w-14 py-4 rounded-xl border transition-all text-base font-cinzel ${
+                  isWishlisted
+                    ? 'border-gold bg-gold/10 text-gold'
+                    : 'border-gold/30 text-cream/60 hover:border-gold hover:text-gold'
+                }`}
+              >
+                <Heart size={20} className={isWishlisted ? 'fill-gold' : ''} />
+                <span className="sm:hidden">{isWishlisted ? 'Wishlisted' : 'Add to Wishlist'}</span>
+              </button>
             </div>
 
             {/* Description */}

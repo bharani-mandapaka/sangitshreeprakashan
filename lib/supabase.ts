@@ -15,6 +15,21 @@ export function getSupabase(): SupabaseClient {
   return client;
 }
 
+/**
+ * A fresh, non-persisting anon-key client for one-off server-side auth calls
+ * (API routes). Deliberately NOT the same singleton as getSupabase() — that
+ * one persists session state in memory, which would leak between requests
+ * from different users if reused on the server. Each call here gets its own
+ * throwaway client instead.
+ */
+export function getSupabaseServer(): SupabaseClient {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+}
+
 // ── Types matching the Supabase schema ─────────────────────────────────────────
 export interface DbOrder {
   id: string;
@@ -29,6 +44,7 @@ export interface DbOrder {
   address_pincode: string;
   subtotal: number;
   payment_method: string;
+  user_id: string | null;
   order_items: DbOrderItem[];
 }
 
