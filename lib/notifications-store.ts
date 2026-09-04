@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware';
 
 export type NotificationTrigger =
   | 'order_placed'
+  | 'order_shipped'
+  | 'order_delivered'
   | 'daily_digest'
   | 'weekly_digest'
   | 'cart_abandoned';
@@ -62,6 +64,37 @@ ORDER TOTAL : {{order_total}}
 Payment     : {{payment_method}}
 
 Please log in to the admin panel to update the order status.
+
+Regards,
+Sangit Shree Prakashan`,
+  },
+  order_shipped: {
+    subject: 'Order Shipped: {{order_id}}',
+    body: `Dear Admin,
+
+An order has been marked as shipped on Sangit Shree Prakashan.
+
+ORDER DETAILS
+-------------
+Order ID        : {{order_id}}
+Customer        : {{customer_name}}
+Tracking ID     : {{tracking_id}}
+Courier         : {{courier_service}}
+
+Regards,
+Sangit Shree Prakashan`,
+  },
+  order_delivered: {
+    subject: 'Order Delivered: {{order_id}}',
+    body: `Dear Admin,
+
+An order has been marked as delivered on Sangit Shree Prakashan.
+
+ORDER DETAILS
+-------------
+Order ID        : {{order_id}}
+Customer        : {{customer_name}}
+Delivered At    : {{delivered_at}}
 
 Regards,
 Sangit Shree Prakashan`,
@@ -145,6 +178,21 @@ export const WHATSAPP_TEMPLATES: Record<NotificationTrigger, string> = {
 
 View order: https://sangit-shree-prakashan.vercel.app/admin/orders`,
 
+  order_shipped: `*Order Shipped* 📦
+*Order ID:* {{order_id}}
+*Customer:* {{customer_name}}
+*Tracking ID:* {{tracking_id}}
+*Courier:* {{courier_service}}
+
+View order: https://sangit-shree-prakashan.vercel.app/admin/orders`,
+
+  order_delivered: `*Order Delivered* ✅
+*Order ID:* {{order_id}}
+*Customer:* {{customer_name}}
+*Delivered At:* {{delivered_at}}
+
+View order: https://sangit-shree-prakashan.vercel.app/admin/orders`,
+
   daily_digest: `*Daily Sales Report - {{date}}*
 
 *Orders:* {{orders_count}}
@@ -203,6 +251,8 @@ export function parseDescription(desc: string): {
   else if (lower.includes('daily'))                        trigger = 'daily_digest';
   else if (lower.includes('abandon') || (lower.includes('cart') && !lower.includes('order')))
                                                            trigger = 'cart_abandoned';
+  else if (lower.includes('deliver'))                      trigger = 'order_delivered';
+  else if (lower.includes('ship') || lower.includes('dispatch')) trigger = 'order_shipped';
   else if (lower.includes('order'))                        trigger = 'order_placed';
 
   // Detect channel
@@ -213,10 +263,12 @@ export function parseDescription(desc: string): {
   else if (wantsWhatsapp)          channel = 'whatsapp';
 
   const triggerLabels: Record<NotificationTrigger, string> = {
-    order_placed:   'Order Placed',
-    daily_digest:   'Daily Digest',
-    weekly_digest:  'Weekly Digest',
-    cart_abandoned: 'Abandoned Cart',
+    order_placed:    'Order Placed',
+    order_shipped:   'Order Shipped',
+    order_delivered: 'Order Delivered',
+    daily_digest:    'Daily Digest',
+    weekly_digest:   'Weekly Digest',
+    cart_abandoned:  'Abandoned Cart',
   };
   const channelLabels: Record<NotificationChannel, string> = {
     email:     'Email',

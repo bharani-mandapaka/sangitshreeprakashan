@@ -16,17 +16,21 @@ import { useUsersStore, initials, type AppUser } from '@/lib/users-store';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const TRIGGER_LABELS: Record<NotificationTrigger, string> = {
-  order_placed:   'Every new order',
-  daily_digest:   'Daily at 8:00 AM',
-  weekly_digest:  'Every Monday 8:00 AM',
-  cart_abandoned: 'Cart abandoned (1 h)',
+  order_placed:    'Every new order',
+  order_shipped:   'Order marked shipped',
+  order_delivered: 'Order marked delivered',
+  daily_digest:    'Daily at 8:00 AM',
+  weekly_digest:   'Every Monday 8:00 AM',
+  cart_abandoned:  'Cart abandoned (1 h)',
 };
 
 const TRIGGER_COLORS: Record<NotificationTrigger, string> = {
-  order_placed:   'bg-green-500/15 text-green-300 border-green-500/30',
-  daily_digest:   'bg-blue-500/15 text-blue-300 border-blue-500/30',
-  weekly_digest:  'bg-purple-500/15 text-purple-300 border-purple-500/30',
-  cart_abandoned: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
+  order_placed:    'bg-green-500/15 text-green-300 border-green-500/30',
+  order_shipped:   'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+  order_delivered: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  daily_digest:    'bg-blue-500/15 text-blue-300 border-blue-500/30',
+  weekly_digest:   'bg-purple-500/15 text-purple-300 border-purple-500/30',
+  cart_abandoned:  'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
 };
 
 const CHANNEL_META: Record<NotificationChannel, { label: string; icon: React.ReactNode; color: string }> = {

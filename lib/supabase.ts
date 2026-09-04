@@ -45,6 +45,11 @@ export interface DbOrder {
   subtotal: number;
   payment_method: string;
   user_id: string | null;
+  tracking_id: string | null;
+  courier_service: string | null;
+  shipped_at: string | null;
+  delivered_at: string | null;
+  expected_delivery_date: string | null;
   order_items: DbOrderItem[];
 }
 

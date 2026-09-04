@@ -42,6 +42,17 @@ create index if not exists order_items_order_id_idx on order_items(order_id);
 alter table orders add column if not exists user_id uuid references auth.users(id);
 create index if not exists orders_user_id_idx on orders(user_id);
 
+-- ── Orders: lifecycle notification fields ────────────────────────────────────────
+-- shipped_at/delivered_at double as both display data (the "date & time" shown to
+-- the customer) and the dedup guard for order-lifecycle notifications — a
+-- notification only fires the first time its *_at column moves from null to set,
+-- so re-saving an order that's already shipped/delivered never re-sends.
+alter table orders add column if not exists tracking_id            text;
+alter table orders add column if not exists courier_service        text;
+alter table orders add column if not exists shipped_at             timestamptz;
+alter table orders add column if not exists delivered_at           timestamptz;
+alter table orders add column if not exists expected_delivery_date timestamptz;
+
 -- ── Row Level Security ────────────────────────────────────────────────────────
 -- Orders/order_items used to have permissive policies for every operation
 -- (using (true) / with check (true)) so the anon-key client — used directly
@@ -145,6 +156,66 @@ create table if not exists notification_rules (
   active           boolean not null default true,
   created_at       timestamptz not null default now()
 );
+
+-- Widen the trigger enum for order-lifecycle notifications beyond order_placed.
+-- Postgres auto-names an inline check constraint "<table>_<column>_check", so
+-- that's what gets dropped and recreated here.
+alter table notification_rules drop constraint if exists notification_rules_trigger_check;
+alter table notification_rules add constraint notification_rules_trigger_check
+  check (trigger in ('order_placed','order_shipped','order_delivered','daily_digest','weekly_digest','cart_abandoned'));
+
+-- Default customer-facing rules for the three order-lifecycle moments. Unlike
+-- the admin-facing rules an admin creates by hand in /admin/notifications,
+-- these target the customer directly via the dynamic {{customer_email}} /
+-- {{customer_phone}} placeholders, which fireNotifications() already resolves
+-- per-order (see lib/notifications-sender.ts). Seeded here so the feature
+-- works out of the box; admins can edit or deactivate them like any other
+-- rule. `on conflict do nothing` makes this safe to re-run — it won't clobber
+-- any edits an admin has since made.
+insert into notification_rules (id, name, description, trigger, channel, recipients, subject, body, whatsapp_numbers, whatsapp_message, active)
+values (
+  'order-placed-customer',
+  'Order Confirmation (Customer)',
+  'Sent to the customer the moment their order is placed.',
+  'order_placed',
+  'both',
+  array['{{customer_email}}'],
+  'Order Confirmed — {{order_id}} | Sangit Shree Prakashan',
+  E'Dear {{customer_name}},\n\nThank you for your order! Here are the details:\n\nORDER ID      : {{order_id}}\nDATE & TIME   : {{order_date}}\n\nITEMS ORDERED\n-------------\n{{items_list}}\n\nTOTAL         : {{order_total}}\n\nDELIVERY ADDRESS\n----------------\n{{shipping_address}}\n\nEXPECTED DELIVERY: {{expected_delivery_date}}\n\nWe will notify you again once your order has shipped.\n\nThank you for shopping with us.\nSangit Shree Prakashan',
+  array['{{customer_phone}}'],
+  E'*Thanks for ordering from Sangit Shree Prakashan!* 🙏\n\n*Order ID:* {{order_id}}\n*Total:* {{order_total}}\n\n*Items:*\n{{items_list}}\n\n*Expected Delivery:* {{expected_delivery_date}}\n\nWe will notify you when your order is shipped.'
+)
+on conflict (id) do nothing;
+
+insert into notification_rules (id, name, description, trigger, channel, recipients, subject, body, whatsapp_numbers, whatsapp_message, active)
+values (
+  'order-shipped-customer',
+  'Order Shipped (Customer)',
+  'Sent to the customer when their order is marked shipped.',
+  'order_shipped',
+  'both',
+  array['{{customer_email}}'],
+  'Your Order Has Shipped — {{order_id}} | Sangit Shree Prakashan',
+  E'Dear {{customer_name}},\n\nGood news — your order is on its way!\n\nORDER ID       : {{order_id}}\nTRACKING ID    : {{tracking_id}}\nCOURIER        : {{courier_service}}\n\nWe will notify you again once your order has been delivered.\n\nThank you for shopping with us.\nSangit Shree Prakashan',
+  array['{{customer_phone}}'],
+  E'*Your order has shipped!* 📦\n\n*Order ID:* {{order_id}}\n*Tracking ID:* {{tracking_id}}\n*Courier:* {{courier_service}}\n\nWe will notify you when your order is delivered.'
+)
+on conflict (id) do nothing;
+
+insert into notification_rules (id, name, description, trigger, channel, recipients, subject, body, whatsapp_numbers, whatsapp_message, active)
+values (
+  'order-delivered-customer',
+  'Order Delivered (Customer)',
+  'Sent to the customer when their order is marked delivered.',
+  'order_delivered',
+  'both',
+  array['{{customer_email}}'],
+  'Your Order Has Been Delivered — {{order_id}} | Sangit Shree Prakashan',
+  E'Dear {{customer_name}},\n\nYour order was delivered on {{delivered_at}}.\n\nDELIVERED\n---------\n{{items_list}}\n\nFor any questions or assistance, reach us at {{support_email}} or {{support_phone}}.\n\nThank you for shopping with Sangit Shree Prakashan!',
+  array['{{customer_phone}}'],
+  E'*Order Delivered* ✅\n\n*Order ID:* {{order_id}}\n*Delivered At:* {{delivered_at}}\n\nNeed help? Reach us at {{support_phone}} or {{support_email}}.\n\nThank you for shopping with Sangit Shree Prakashan!'
+)
+on conflict (id) do nothing;
 
 -- ── Notification Logs ─────────────────────────────────────────────────────────
 create table if not exists notification_logs (
