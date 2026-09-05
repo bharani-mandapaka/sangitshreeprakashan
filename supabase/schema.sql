@@ -116,6 +116,9 @@ alter table wishlist enable row level security;
 
 -- Unlike orders, wishlist is net-new with no admin dependency, so it's scoped
 -- properly to the owning user from day one.
+drop policy if exists "select_own_wishlist" on wishlist;
+drop policy if exists "insert_own_wishlist" on wishlist;
+drop policy if exists "delete_own_wishlist" on wishlist;
 create policy "select_own_wishlist" on wishlist for select using (auth.uid() = user_id);
 create policy "insert_own_wishlist" on wishlist for insert with check (auth.uid() = user_id);
 create policy "delete_own_wishlist" on wishlist for delete using (auth.uid() = user_id);
@@ -157,6 +160,17 @@ create table if not exists notification_rules (
   created_at       timestamptz not null default now()
 );
 
+-- Which HTML wrapper an email uses (see lib/notifications-sender.ts). Rules
+-- created by hand in /admin/notifications are staff-facing ("Dear Admin...")
+-- and default to 'admin', which keeps the existing internal-alert styling.
+-- The three order-lifecycle rules seeded below are the only 'customer' ones —
+-- without this flag, customers were getting emails branded "ADMIN
+-- NOTIFICATION" under the logo, since both used the same wrapper.
+alter table notification_rules add column if not exists audience text not null default 'admin';
+alter table notification_rules drop constraint if exists notification_rules_audience_check;
+alter table notification_rules add constraint notification_rules_audience_check
+  check (audience in ('admin','customer'));
+
 -- Widen the trigger enum for order-lifecycle notifications beyond order_placed.
 -- Postgres auto-names an inline check constraint "<table>_<column>_check", so
 -- that's what gets dropped and recreated here.
@@ -172,7 +186,7 @@ alter table notification_rules add constraint notification_rules_trigger_check
 -- works out of the box; admins can edit or deactivate them like any other
 -- rule. `on conflict do nothing` makes this safe to re-run — it won't clobber
 -- any edits an admin has since made.
-insert into notification_rules (id, name, description, trigger, channel, recipients, subject, body, whatsapp_numbers, whatsapp_message, active)
+insert into notification_rules (id, name, description, trigger, channel, recipients, subject, body, whatsapp_numbers, whatsapp_message, active, audience)
 values (
   'order-placed-customer',
   'Order Confirmation (Customer)',
@@ -180,14 +194,16 @@ values (
   'order_placed',
   'both',
   array['{{customer_email}}'],
-  'Order Confirmed — {{order_id}} | Sangit Shree Prakashan',
-  E'Dear {{customer_name}},\n\nThank you for your order! Here are the details:\n\nORDER ID      : {{order_id}}\nDATE & TIME   : {{order_date}}\n\nITEMS ORDERED\n-------------\n{{items_list}}\n\nTOTAL         : {{order_total}}\n\nDELIVERY ADDRESS\n----------------\n{{shipping_address}}\n\nEXPECTED DELIVERY: {{expected_delivery_date}}\n\nWe will notify you again once your order has shipped.\n\nThank you for shopping with us.\nSangit Shree Prakashan',
+  'Your Order is Confirmed — {{order_id}} | Sangit Shree Prakashan',
+  E'Dear {{customer_name}},\n\nThank you for choosing Sangit Shree Prakashan. We are delighted to confirm that your order has been received and is being prepared with care.\n\nOrder ID    : {{order_id}}\nPlaced on   : {{order_date}}\n\nYour Order\n----------\n{{items_list}}\n\nOrder Total : {{order_total}}\n\nDelivering To\n-------------\n{{shipping_address}}\n\nWe expect your order to reach you by {{expected_delivery_date}}. You will hear from us again as soon as it ships.\n\nThank you for supporting the tradition of classical Indian music.\n\nWarm regards,\nSangit Shree Prakashan',
   array['{{customer_phone}}'],
-  E'*Thanks for ordering from Sangit Shree Prakashan!* 🙏\n\n*Order ID:* {{order_id}}\n*Total:* {{order_total}}\n\n*Items:*\n{{items_list}}\n\n*Expected Delivery:* {{expected_delivery_date}}\n\nWe will notify you when your order is shipped.'
+  E'*Thank you for your order!* 🙏\nSangit Shree Prakashan\n\n*Order ID:* {{order_id}}\n*Total:* {{order_total}}\n\n*Your Order:*\n{{items_list}}\n\nExpected delivery: *{{expected_delivery_date}}*\n\nWe''ll let you know as soon as it ships.',
+  true,
+  'customer'
 )
 on conflict (id) do nothing;
 
-insert into notification_rules (id, name, description, trigger, channel, recipients, subject, body, whatsapp_numbers, whatsapp_message, active)
+insert into notification_rules (id, name, description, trigger, channel, recipients, subject, body, whatsapp_numbers, whatsapp_message, active, audience)
 values (
   'order-shipped-customer',
   'Order Shipped (Customer)',
@@ -195,14 +211,16 @@ values (
   'order_shipped',
   'both',
   array['{{customer_email}}'],
-  'Your Order Has Shipped — {{order_id}} | Sangit Shree Prakashan',
-  E'Dear {{customer_name}},\n\nGood news — your order is on its way!\n\nORDER ID       : {{order_id}}\nTRACKING ID    : {{tracking_id}}\nCOURIER        : {{courier_service}}\n\nWe will notify you again once your order has been delivered.\n\nThank you for shopping with us.\nSangit Shree Prakashan',
+  'Your Order is on Its Way — {{order_id}} | Sangit Shree Prakashan',
+  E'Dear {{customer_name}},\n\nGood news — your order has been dispatched and is now on its way to you.\n\nOrder ID     : {{order_id}}\nTracking ID  : {{tracking_id}}\nCourier      : {{courier_service}}\n\nWe will write to you again once it has been delivered.\n\nThank you for your patience, and for supporting Sangit Shree Prakashan.\n\nWarm regards,\nSangit Shree Prakashan',
   array['{{customer_phone}}'],
-  E'*Your order has shipped!* 📦\n\n*Order ID:* {{order_id}}\n*Tracking ID:* {{tracking_id}}\n*Courier:* {{courier_service}}\n\nWe will notify you when your order is delivered.'
+  E'*Your order is on its way!* 📦\n\n*Order ID:* {{order_id}}\n*Tracking ID:* {{tracking_id}}\n*Courier:* {{courier_service}}\n\nWe''ll let you know once it''s delivered.',
+  true,
+  'customer'
 )
 on conflict (id) do nothing;
 
-insert into notification_rules (id, name, description, trigger, channel, recipients, subject, body, whatsapp_numbers, whatsapp_message, active)
+insert into notification_rules (id, name, description, trigger, channel, recipients, subject, body, whatsapp_numbers, whatsapp_message, active, audience)
 values (
   'order-delivered-customer',
   'Order Delivered (Customer)',
@@ -210,10 +228,12 @@ values (
   'order_delivered',
   'both',
   array['{{customer_email}}'],
-  'Your Order Has Been Delivered — {{order_id}} | Sangit Shree Prakashan',
-  E'Dear {{customer_name}},\n\nYour order was delivered on {{delivered_at}}.\n\nDELIVERED\n---------\n{{items_list}}\n\nFor any questions or assistance, reach us at {{support_email}} or {{support_phone}}.\n\nThank you for shopping with Sangit Shree Prakashan!',
+  'Your Order Has Arrived — {{order_id}} | Sangit Shree Prakashan',
+  E'Dear {{customer_name}},\n\nWe''re happy to let you know that your order was delivered on {{delivered_at}}.\n\nDelivered\n---------\n{{items_list}}\n\nIf you have any questions or need assistance, please reach us at {{support_email}} or {{support_phone}} — we''re always happy to help.\n\nThank you for choosing Sangit Shree Prakashan. We hope these books serve you well in your musical journey.\n\nWarm regards,\nSangit Shree Prakashan',
   array['{{customer_phone}}'],
-  E'*Order Delivered* ✅\n\n*Order ID:* {{order_id}}\n*Delivered At:* {{delivered_at}}\n\nNeed help? Reach us at {{support_phone}} or {{support_email}}.\n\nThank you for shopping with Sangit Shree Prakashan!'
+  E'*Your order has been delivered!* ✅\n\nDelivered on {{delivered_at}}.\n\nNeed help? Write to us at {{support_email}} or call {{support_phone}}.\n\nThank you for shopping with Sangit Shree Prakashan!',
+  true,
+  'customer'
 )
 on conflict (id) do nothing;
 
@@ -235,5 +255,8 @@ create index if not exists notif_logs_sent_at_idx on notification_logs(sent_at d
 alter table notification_rules enable row level security;
 alter table notification_logs  enable row level security;
 
+drop policy if exists "anon_all_notification_rules" on notification_rules;
+drop policy if exists "anon_all_notification_logs"  on notification_logs;
 create policy "anon_all_notification_rules" on notification_rules for all to anon using (true) with check (true);
 create policy "anon_all_notification_logs"  on notification_logs  for all to anon using (true) with check (true);
+

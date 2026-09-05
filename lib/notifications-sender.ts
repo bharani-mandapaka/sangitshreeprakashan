@@ -51,6 +51,8 @@ async function sendWhatsAppMessage(to: string, body: string): Promise<void> {
 }
 
 // ── Admin email HTML wrapper ───────────────────────────────────────────────────
+// Used for staff-facing rules (audience='admin') — anything an admin composes
+// by hand in /admin/notifications, e.g. "new order came in" alerts to staff.
 function buildAdminEmailHtml(subject: string, body: string): string {
   return `<!DOCTYPE html>
 <html>
@@ -67,6 +69,35 @@ function buildAdminEmailHtml(subject: string, body: string): string {
     <pre style="white-space:pre-wrap;font-family:monospace;font-size:13px;line-height:1.8;color:#444;margin:0;background:#f9f9f9;padding:16px;border-radius:6px;border-left:3px solid #C9A84C;">${body}</pre>
   </div>
   <div style="background:#f5f5f5;padding:12px 24px;border-top:1px solid #e0e0e0;">
+    <p style="margin:0;color:#999;font-size:11px;">
+      Sangit Shree Prakashan · Kanpur, UP · sangitshreeprakashan.com
+    </p>
+  </div>
+</div>
+</body>
+</html>`;
+}
+
+// ── Customer email HTML wrapper ─────────────────────────────────────────────────
+// Used for audience='customer' rules (the three order-lifecycle rules seeded
+// in supabase/schema.sql). Same brand shell as the admin wrapper, minus the
+// "ADMIN NOTIFICATION" label — that used to run on every customer email too,
+// since both shared buildAdminEmailHtml() before this split.
+function buildCustomerEmailHtml(subject: string, body: string): string {
+  return `<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f0f0f0;font-family:Georgia,serif;">
+<div style="max-width:600px;margin:32px auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e0e0e0;">
+  <div style="background:#040000;padding:20px 24px;">
+    <h1 style="margin:0;color:#C9A84C;font-size:14px;letter-spacing:2px;font-weight:normal;">
+      SANGIT SHREE PRAKASHAN
+    </h1>
+  </div>
+  <div style="padding:28px 24px;">
+    <h2 style="margin:0 0 16px;color:#222;font-size:16px;">${subject}</h2>
+    <pre style="white-space:pre-wrap;font-family:Georgia,serif;font-size:14px;line-height:1.8;color:#333;margin:0;">${body}</pre>
+  </div>
+  <div style="background:#f5f5f5;padding:16px 24px;border-top:1px solid #e0e0e0;">
     <p style="margin:0;color:#999;font-size:11px;">
       Sangit Shree Prakashan · Kanpur, UP · sangitshreeprakashan.com
     </p>
@@ -117,13 +148,24 @@ export async function fireNotifications(
         const resolvedTo = (rule.recipients as string[])
           .map((r) => interpolate(r, vars))
           .filter((r) => r && !r.includes('[') && r.includes('@'));
+        const html = rule.audience === 'customer'
+          ? buildCustomerEmailHtml(subject, body)
+          : buildAdminEmailHtml(subject, body);
         for (const to of resolvedTo) {
-          await resend.emails.send({
+          // resend.emails.send() does NOT throw on API-level failures (bad
+          // recipient, unverified domain, etc.) — it resolves normally with
+          // { data: null, error: {...} }. Without checking `error` here, a
+          // failed send was silently logged as "sent" with no clue why the
+          // customer never got the email.
+          const { error: sendError } = await resend.emails.send({
             from:    'Sangit Shree Prakashan <orders@sangitshreeprakashan.com>',
             to,
             subject,
-            html:    buildAdminEmailHtml(subject, body),
+            html,
           });
+          if (sendError) {
+            throw new Error(`Resend rejected send to ${to}: ${sendError.message}`);
+          }
         }
       } catch (err) {
         emailError = String(err);

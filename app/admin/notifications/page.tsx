@@ -673,6 +673,10 @@ export default function NotificationsPage() {
       whatsapp_message: waMsg,
       active:           true,
       created_at:       new Date().toISOString(),
+      // Rules built here use the staff-facing "Dear Admin" templates
+      // (see EMAIL_TEMPLATES in lib/notifications-store.ts) — only the
+      // seeded order-lifecycle rules in supabase/schema.sql are 'customer'.
+      audience:         'admin',
     };
 
     const { error } = await getSupabase().from('notification_rules').insert(newRule);

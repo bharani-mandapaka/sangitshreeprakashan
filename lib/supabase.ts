@@ -77,6 +77,7 @@ export interface DbNotificationRule {
   whatsapp_message: string;
   active: boolean;
   created_at: string;
+  audience: 'admin' | 'customer';
 }
 
 export interface DbNotificationLog {
