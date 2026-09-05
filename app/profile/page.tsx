@@ -8,7 +8,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '@/lib/auth-store';
 import { useWishlistStore } from '@/lib/wishlist-store';
 import { getSupabase, type DbOrder } from '@/lib/supabase';
-import { getBookById } from '@/lib/books';
+import { mapDbBookToBook, type DbBookRow } from '@/lib/books-data';
+import type { Book } from '@/lib/books';
 import { formatPrice } from '@/lib/utils';
 import BookCard from '@/components/BookCard';
 
@@ -29,6 +30,7 @@ export default function ProfilePage() {
   const [orders,        setOrders]        = useState<DbOrder[]>([]);
   const [ordersLoading,  setOrdersLoading] = useState(true);
   const [ordersError,    setOrdersError]   = useState('');
+  const [wishlistBooks,  setWishlistBooks] = useState<Book[]>([]);
 
   // Editable profile fields — phone accounts have no real email of their own
   // (the auth email is an internal synthetic address), so this lets them add
@@ -70,6 +72,26 @@ export default function ProfilePage() {
     setEditEmail((user.user_metadata?.real_email as string | undefined) ?? '');
   }, [user]);
 
+  // Wishlist book details now live in Supabase (see lib/books-data.ts) instead
+  // of the static lib/books.ts array, so looking them up by id is async —
+  // this used to be a synchronous wishlistIds.map(getBookById) during render.
+  useEffect(() => {
+    if (wishlistIds.length === 0) {
+      setWishlistBooks([]);
+      return;
+    }
+    let cancelled = false;
+    getSupabase()
+      .from('books')
+      .select('*')
+      .in('id', wishlistIds)
+      .then(({ data }) => {
+        if (cancelled) return;
+        setWishlistBooks(data ? (data as DbBookRow[]).map(mapDbBookToBook) : []);
+      });
+    return () => { cancelled = true; };
+  }, [wishlistIds]);
+
   if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-dark pt-20 lg:pt-24 flex items-center justify-center">
@@ -77,10 +99,6 @@ export default function ProfilePage() {
       </div>
     );
   }
-
-  const wishlistBooks = wishlistIds
-    .map(getBookById)
-    .filter((b): b is NonNullable<typeof b> => !!b);
 
   const handleSignOut = async () => {
     await signOut();
