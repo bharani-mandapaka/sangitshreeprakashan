@@ -65,10 +65,18 @@ export function mapDbBookToBook(row: DbBookRow): Book {
 // Each call gets its own throwaway anon-key client — see getSupabaseServer()'s
 // own comment for why (avoids leaking session state between requests).
 
+// Bundles first, then individual books grouped by series with parts in order
+// (Swar Vadan Part 1, 2, 3... together, not scattered alphabetically), and
+// anything without a series (one-off titles like "Malhar Darshan") falls to
+// the end, sorted by title. Applied everywhere multiple books are listed so
+// the catalog reads the same way it did as a hand-ordered static array.
 export async function getAllBooks(): Promise<Book[]> {
   const { data, error } = await getSupabaseServer()
     .from('books')
     .select('*')
+    .order('is_bundle', { ascending: false })
+    .order('series', { ascending: true, nullsFirst: false })
+    .order('part', { ascending: true, nullsFirst: false })
     .order('title_english', { ascending: true });
   if (error || !data) return [];
   return (data as DbBookRow[]).map(mapDbBookToBook);
@@ -99,11 +107,25 @@ export async function getBooksByIds(ids: string[]): Promise<Book[]> {
 }
 
 export async function getBooksByCategory(category: BookCategory): Promise<Book[]> {
-  const { data } = await getSupabaseServer().from('books').select('*').eq('category', category);
+  const { data } = await getSupabaseServer()
+    .from('books')
+    .select('*')
+    .eq('category', category)
+    .order('is_bundle', { ascending: false })
+    .order('series', { ascending: true, nullsFirst: false })
+    .order('part', { ascending: true, nullsFirst: false })
+    .order('title_english', { ascending: true });
   return data ? (data as DbBookRow[]).map(mapDbBookToBook) : [];
 }
 
 export async function getFeaturedBooks(): Promise<Book[]> {
-  const { data } = await getSupabaseServer().from('books').select('*').eq('is_featured', true);
+  const { data } = await getSupabaseServer()
+    .from('books')
+    .select('*')
+    .eq('is_featured', true)
+    .order('is_bundle', { ascending: false })
+    .order('series', { ascending: true, nullsFirst: false })
+    .order('part', { ascending: true, nullsFirst: false })
+    .order('title_english', { ascending: true });
   return data ? (data as DbBookRow[]).map(mapDbBookToBook) : [];
 }
