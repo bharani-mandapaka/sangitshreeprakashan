@@ -343,12 +343,15 @@ on conflict (id) do nothing;
 -- Real file upload for /admin/books, replacing the manual-path-only approach.
 -- Uploads go through app/api/admin/books/upload-cover/route.ts using the
 -- service-role client, so the anon key never needs write access to this
--- bucket -- same pattern as the books table itself. Public read is required
--- so cover images actually render on the storefront.
+-- bucket -- same pattern as the books table itself.
+--
+-- No storage.objects RLS policy is needed here: a public bucket (public =
+-- true) already serves individual files at their public URL without going
+-- through RLS at all. A SELECT policy would only be needed to let the anon
+-- key *list* every file in the bucket via the API, which nothing in this
+-- app does -- so deliberately not adding one avoids letting anyone enumerate
+-- every uploaded filename for no functional benefit.
+drop policy if exists "read_covers" on storage.objects;
 insert into storage.buckets (id, name, public)
 values ('covers', 'covers', true)
 on conflict (id) do nothing;
-
-drop policy if exists "read_covers" on storage.objects;
-create policy "read_covers" on storage.objects for select
-  using (bucket_id = 'covers');

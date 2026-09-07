@@ -189,7 +189,7 @@ notification_logs  (id, rule_id, rule_name, trigger, channel, recipients, status
 - `phone_otps` — no policies whatsoever; service role only.
 - `books` — public SELECT (`for select using (true)`); no insert/update/delete policy for anon at all, so writes only happen through the service-role admin route.
 - `notification_rules`/`notification_logs` — **still fully permissive** to the anon key. Not yet tightened (see `tasks.md`).
-- **Storage bucket `covers`** — public bucket (`public = true`), public SELECT via a `storage.objects` policy; no insert/update/delete policy for anon, so uploads only happen through the service-role `upload-cover` route.
+- **Storage bucket `covers`** — public bucket (`public = true`); no RLS policy at all on `storage.objects` for it, deliberately — a public bucket already serves files at their public URL without RLS, and adding a SELECT policy would only let the anon key *list* every uploaded filename via the API for no functional benefit. Uploads only happen through the service-role `upload-cover` route.
 
 ## API routes (live)
 - `POST /api/orders/create` — verifies the caller's session (if any), inserts order + items via the service-role client, computes `expected_delivery_date`, fires the `order_placed` customer notification
