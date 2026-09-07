@@ -151,21 +151,33 @@ function CoverImageField({
           )}
         </div>
         <div className="flex-1 space-y-2">
-          <label className={`inline-flex items-center gap-2 border font-cinzel text-xs px-3 py-2 rounded-lg transition-all w-fit ${
-            uploading
-              ? 'border-gold/15 text-cream/30 cursor-wait'
-              : 'border-gold/25 hover:border-gold/50 text-gold/80 hover:text-gold cursor-pointer'
-          }`}>
-            <Upload size={13} />
-            {uploading ? 'Uploading…' : 'Upload Image'}
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/avif"
-              className="hidden"
-              onChange={handleFileChange}
-              disabled={uploading}
-            />
-          </label>
+          <div className="flex flex-wrap gap-2">
+            <label className={`inline-flex items-center gap-2 border font-cinzel text-xs px-3 py-2 rounded-lg transition-all w-fit ${
+              uploading
+                ? 'border-gold/15 text-cream/30 cursor-wait'
+                : 'border-gold/25 hover:border-gold/50 text-gold/80 hover:text-gold cursor-pointer'
+            }`}>
+              <Upload size={13} />
+              {uploading ? 'Uploading…' : 'Upload Image'}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/avif"
+                className="hidden"
+                onChange={handleFileChange}
+                disabled={uploading}
+              />
+            </label>
+            {form.coverImage && (
+              <button
+                type="button"
+                onClick={() => onChange({ ...form, coverImage: '' })}
+                disabled={uploading}
+                className="inline-flex items-center gap-1.5 border border-red-500/25 hover:border-red-500/50 text-red-400/80 hover:text-red-400 font-cinzel text-xs px-3 py-2 rounded-lg transition-all disabled:opacity-50"
+              >
+                <X size={13} /> Remove
+              </button>
+            )}
+          </div>
           <input
             className="input-gold text-xs py-1.5"
             value={form.coverImage}
