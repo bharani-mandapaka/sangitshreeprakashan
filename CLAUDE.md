@@ -162,10 +162,12 @@ books (id, slug, title_hindi, title_english, price, category, level, language,
        -- Live source of truth for the storefront (see lib/books-data.ts) and
        -- admin catalog UI (/admin/books). id is the slug for books created via
        -- the admin panel; the original 36 seeded rows keep their hand-picked
-       -- short-code ids (e.g. "sv-1"). cover_image is a manual path
-       -- (e.g. /covers/foo.jpg into public/), not a real upload — see
-       -- app/api/admin/books/route.ts. lib/books.ts (the old static array) is
-       -- left in the repo but unused by any live consumer.
+       -- short-code ids (e.g. "sv-1"). cover_image is a URL — either a legacy
+       -- manual path (e.g. /covers/foo.jpg into public/, from the original 36
+       -- seeded books) or a real upload to the Supabase Storage 'covers'
+       -- bucket via app/api/admin/books/upload-cover/route.ts. Both work; the
+       -- field is just stored as a plain string either way. lib/books.ts (the
+       -- old static array) is left in the repo but unused by any live consumer.
 
 notification_rules (id, name, description, trigger, channel, recipients, subject, body,
                     whatsapp_numbers, whatsapp_message, active, created_at, audience)
@@ -187,6 +189,7 @@ notification_logs  (id, rule_id, rule_name, trigger, channel, recipients, status
 - `phone_otps` — no policies whatsoever; service role only.
 - `books` — public SELECT (`for select using (true)`); no insert/update/delete policy for anon at all, so writes only happen through the service-role admin route.
 - `notification_rules`/`notification_logs` — **still fully permissive** to the anon key. Not yet tightened (see `tasks.md`).
+- **Storage bucket `covers`** — public bucket (`public = true`), public SELECT via a `storage.objects` policy; no insert/update/delete policy for anon, so uploads only happen through the service-role `upload-cover` route.
 
 ## API routes (live)
 - `POST /api/orders/create` — verifies the caller's session (if any), inserts order + items via the service-role client, computes `expected_delivery_date`, fires the `order_placed` customer notification
@@ -197,6 +200,7 @@ notification_logs  (id, rule_id, rule_name, trigger, channel, recipients, status
 - `POST /api/admin/books` — create a book (or bundle); service-role, admin-cookie gated
 - `PATCH /api/admin/books` — update a book by `id`
 - `DELETE /api/admin/books` — delete a book by `id`
+- `POST /api/admin/books/upload-cover` — uploads an image file to the Supabase Storage `covers` bucket, returns its public URL; service-role, admin-cookie gated; 5MB limit, JPG/PNG/WebP/AVIF only
 - `POST /api/auth/phone/send-otp` — generates and stores a mock OTP for a phone number
 - `POST /api/auth/phone/verify-otp` — checks the OTP, signs in/up via the synthetic-email mechanism above
 - `POST /api/notifications/test` — sends a test notification for a given rule
@@ -221,9 +225,12 @@ Each book has: `id`, `slug`, `titleEnglish`, `titleHindi`, `authors`, `price`, `
 Categories: `instrumental` (व), `vocal` (ग), `raag-theory` (र), `kathak` (क), `research` (श), `cbse` (प), `bundle` (सं). Icons are single Devanagari characters styled with `font-devanagari text-gold`.
 
 Admins manage the catalog at `/admin/books` — list/search/filter, create, edit, delete. Bundles
-aren't a separate flow, just a book with the "Bundle Set" checkbox on. Cover images are a manual
-path field (e.g. `/covers/foo.jpg`, meaning a file already in `public/covers/`) — there's no
-upload UI; that's a possible Phase 2+ upgrade (Supabase Storage) if it's ever needed.
+aren't a separate flow, just a book with the "Bundle Set" checkbox on. Cover images support a real
+file upload (JPG/PNG/WebP/AVIF, 5MB max) to the Supabase Storage `covers` bucket via
+`app/api/admin/books/upload-cover/route.ts`, with a live thumbnail preview in the form — the
+underlying path/URL field is still directly editable too, so the original 36 books' legacy
+`/covers/foo.jpg` paths (files in `public/covers/`) keep working exactly as before. `next.config.mjs`
+allow-lists `*.supabase.co` under `images.remotePatterns` so `next/image` can serve the uploaded URLs.
 
 ### Books added by Shreeyanshi (July 2026)
 - Swar Vadan Part 1
@@ -320,7 +327,7 @@ the layout's own route.
 - Tighten RLS on `notification_rules`/`notification_logs` (still open to the anon key)
 - Real Google OAuth + role-based access for admin (staff vs admin)
 - ~~Catalog management from admin: edit/create books, create/edit bundles, migrate `lib/books.ts` to a Supabase `books` table~~ ✓ done — see "Book catalog" above and `/admin/books`
-- Real cover-image upload to Supabase Storage (today it's a manual path field — good enough for now, but an upload UI would be nicer)
+- ~~Real cover-image upload to Supabase Storage~~ ✓ done — see "Book catalog" above
 - Manually create an order from admin (phone/walk-in orders)
 - Patch the Next.js CVE flagged by `npm audit` (dev-server origin-verification issue, plus `ws`/`glob` vulnerabilities) — stay within the 14.2.x line, don't jump to Next 15 (breaks the `params` API this codebase relies on)
 

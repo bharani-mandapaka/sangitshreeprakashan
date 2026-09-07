@@ -338,3 +338,17 @@ values
   ('bal-3', 'bal-sangit-sangrah-part-3', 'बाल संगीत संग्रह भाग-3', 'Bal Sangit Sangrah Part 3', 125, 'cbse', 'beginner', 'bilingual', array['पं० सतीश चन्द्र श्रीवास्तव','डॉ. अल्पना खरे'], 'Designed for Class 8 and beginner students. Covers ragas Asavari, Bhairav and Pilu with alaap, notations and taans. Includes orchestra pieces, prayers, patriotic songs, English songs, biographies of musicians and music terminology.', null, '/covers/bal-sangit-sangrah-part-3.jpg', 'Bal Sangit Sangrah', 3, false, false, true, array['children','beginner','class-8','vocal','bilingual']),
   ('treasure-raags-taals', 'treasure-of-raags-and-taals', 'Treasure of Raags & Taals', 'Treasure of Raags & Taals', 150, 'research', 'research', 'english', array['Pt. Satish Chandra Srivastava'], 'A comprehensive reference covering 564 North Indian ragas with Thaat, Jati, Vadi, Samvadi, nature of notes, Aaroha, Avaroha and performing time. Also includes 69 North Indian taals with Matra, Vibhag, Tali, Khali and Theka. Covers 938 South Indian ragas and 175 South Indian taals. An invaluable resource for music lovers, students, teachers and research scholars.', null, '/covers/treasure-of-raags-and-taals.jpg', null, null, false, false, true, array['research','reference','raag','taal','english','scholarly'])
 on conflict (id) do nothing;
+
+-- ── Book cover uploads (Supabase Storage) ────────────────────────────────────
+-- Real file upload for /admin/books, replacing the manual-path-only approach.
+-- Uploads go through app/api/admin/books/upload-cover/route.ts using the
+-- service-role client, so the anon key never needs write access to this
+-- bucket -- same pattern as the books table itself. Public read is required
+-- so cover images actually render on the storefront.
+insert into storage.buckets (id, name, public)
+values ('covers', 'covers', true)
+on conflict (id) do nothing;
+
+drop policy if exists "read_covers" on storage.objects;
+create policy "read_covers" on storage.objects for select
+  using (bucket_id = 'covers');

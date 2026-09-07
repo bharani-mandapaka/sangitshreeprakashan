@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import {
-  RefreshCw, Search, Plus, Pencil, Trash2, X, Package, BookOpen,
+  RefreshCw, Search, Plus, Pencil, Trash2, X, Package, BookOpen, Upload,
 } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
 import type { DbBookRow } from '@/lib/books-data';
@@ -105,6 +105,80 @@ function formToPayload(form: BookFormState) {
   };
 }
 
+// ── Cover image: upload + live preview, with the underlying path/URL still
+// editable directly for anyone who wants to paste one in (e.g. an existing
+// /covers/*.jpg from public/, or a URL from elsewhere). Uploads go through
+// app/api/admin/books/upload-cover/route.ts to Supabase Storage. ───────────
+function CoverImageField({
+  form,
+  onChange,
+}: {
+  form: BookFormState;
+  onChange: (f: BookFormState) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+    setUploading(true);
+    setUploadError('');
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/api/admin/books/upload-cover', { method: 'POST', body: fd });
+    const data = await res.json().catch(() => ({}));
+    setUploading(false);
+    if (!res.ok) {
+      setUploadError(data.error ?? 'Upload failed.');
+      return;
+    }
+    onChange({ ...form, coverImage: data.url });
+  };
+
+  return (
+    <div>
+      <label className="block text-cream/40 text-xs uppercase tracking-widest font-cinzel mb-1.5">Cover Image</label>
+      <div className="flex items-start gap-4">
+        <div className="relative w-16 h-20 rounded-lg overflow-hidden bg-black/40 border border-gold/10 flex-shrink-0">
+          {form.coverImage ? (
+            <Image src={form.coverImage} alt="" fill sizes="64px" className="object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gold/20">
+              <BookOpen size={20} />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 space-y-2">
+          <label className={`inline-flex items-center gap-2 border font-cinzel text-xs px-3 py-2 rounded-lg transition-all w-fit ${
+            uploading
+              ? 'border-gold/15 text-cream/30 cursor-wait'
+              : 'border-gold/25 hover:border-gold/50 text-gold/80 hover:text-gold cursor-pointer'
+          }`}>
+            <Upload size={13} />
+            {uploading ? 'Uploading…' : 'Upload Image'}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/avif"
+              className="hidden"
+              onChange={handleFileChange}
+              disabled={uploading}
+            />
+          </label>
+          <input
+            className="input-gold text-xs py-1.5"
+            value={form.coverImage}
+            onChange={(e) => onChange({ ...form, coverImage: e.target.value })}
+            placeholder="/covers/swar-vadan-part-1.jpg, or upload above"
+          />
+          {uploadError && <p className="text-red-400 text-[10px]">{uploadError}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Create/edit form (modal) ─────────────────────────────────────────────────
 function BookFormModal({
   form,
@@ -165,10 +239,13 @@ function BookFormModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+    // A flex+overflow-y-auto wrapper clips the top of tall content on short
+    // viewports (a known flexbox/scroll interaction quirk) -- plain block
+    // layout with mx-auto centering scrolls correctly from the very top.
+    <div className="fixed inset-0 bg-black/70 z-50 overflow-y-auto p-4">
       <form
         onSubmit={handleSubmit}
-        className="bg-[#0A0000] border border-gold/15 rounded-2xl w-full max-w-2xl my-8 p-6 space-y-5"
+        className="bg-[#0A0000] border border-gold/15 rounded-2xl w-full max-w-2xl mx-auto my-8 p-6 space-y-5"
       >
         <div className="flex items-center justify-between">
           <h2 className="font-cinzel text-gold font-bold text-lg">
@@ -260,16 +337,6 @@ function BookFormModal({
             </select>
           </div>
           <div>
-            <label className="block text-cream/40 text-xs uppercase tracking-widest font-cinzel mb-1.5">Cover Image Path</label>
-            <input
-              className="input-gold text-sm"
-              value={form.coverImage}
-              onChange={(e) => onChange({ ...form, coverImage: e.target.value })}
-              placeholder="/covers/swar-vadan-part-1.jpg"
-            />
-          </div>
-
-          <div>
             <label className="block text-cream/40 text-xs uppercase tracking-widest font-cinzel mb-1.5">
               Series <span className="normal-case text-cream/25">(optional)</span>
             </label>
@@ -279,6 +346,7 @@ function BookFormModal({
               onChange={(e) => onChange({ ...form, series: e.target.value })}
             />
           </div>
+
           <div>
             <label className="block text-cream/40 text-xs uppercase tracking-widest font-cinzel mb-1.5">
               Part # <span className="normal-case text-cream/25">(optional)</span>
@@ -293,6 +361,8 @@ function BookFormModal({
             />
           </div>
         </div>
+
+        <CoverImageField form={form} onChange={onChange} />
 
         <div>
           <label className="block text-cream/40 text-xs uppercase tracking-widest font-cinzel mb-1.5">
@@ -653,8 +723,8 @@ export default function AdminBooksPage() {
 
       {/* Delete confirmation */}
       {deleteTarget && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0A0000] border border-gold/15 rounded-2xl w-full max-w-sm p-6 space-y-4">
+        <div className="fixed inset-0 bg-black/70 z-50 overflow-y-auto p-4">
+          <div className="bg-[#0A0000] border border-gold/15 rounded-2xl w-full max-w-sm mx-auto my-8 p-6 space-y-4">
             <h2 className="font-cinzel text-cream font-bold text-base">Delete this book?</h2>
             <p className="text-cream/50 text-sm">
               <span className="text-cream">{deleteTarget.title_english}</span> will be permanently removed from the catalog. This can&apos;t be undone.

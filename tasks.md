@@ -59,6 +59,9 @@
 - [x] Every storefront consumer switched from the static array to the live table: homepage, `/books` (split into a server component + `components/BooksListClient.tsx` since a `'use client'` page can't be async), book detail pages + related books, sitemap, profile wishlist tab
 - [x] `/admin/books` — list with search/category/bundle-only filters, create/edit form (all fields including authors/tags as line/comma-separated text), delete with inline confirm. Bundles use the same form via the "Bundle Set" checkbox — no separate bundle UI needed.
 - [x] `lib/books.ts` deliberately left in place (types + `categoryMeta` still imported everywhere) with its static array and helpers now dead code — not deleted, per the chosen migration approach
+- [x] Default catalog ordering fixed — bundles first, then individual books grouped by series with parts in numeric order, instead of a flat alphabetical sort that scattered series and bundles randomly
+- [x] Real cover-image upload — public Supabase Storage `covers` bucket, `POST /api/admin/books/upload-cover` (service-role, 5MB limit, JPG/PNG/WebP/AVIF), live thumbnail preview + upload button in the admin form, with the path/URL still directly editable for the legacy `/covers/*.jpg` books. `next.config.mjs` allow-lists `*.supabase.co` for `next/image`.
+- [x] Fixed the admin book-form modal clipping at the top on shorter viewports (flexbox + `overflow-y-auto` scroll bug) — switched to a plain block layout with `mx-auto` centering that scrolls correctly
 
 ---
 
