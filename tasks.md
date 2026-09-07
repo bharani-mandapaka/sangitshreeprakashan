@@ -84,7 +84,8 @@
 - [ ] Real photos and refined content (mobile scroll fix already done, PR #4)
 
 ### Notifications — remaining before this is fully live end-to-end
-- [ ] **Re-verify `sangitshreeprakashan.com` on Resend** — currently shows unverified, so no customer email actually sends despite the code path being correct. Needs whoever owns the domain's DNS (Bharani).
+> **On hold** (as of this session) — pausing further work here to study the domain situation before touching DNS, since `sangitshreeprakashan.com` already has an existing website live on it. The `feature/order-notifications` PR is open and code-complete; it's just parked until the domain question is resolved.
+- [ ] **Re-verify `sangitshreeprakashan.com` on Resend** — currently shows unverified, so no customer email actually sends despite the code path being correct. Needs whoever owns the domain's DNS (Bharani). Email-sending DNS records (TXT/CNAME for SPF+DKIM) don't conflict with whatever's already routing the existing website — but confirm what's already in the domain's DNS before adding anything, in case there's an existing SPF record that needs merging rather than overwriting.
 - [ ] WhatsApp sends are still skipped — needs `WHATSAPP_PHONE_NUMBER_ID` + `WHATSAPP_TOKEN` (Meta Cloud API business verification, 2–4 weeks)
 - [ ] Fix: `app/checkout/page.tsx` never checks whether `POST /api/orders/create` actually succeeded before showing the confirmation screen — a server error currently still looks like success to the customer
 - [ ] Open question flagged in the story doc but intentionally not built: an OTP step on delivery confirmation ("need to confirm" per the original spec) — needs a product decision first
