@@ -63,6 +63,18 @@
 - [x] Real cover-image upload — public Supabase Storage `covers` bucket, `POST /api/admin/books/upload-cover` (service-role, 5MB limit, JPG/PNG/WebP/AVIF), live thumbnail preview + upload button in the admin form, with the path/URL still directly editable for the legacy `/covers/*.jpg` books. `next.config.mjs` allow-lists `*.supabase.co` for `next/image`.
 - [x] Fixed the admin book-form modal clipping at the top on shorter viewports (flexbox + `overflow-y-auto` scroll bug) — switched to a plain block layout with `mx-auto` centering that scrolls correctly
 
+### Admin invoice printing (Bill of Supply)
+Scoped to a single admin-panel-only story — see `order-invoice-user-stories.md`. Modeled on
+the business's real existing invoice (Invoice #469), not the earlier Amazon.in example that
+was ruled out — no GSTIN/HSN/tax fields, just a plain Bill of Supply.
+- [x] `lib/seller-details.ts` — letterhead (name/address/phone), reusing `CONTACT` from `lib/utils.ts`
+- [x] `orders.invoice_number` column + `orders_invoice_number_seq` sequence + `next_invoice_number()` RPC (`invoice-number-column.sql`, isolated per the transactional-rollback lesson from the books-table migration)
+- [x] `GET /api/admin/orders/[id]/invoice` — service-role, admin-cookie gated; lazily assigns `invoice_number` on first print rather than at order-creation time
+- [x] `/admin/orders/[id]/invoice` — print-ready page: logo + business details left, "BILL OF SUPPLY" centered, Bill To, line items, Grand Total/Delivery Fee (always ₹0 — no shipping-charge feature exists)/Total Paid, Authorised Signatory footer
+- [x] "Print Invoice" link added to each order row on `/admin/orders`
+- [ ] **Before this goes live:** run `invoice-number-column.sql` in Supabase, after setting its sequence's starting value to continue from whatever number the business's current invoicing process last issued (not necessarily 470 — that's a placeholder based on Invoice #469)
+- [ ] Customer-facing invoice access (order history, checkout success, guest lookup) — deliberately out of scope for this round, see Open Questions in `order-invoice-user-stories.md`
+
 ---
 
 ## Phase 1 — Customer-facing (make it real for buyers)

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronUp, Download, MapPin, Phone, Mail, Package, RefreshCw, Truck } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, MapPin, Phone, Mail, Package, RefreshCw, Truck, Printer } from 'lucide-react';
 import { type DbOrder } from '@/lib/supabase';
 import { type OrderStatus } from '@/lib/orders-store';
 import { formatPrice } from '@/lib/utils';
@@ -223,6 +223,20 @@ function OrderRow({
                     <RefreshCw size={11} className="absolute right-8 top-1/2 -translate-y-1/2 text-gold animate-spin" />
                   )}
                 </div>
+
+                {/* Print Invoice — opens the admin-only Bill of Supply page
+                    (app/admin/orders/[id]/invoice) in a new tab. Available
+                    regardless of order status, since admins may want to
+                    print ahead of marking an order "Shipped". */}
+                <a
+                  href={`/admin/orders/${order.id}/invoice`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-3 inline-flex items-center gap-1.5 border border-gold/20 hover:border-gold/40 text-gold/70 hover:text-gold font-cinzel text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <Printer size={11} /> Print Invoice
+                </a>
 
                 {/* Inline tracking-info prompt — required the first time an
                     order is marked shipped, since that's what goes into the

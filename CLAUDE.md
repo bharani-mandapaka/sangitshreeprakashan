@@ -66,6 +66,7 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 | Order-lifecycle notifications | Real, code-wise — placed/shipped/delivered each fire one email + WhatsApp to the customer via `fireNotifications()`, with a duplicate-send guard (`shipped_at`/`delivered_at` only ever get set once). Email delivery is currently blocked by the Resend domain issue above; WhatsApp is skipped until Meta Cloud API creds exist. |
 | Admin dashboard | Real — reads orders from Supabase |
 | Admin orders page | Real — reads from Supabase via a service-role API route; marking an order "Shipped" requires entering Tracking ID + Courier first |
+| Admin invoice printing | Real, pending one setup step — "Print Invoice" per order on `/admin/orders` renders a real Bill of Supply; needs `invoice-number-column.sql` run in Supabase first (see "Admin panel" above), with its sequence starting value confirmed against the business's current invoice numbering |
 | Admin analytics | localStorage — visits/clicks tracked client-side via analytics-store |
 | Customer phone-login OTP | Mock — code returned in the API response and shown on screen, not actually texted |
 | Admin users-page OTP | Mock — separate from the above, still just a UI simulation |
@@ -109,6 +110,8 @@ Development in Vercel, or PR preview deploys build without them.
 - Password: set via the `ADMIN_PASSWORD` env var (not committed anywhere in this repo)
 - Auth: `POST /api/admin/login` checks the password and sets a signed httpOnly cookie (`ssp_admin_session`, `lib/admin-auth.ts`); `POST /api/admin/logout` clears it. Every admin API route checks this cookie server-side via `isAdminRequest()`.
 - Sidebar pages: Dashboard, Orders, Catalog, Notifications, Users
+- **Print Invoice** — from `/admin/orders`, each order has a "Print Invoice" link opening `/admin/orders/[id]/invoice` in a new tab: a plain black-on-white, print-styled Bill of Supply (logo + business details on the left, "BILL OF SUPPLY" centered, Bill To block, line items, Grand Total/Delivery Fee/Total Paid, Authorised Signatory footer) matching the business's existing real invoice format (Invoice #469). Letterhead details live in `lib/seller-details.ts` (reuses `CONTACT` from `lib/utils.ts` — one source of truth, not re-typed). No GSTIN/HSN/tax fields — it's a Bill of Supply, not a GST Tax Invoice. See `order-invoice-user-stories.md` for the full story and explicitly out-of-scope items (customer-facing access, packing slip — both deferred).
+  - **Before this ships:** `invoice-number-column.sql` needs running in Supabase (adds the column, sequence, and RPC) — and the sequence's starting value (currently `470`) needs to be set to whatever number actually comes after the last invoice issued by the business's current process, so the two don't collide. See that file's comments and the Open Questions in `order-invoice-user-stories.md`.
 
 ## Phone auth (customer sign-up/login)
 Supabase Auth only ships with email+password out of the box, so phone-first
@@ -144,10 +147,16 @@ policy has a matching `drop policy if exists` first). Summary:
 orders (id, created_at, status, customer_name, customer_email, customer_phone,
         address_line1, address_city, address_state, address_pincode,
         subtotal, payment_method, user_id,
-        tracking_id, courier_service, shipped_at, delivered_at, expected_delivery_date)
+        tracking_id, courier_service, shipped_at, delivered_at, expected_delivery_date,
+        invoice_number)
         -- user_id nullable (guest checkout). tracking_id/courier_service set when
         -- first marked "Shipped". shipped_at/delivered_at double as both display
         -- data and the duplicate-notification guard (fire only on null → set).
+        -- invoice_number is nullable and assigned lazily — the first time an
+        -- admin prints that order's invoice (see "Admin panel" below), via
+        -- the orders_invoice_number_seq sequence + next_invoice_number() RPC
+        -- — not at order-creation time, so only orders someone actually
+        -- prints ever consume a number. Never reassigned once set.
 
 order_items (id, order_id, book_id, sku, title_english, title_hindi, qty, price)
 
@@ -195,6 +204,7 @@ notification_logs  (id, rule_id, rule_name, trigger, channel, recipients, status
 - `POST /api/orders/create` — verifies the caller's session (if any), inserts order + items via the service-role client, computes `expected_delivery_date`, fires the `order_placed` customer notification
 - `GET /api/admin/orders` — all orders + items, service-role, admin-cookie gated
 - `PATCH /api/admin/orders` — updates order status; requires `trackingId`/`courierService` the first time it's set to "shipped"; fires `order_shipped`/`order_delivered` notifications only on the first transition into that status
+- `GET /api/admin/orders/[id]/invoice` — order + items for the admin "Print Invoice" page; service-role, admin-cookie gated; lazily assigns and persists `invoice_number` on first call if the order doesn't have one yet
 - `POST /api/admin/login` — checks `ADMIN_PASSWORD`, sets the signed session cookie
 - `POST /api/admin/logout` — clears the session cookie
 - `POST /api/admin/books` — create a book (or bundle); service-role, admin-cookie gated

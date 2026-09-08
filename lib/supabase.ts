@@ -50,6 +50,7 @@ export interface DbOrder {
   shipped_at: string | null;
   delivered_at: string | null;
   expected_delivery_date: string | null;
+  invoice_number: number | null;
   order_items: DbOrderItem[];
 }
 
