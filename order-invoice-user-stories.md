@@ -1,10 +1,10 @@
 # Order Invoice (Bill of Supply) — User Stories
 
 **Product:** Sangit Shree Prakashan
-**Feature:** Admin-panel printing of a Bill of Supply for an order
+**Feature:** Printing/downloading a Bill of Supply for an order — admin and customer sides
 **Author:** Shreeyanshi Chandra
 
-*Scoped to a single story for the admin panel only — an admin printing an invoice for fulfillment. Customer-facing access (order history, checkout success, guest lookup) is deferred to a follow-up story set once this ships.*
+*Originally scoped to the admin panel only (Story 1). Story 2 — customer-facing download from order history — has since shipped too. Checkout-success-screen access and guest-checkout access are still deferred; see Open Questions.*
 
 ## Context
 
@@ -43,10 +43,24 @@ Since Invoice #469 already exists, whatever currently produces this document isn
 8. Available regardless of the order's current status, so admins can print ahead of marking an order "Shipped," not only after.
 9. Out of scope for this story: any customer-facing access to their own invoice (order history, checkout success, guest lookup) — that's a separate, later story set once this admin-only version ships.
 
+## Story 2: Customer Downloads Their Invoice from Order History
+
+**Description:** As a logged-in customer, I want to download the Bill of Supply for any of my past orders from my Orders tab, so I have a copy for my own records without asking the business for one.
+
+**Design:** N/A — a "Download Invoice" link per order in `/profile`'s Orders tab, opening `/orders/[id]/invoice` in a new tab. Same document as Story 1 (same `InvoiceSheet` component), reached a different way.
+
+**Acceptance Criteria:**
+1. `GET /api/orders/[id]/invoice` verifies the caller's Supabase Auth session via bearer token (same pattern as `POST /api/orders/create`) rather than the admin cookie — this is a customer route, not an admin one.
+2. Returns the order only if `order.user_id` matches the verified caller; otherwise 404 (not 403, so a customer poking at other order ids can't tell which ones exist).
+3. Lazily assigns `invoice_number` on first load, same as the admin route — a customer downloading first and an admin printing first both land on the same shared counter, whichever happens first.
+4. "Download" is the browser's native Print dialog ("Save as PDF"), same UX as the admin flow — no server-generated PDF file exists in this codebase.
+5. Out of scope for this story: the checkout-success screen and guest-checkout orders (no account, so nothing to log into and no session to verify against) — both remain open, see below.
+
 ## Open Questions (for whoever picks these up)
 
 - **What's the last invoice number issued by the current process?** Needed to seed Story 1's counter so the website's new sequence continues from Invoice #469 (or whatever the latest actually is) instead of restarting or colliding.
 - **What currently generates Invoice #469 today?** Worth knowing whether it's a manual template, a separate tool, or something on the existing `sangitshreeprakashan.com` site — affects whether that process needs to be retired once this ships, so two systems don't both claim the same numbers.
 - **PDF vs. browser print:** is a print-styled HTML page (via the browser's own "Print to PDF") sufficient, or does the business want an actual server-generated PDF file?
 - **Delivery Fee line:** confirm it should always read ₹0.00 for now (no shipping-charge feature exists anywhere in the codebase today), rather than this feature quietly needing to build one.
-- **Customer-facing access (deferred):** once admin printing ships, a follow-up story set can cover a logged-in customer viewing their invoice from `/profile`, access right after checkout, and guest-checkout access (no account) — none of that is in scope here.
+- **Checkout-success-screen access (still deferred):** a "Download Invoice" link on the "Order Confirmed!" screen right after checkout, for immediate access without digging through order history.
+- **Guest-checkout access (still deferred):** guest orders have no `user_id`, so Story 2's bearer-token check doesn't apply — needs its own mechanism (e.g. a link mailed at order-placed time once Resend's domain issue resolves, or an order-lookup-by-ID-and-phone page) decided before it's built.

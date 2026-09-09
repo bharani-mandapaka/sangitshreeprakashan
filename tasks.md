@@ -75,7 +75,8 @@ was ruled out — no GSTIN/HSN/tax fields, just a plain Bill of Supply.
 - [x] Invoice markup extracted to `components/admin/InvoiceSheet.tsx` for reuse
 - [x] Bulk printing: per-order checkboxes + header "select all" (scoped to the current filter) on `/admin/orders`, a "Print Selected (N)" button, `GET /api/admin/orders/invoice-batch` (sequential invoice-number assignment, preserves selection order), and `/admin/orders/print-batch` — renders every selected invoice with a page break between them and auto-opens the print dialog once loaded
 - [ ] **Before this goes live:** run `invoice-number-column.sql` in Supabase, after setting its sequence's starting value to continue from whatever number the business's current invoicing process last issued (not necessarily 470 — that's a placeholder based on Invoice #469). Confirmed run and working as of this session — starting value still needs the real last-issued number from Bharani before production use.
-- [ ] Customer-facing invoice access (order history, checkout success, guest lookup) — deliberately out of scope for this round, see Open Questions in `order-invoice-user-stories.md`
+- [x] Customer-facing "Download Invoice" — `/profile` Orders tab only (logged-in customers). `GET /api/orders/[id]/invoice` (bearer-token auth, ownership-checked, 404s rather than 403s on mismatch) + `/orders/[id]/invoice` page, both reusing `InvoiceSheet`.
+- [ ] Checkout-success-screen "Download Invoice" and guest-checkout access — deliberately not built yet (only order-history access was in scope for this round), see Open Questions in `order-invoice-user-stories.md`
 
 ---
 
