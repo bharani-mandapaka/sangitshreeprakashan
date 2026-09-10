@@ -48,7 +48,6 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 ## Known issues
 
 - **Resend domain not currently verified — on hold.** `sangitshreeprakashan.com` shows as unverified on Resend's side (`https://resend.com/domains`), even though earlier notes said it was verified — something changed (DNS records dropped, or a different Resend account/key now in use). Every customer email (order placed/shipped/delivered) fails silently-ish today: `fireNotifications()` catches the error and logs it, but the customer never receives anything. Needs whoever owns the domain's DNS (Bharani) to re-verify it in Resend. Complication: `sangitshreeprakashan.com` already has an existing website live on it, so this is paused pending a closer look at the domain's current DNS setup before adding records — see the Notifications section in `tasks.md`. Until then, emails can be tested by temporarily sending `from` Resend's built-in `onboarding@resend.dev` test address.
-- **Checkout doesn't check the order-create response.** `app/checkout/page.tsx`'s `handlePay()` calls `POST /api/orders/create` but never checks `res.ok` before showing the success screen — if the save fails server-side, the customer still sees "order confirmed" with nothing actually saved. Predates this session's notification work; not yet fixed.
 - **`notification_rules`/`notification_logs` RLS is still fully permissive** to the anon key (`for all to anon using (true) with check (true)`) — unlike `orders`/`order_items`, which got scoped down. See Security & maintenance in `tasks.md`.
 
 ---
@@ -61,7 +60,7 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 | Book detail pages | Real — server component passes book to `BookDetailClient` |
 | Admin catalog management | Real — `/admin/books` lists, creates, edits, and deletes books (bundles are just books with `isBundle` checked, same form) via `app/api/admin/books/route.ts` |
 | Cart + checkout UI | Real |
-| Payments | Mock — no Razorpay yet (see `razorpay-integration-user-stories.md`) |
+| Payments | Real, code-complete — checkout goes through Razorpay's actual hosted widget (`app/checkout/page.tsx` + `POST /api/checkout/create-order` + `POST /api/checkout/verify`); no order is saved until the payment signature is verified. Still needs real `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` in env — test-mode keys work today, live keys are blocked on Bharani's GST/PAN account approval. See "Payments (Razorpay)" below. |
 | Orders saved to DB | Real — `POST /api/orders/create` writes to Supabase via the service-role key |
 | Order-lifecycle notifications | Real, code-wise — placed/shipped/delivered each fire one email + WhatsApp to the customer via `fireNotifications()`, with a duplicate-send guard (`shipped_at`/`delivered_at` only ever get set once). Email delivery is currently blocked by the Resend domain issue above; WhatsApp is skipped until Meta Cloud API creds exist. |
 | Admin dashboard | Real — reads orders from Supabase |
@@ -98,6 +97,8 @@ ADMIN_SESSION_SECRET           # required — signs the admin session cookie
 CRON_SECRET                    # optional — Bearer token for the digest cron routes
 WHATSAPP_PHONE_NUMBER_ID       # optional — unset means WhatsApp sends are skipped
 WHATSAPP_TOKEN                 # optional
+RAZORPAY_KEY_ID                # required — also returned to the browser (public by design)
+RAZORPAY_KEY_SECRET            # required — server-only, signs/verifies payments
 ```
 
 `NEXT_PUBLIC_*` variables are inlined at build time — enable them for Production, Preview **and**
@@ -130,6 +131,34 @@ auth is layered on top of it rather than replacing it:
   `user_metadata.real_email`) — never used for login, only for
   order-confirmation prefill.
 
+## Payments (Razorpay)
+Real payment integration, per `razorpay-integration-user-stories.md`. The core behavior change
+from the old mock checkout: **an order is only ever saved once payment is verified — never
+before, and never unconditionally.**
+
+- `app/checkout/page.tsx`'s payment step no longer has its own hand-built UI — clicking "Pay"
+  calls `POST /api/checkout/create-order`, then opens Razorpay's actual hosted widget
+  (`checkout.razorpay.com/v1/checkout.js`, loaded via `next/script`) using the returned order id.
+  The app never sees card numbers or UPI PINs.
+- On success, the widget's `handler` callback POSTs the payment id/order id/signature to
+  `POST /api/checkout/verify`, which independently re-derives the signature with
+  `RAZORPAY_KEY_SECRET` (`lib/razorpay.ts`'s `verifyRazorpaySignature`) before trusting anything —
+  only then does the order get written to Supabase and the customer notified.
+- The amount charged is computed **server-side, twice** — once in `create-order`, once again in
+  `verify` — from each book's real, current price in the `books` table
+  (`lib/books-data.ts`'s `computeVerifiedSubtotal`), never from whatever the client sends. A
+  tampered client-side total can't under-charge.
+- Cancelled/abandoned payments (closing the widget) use Razorpay's `modal.ondismiss` — the
+  customer lands back on the payment step with their cart intact, no error shown. Razorpay-reported
+  failures (declined card, etc.) use the widget's `payment.failed` event, surfacing Razorpay's own
+  failure reason inline and letting the customer retry immediately.
+- Retrying always creates a **fresh** Razorpay order (no idempotency/reuse) — since no Supabase
+  order exists until `verify` succeeds, a failed attempt followed by a successful retry never
+  leaves a duplicate or orphaned order.
+- Not covered here: refunds/cancellations after an order exists (would be its own story set), and
+  reconciling failed attempts beyond server logs (`console.error` in both routes) — no dedicated
+  admin view of failed payment attempts exists.
+
 ## Data stores (`lib/`)
 Zustand + `persist` to localStorage for client-side state. Orders and notification rules are the source of truth in Supabase, not these stores.
 
@@ -160,6 +189,10 @@ orders (id, created_at, status, customer_name, customer_email, customer_phone,
         -- the orders_invoice_number_seq sequence + next_invoice_number() RPC
         -- — not at order-creation time, so only orders someone actually
         -- prints ever consume a number. Never reassigned once set.
+        -- razorpay_order_id/razorpay_payment_id are set by
+        -- POST /api/checkout/verify once a payment is signature-verified —
+        -- see "Payments (Razorpay)" below. Both null for any order that
+        -- predates this (there are none yet; mock checkout never set them).
 
 order_items (id, order_id, book_id, sku, title_english, title_hindi, qty, price)
 
@@ -204,7 +237,9 @@ notification_logs  (id, rule_id, rule_name, trigger, channel, recipients, status
 - **Storage bucket `covers`** — public bucket (`public = true`); no RLS policy at all on `storage.objects` for it, deliberately — a public bucket already serves files at their public URL without RLS, and adding a SELECT policy would only let the anon key *list* every uploaded filename via the API for no functional benefit. Uploads only happen through the service-role `upload-cover` route.
 
 ## API routes (live)
-- `POST /api/orders/create` — verifies the caller's session (if any), inserts order + items via the service-role client, computes `expected_delivery_date`, fires the `order_placed` customer notification
+- `POST /api/orders/create` — the old direct-save route from before real payments existed. **No longer called by checkout** (`app/checkout/page.tsx` now goes through the two Razorpay routes below instead) — left in place rather than deleted in case anything else still references it.
+- `POST /api/checkout/create-order` — Story 1: recomputes the cart's amount from real book prices (never trusts the client), creates a Razorpay order, returns `{ razorpayOrderId, amount, currency, keyId }`. Writes nothing to Supabase.
+- `POST /api/checkout/verify` — Story 2: verifies the Razorpay payment signature server-side (rejects a forged/replayed "success"), recomputes the subtotal again the same way, and only then inserts order + items and fires the `order_placed` notification — the only place a real checkout ever creates an order now.
 - `GET /api/admin/orders` — all orders + items, service-role, admin-cookie gated
 - `PATCH /api/admin/orders` — updates order status; requires `trackingId`/`courierService` the first time it's set to "shipped"; fires `order_shipped`/`order_delivered` notifications only on the first transition into that status
 - `GET /api/admin/orders/[id]/invoice` — order + items for the admin "Print Invoice" page; service-role, admin-cookie gated; lazily assigns and persists `invoice_number` on first call if the order doesn't have one yet
@@ -304,7 +339,7 @@ the layout's own route.
 
 **Goal:** A customer can browse, pay, and receive confirmation. Orders appear in the database.
 
-**Critical path:** ~~Supabase setup~~ ✓ → ~~confirmation email~~ ✓ → ~~SEO~~ ✓ → ~~customer accounts~~ ✓ → ~~order-lifecycle notifications~~ ✓ (code-complete; blocked on Resend domain re-verification for actual delivery) → **Razorpay integration (remaining blocker)**.
+**Critical path:** ~~Supabase setup~~ ✓ → ~~confirmation email~~ ✓ → ~~SEO~~ ✓ → ~~customer accounts~~ ✓ → ~~order-lifecycle notifications~~ ✓ (code-complete; blocked on Resend domain re-verification for actual delivery) → ~~Razorpay integration~~ ✓ code-complete, **blocked on real API keys (Bharani's account approval) to actually go live**.
 
 ### Services status
 | What | Service | Status |
@@ -312,11 +347,11 @@ the layout's own route.
 | Database | Supabase (Postgres) | Live — orders, order_items, wishlist, phone_otps, notification_rules, notification_logs |
 | Auth | Supabase Auth | Live — phone+OTP for customers (mock OTP), password-gated cookie for admin |
 | Transactional email | Resend | Code-complete, but the domain shows unverified on Resend's side right now — see Known issues |
-| Payments | Razorpay | Not started — needs GST/PAN account verification. See `razorpay-integration-user-stories.md` for the three stories covering this. |
+| Payments | Razorpay | Code-complete (see "Payments (Razorpay)" above) — needs `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` in env to actually run. Test-mode keys work today without waiting on approval; live keys need Bharani's GST/PAN account verification. See `razorpay-integration-user-stories.md`. |
 | SEO | Next.js generateMetadata + sitemap | Live |
 
 ### Remaining Phase 1 work
-- Razorpay account approval + payment integration (blocked on Bharani) — see `razorpay-integration-user-stories.md`
+- Get real Razorpay API keys into env (test-mode keys to try it out now; live keys once Bharani's account is approved) and test the actual pay → verify → order-saved flow end-to-end
 - Re-verify the `sangitshreeprakashan.com` domain on Resend (blocked on whoever owns the DNS)
 - Founder timeline — real photos, refined content (mobile scroll fix done in PR #4)
 - Final copy for book descriptions, table of contents, author bios

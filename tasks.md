@@ -6,7 +6,7 @@
 - [x] Project setup — Next.js 14, Tailwind, Framer Motion, Zustand
 - [x] Book catalog with category filter and search
 - [x] Shopping cart with localStorage persist
-- [x] Checkout page with order summary and payment flow (payment step is still mock — see Phase 1)
+- [x] Checkout page with order summary and payment flow (payment step now goes through Razorpay's real widget — see Phase 1's Payments section)
 - [x] Homepage with gallery slideshow
 - [x] About page with auto-scrolling founder timeline
 - [x] Contact page
@@ -83,15 +83,20 @@ was ruled out — no GSTIN/HSN/tax fields, just a plain Bill of Supply.
 ## Phase 1 — Customer-facing (make it real for buyers)
 
 > Goal: a customer can browse, pay, and receive confirmation. Orders land in a real database.
-> Supabase ✓ · Customer accounts ✓ · Order-lifecycle notifications ✓ (code-complete, blocked on Resend domain) · Razorpay — remaining blocker.
+> Supabase ✓ · Customer accounts ✓ · Order-lifecycle notifications ✓ (code-complete, blocked on Resend domain) · Razorpay ✓ code-complete, blocked on real keys.
 
-### Payments (main remaining work)
-- [ ] Razorpay API keys — migrating from old website, need keys from Bharani (Key ID + Key Secret); blocked on his GST/PAN account verification
-- [ ] API route `POST /api/checkout/create-order` — creates Razorpay order, returns ID to frontend
-- [ ] Razorpay payment modal wired into checkout page (replacing the current mock UI)
-- [ ] API route `POST /api/checkout/verify` — verifies signature, only *then* writes order to Supabase and fires the order-placed notification (today's mock flow saves the order regardless of payment outcome — that has to change)
-- [ ] Handle payment failures/cancellations gracefully on frontend, no duplicate orders on retry
-- See `razorpay-integration-user-stories.md` for the full breakdown (3 stories + open questions)
+### Payments — code-complete, blocked on real API keys
+All three stories in `razorpay-integration-user-stories.md` are built:
+- [x] `orders.razorpay_order_id` / `orders.razorpay_payment_id` columns (`razorpay-columns.sql`)
+- [x] `lib/razorpay.ts` — order creation (raw fetch + Basic Auth, no new npm dependency) + signature verification (Node `crypto` HMAC)
+- [x] `lib/books-data.ts`'s `computeVerifiedSubtotal()` — recomputes the cart total from real book prices, used by both routes below so the client's price/subtotal is never trusted
+- [x] `POST /api/checkout/create-order` (Story 1) — creates the Razorpay order, writes nothing to Supabase
+- [x] `POST /api/checkout/verify` (Story 2) — verifies the signature server-side, only then saves the order + fires `order_placed`; rejects and logs an invalid/forged signature (Story 3, AC5)
+- [x] `app/checkout/page.tsx` rewritten — real Razorpay checkout.js widget replaces the old mock UI entirely; handles success, `payment.failed` (Story 3, AC2), and widget dismissal/cancel (Story 3, AC1) without leaving the customer confused or creating orphaned orders
+- [x] Retry behavior resolved: each retry creates a **fresh** Razorpay order (no reuse/idempotency) — since nothing is saved to Supabase until `verify` succeeds, this can't create duplicates (Story 3, AC4)
+- [ ] **Before this can actually run:** `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` need to be real values in `.env.local`/Vercel — test-mode keys (available immediately from the Razorpay dashboard, no approval needed) are enough to test the whole flow now; live keys need Bharani's GST/PAN account verification to go live for real
+- [ ] Run `razorpay-columns.sql` in Supabase before testing (adds the two new columns)
+- [ ] End-to-end test once test-mode keys exist: pay with Razorpay's documented test card/UPI, confirm the order actually saves, then deliberately fail/cancel a payment and confirm no order is created
 
 ### Book content
 - [ ] Final copy for descriptions, table of contents, author bios
@@ -105,7 +110,7 @@ was ruled out — no GSTIN/HSN/tax fields, just a plain Bill of Supply.
 > **On hold** (as of this session) — pausing further work here to study the domain situation before touching DNS, since `sangitshreeprakashan.com` already has an existing website live on it. The `feature/order-notifications` PR is open and code-complete; it's just parked until the domain question is resolved.
 - [ ] **Re-verify `sangitshreeprakashan.com` on Resend** — currently shows unverified, so no customer email actually sends despite the code path being correct. Needs whoever owns the domain's DNS (Bharani). Email-sending DNS records (TXT/CNAME for SPF+DKIM) don't conflict with whatever's already routing the existing website — but confirm what's already in the domain's DNS before adding anything, in case there's an existing SPF record that needs merging rather than overwriting.
 - [ ] WhatsApp sends are still skipped — needs `WHATSAPP_PHONE_NUMBER_ID` + `WHATSAPP_TOKEN` (Meta Cloud API business verification, 2–4 weeks)
-- [ ] Fix: `app/checkout/page.tsx` never checks whether `POST /api/orders/create` actually succeeded before showing the confirmation screen — a server error currently still looks like success to the customer
+- [x] ~~Fix: checkout never checked whether order-creation actually succeeded before showing the confirmation screen~~ — resolved as part of the Razorpay rewrite: `app/checkout/page.tsx` now only shows the success screen after `POST /api/checkout/verify` returns `res.ok`, not optimistically
 - [ ] Open question flagged in the story doc but intentionally not built: an OTP step on delivery confirmation ("need to confirm" per the original spec) — needs a product decision first
 
 ---

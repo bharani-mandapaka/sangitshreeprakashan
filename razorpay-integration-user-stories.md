@@ -84,9 +84,14 @@ or confused about whether I've ordered anything.
 
 ---
 
-## Open Questions (for whoever picks these up)
+## Status: all three stories built (code-complete)
 
-- **Blocked on account approval.** Real API keys (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`) don't exist yet — Bharani's GST/PAN verification with Razorpay is still pending per `CLAUDE.md`. None of this can go live until that clears, though the routes can be built and tested against Razorpay's test-mode keys in the meantime.
-- **Schema change needed.** `orders.payment_method` today just stores a string like `"upi"`. Story 2 (AC4) implies adding columns for the actual Razorpay order ID and payment ID — needs a migration similar to the tracking/notification columns added for the shipping-notification work.
+- `lib/razorpay.ts`, `app/api/checkout/create-order`, `app/api/checkout/verify`, and the rewritten `app/checkout/page.tsx` implement Stories 1–3 in full — see `CLAUDE.md`'s "Payments (Razorpay)" section for how it fits together.
+- **Retry UX (was an open question):** resolved as "always create a fresh Razorpay order" — no idempotency/reuse of a previous order ID. Since nothing is written to Supabase until `verify` succeeds, this can't produce duplicate or orphaned orders (Story 3, AC4) even across several failed attempts.
+- **Schema change (was an open question):** done — `razorpay-columns.sql` adds `orders.razorpay_order_id` / `orders.razorpay_payment_id`, set by the `verify` route.
+
+## Open Questions (still open)
+
+- **Blocked on real keys to actually go live.** `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` need to be set in env before any of this runs at all — test-mode keys (available immediately from the Razorpay dashboard, no approval needed) are enough to exercise the whole flow now; only *live* keys need Bharani's GST/PAN account verification. Nothing has been tested end-to-end yet since no keys exist in this environment.
 - **Refunds are not covered here.** These three stories only cover the pay → confirm path. Cancellations/returns/refunds after an order is placed would be a separate set of stories once that policy exists.
-- **Retry UX (Story 3, AC2)** needs a product decision on whether "retry" re-uses the same Razorpay order ID or creates a fresh one — affects whether `/api/checkout/create-order` needs idempotency handling.
+- **No dedicated admin view of failed payment attempts** — Story 3, AC5's bar was met at the "visible in server logs" level (`console.error` in both routes), not a UI. Worth a follow-up if failed-payment support requests become common.

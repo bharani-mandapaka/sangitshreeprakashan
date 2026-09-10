@@ -2,7 +2,12 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
-export type PaymentMethod = 'upi' | 'card' | 'netbanking';
+// 'razorpay' covers the real payment flow (app/checkout/page.tsx) — the
+// specific method (UPI/card/netbanking) the customer picked lives inside
+// Razorpay's own dashboard, not something this client-side analytics-only
+// store needs to know. 'upi'/'card'/'netbanking' are kept for old locally-
+// logged entries from before the real integration.
+export type PaymentMethod = 'upi' | 'card' | 'netbanking' | 'razorpay';
 
 export interface OrderItem {
   bookId: string;
