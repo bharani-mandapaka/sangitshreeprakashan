@@ -58,8 +58,9 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 | Admin dashboard | Real — reads orders from Supabase |
 | Admin orders page | Real — reads from Supabase, status updates write back |
 | Admin analytics | localStorage — visits/clicks tracked client-side via analytics-store |
-| OTP verification | Mock — code shown on screen |
-| WhatsApp notifications | UI only — no Meta/Twilio API |
+| Customer phone-login OTP | Real send path code-complete via WhatsApp (`lib/whatsapp-otp.ts`, Meta Cloud API Authentication template) — falls back to the mock (code returned in the API response, shown on screen) whenever `WHATSAPP_PHONE_NUMBER_ID`/`WHATSAPP_TOKEN` aren't set or the send fails. Blocked on Meta Business verification + an approved Authentication template, same as WhatsApp notifications below. |
+| Admin users-page OTP | Mock — separate from the above, still just a UI simulation |
+| WhatsApp notifications | Wired in code (`fireNotifications()` calls Meta's Cloud API) but silently skipped — no `WHATSAPP_PHONE_NUMBER_ID`/`WHATSAPP_TOKEN` configured yet. Customer OTP delivery (`lib/whatsapp-otp.ts`) uses the same credentials via a separate Authentication-template send — see "Phone auth" below. |
 | Google OAuth (admin sign-in) | Simulated UI — no real token (separate from customer accounts below) |
 | Customer accounts | Real — Supabase Auth, email/password works out of the box; Google sign-in needs a one-time setup (Google Cloud OAuth app + Supabase provider config — see tasks.md) |
 | Wishlist | Real — `wishlist` table in Supabase, heart icon on book cards and detail pages |
@@ -92,9 +93,33 @@ Development in Vercel, or PR preview deploys build without them.
 
 ## Admin panel
 - URL: `/admin`
-- Password: `ssp@admin`
-- Auth stored in localStorage: `ssp-admin-auth = "1"`
+- Password: set via the `ADMIN_PASSWORD` env var (not committed anywhere in this repo)
+- Auth: `POST /api/admin/login` checks the password and sets a signed httpOnly cookie (`ssp_admin_session`, `lib/admin-auth.ts`); `POST /api/admin/logout` clears it. Every admin API route checks this cookie server-side via `isAdminRequest()`.
 - Sidebar pages: Dashboard, Orders, Notifications, Users
+
+## Phone auth (customer sign-up/login)
+Supabase Auth only ships with email+password out of the box, so phone-first
+auth is layered on top of it rather than replacing it:
+- The "email" Supabase sees is synthetic: `phone-<digits>@ssp-phone-auth.internal`.
+- The "password" is never stored — it's deterministically derived as
+  `HMAC-SHA256(PHONE_AUTH_SECRET, phone)` and recomputed on every login.
+- OTPs are generated and checked server-side against the `phone_otps` table
+  (service-role only, no RLS policies). `POST /api/auth/phone/send-otp`
+  (`app/api/auth/phone/send-otp/route.ts`) tries a real WhatsApp send first
+  via `lib/whatsapp-otp.ts` (Meta Cloud API, Authentication-category template
+  — required for business-initiated messages, unlike the free-form text
+  `lib/notifications-sender.ts` uses for order updates) whenever
+  `WHATSAPP_PHONE_NUMBER_ID`/`WHATSAPP_TOKEN` are set; otherwise — or if that
+  send throws — it falls back to the original mock: the code is returned
+  directly in the API response for on-screen display. Went with WhatsApp over
+  a paid SMS provider (MSG91/Twilio) since it rides the same Meta Business
+  verification already planned for order notifications, avoiding a second
+  paid integration. See `.env.example`'s WhatsApp OTP template section for
+  the template name/language/button env vars — they must match whatever
+  Authentication template gets approved in Meta's WhatsApp Manager.
+- An optional real email can be attached after sign-up (stored in
+  `user_metadata.real_email`) — never used for login, only for
+  order-confirmation prefill.
 
 ## Data stores (`lib/`)
 Zustand + `persist` to localStorage for client-side state. Orders are also written to Supabase on every checkout.
@@ -225,9 +250,16 @@ the layout's own route.
 ### Services to integrate
 | What | Service | Notes |
 |------|---------|-------|
-| Auth | NextAuth.js + Google | Replace localStorage password gate |
-| OTP | MSG91 or Twilio Verify | Replace mock OTP in users page |
-| WhatsApp | Meta Cloud API | Start verification early — approval takes 2–4 weeks |
+| Auth | NextAuth.js + Google | Admin login is real (signed cookie, no committed password) but still a single shared password, not per-person Google accounts or roles |
+| OTP | WhatsApp (Meta Cloud API) for customer login | Customer phone-login OTP is code-complete via `lib/whatsapp-otp.ts` — chosen over MSG91/Twilio to reuse the WhatsApp integration below instead of a second paid provider. Blocked on the same Meta verification + a separate Authentication-template approval. The admin users-page OTP mock is unrelated and still needs its own provider decision. |
+| WhatsApp | Meta Cloud API | Code already calls it in `fireNotifications()`; start business verification early — approval takes 2–4 weeks |
+
+### Remaining Phase 2 work
+- Tighten RLS on `notification_rules`/`notification_logs` (still open to the anon key)
+- Real Google OAuth + role-based access for admin (staff vs admin)
+- Catalog management from admin: edit/create books, create/edit bundles, migrate `lib/books.ts` to a Supabase `books` table (built on `feature/admin-catalog-management`, not yet on this branch)
+- Manually create an order from admin (phone/walk-in orders)
+- Patch the Next.js CVE flagged by `npm audit` (dev-server origin-verification issue, plus `ws`/`glob` vulnerabilities) — stay within the 14.2.x line, don't jump to Next 15 (breaks the `params` API this codebase relies on)
 
 ### Additional Supabase tables (Phase 2)
 `notification_rules` and `notification_logs` already exist — see the live schema above.

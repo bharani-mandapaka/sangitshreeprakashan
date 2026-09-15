@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { normalizePhone, generateOtp } from '@/lib/phone-auth';
+import { isWhatsAppOtpConfigured, sendWhatsAppOtp } from '@/lib/whatsapp-otp';
 
 const OTP_TTL_MS = 5 * 60 * 1000;      // codes are valid for 5 minutes
 const RESEND_COOLDOWN_MS = 30 * 1000;  // don't let the same phone spam requests
@@ -49,14 +50,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Prefer a real WhatsApp send when configured — works in any environment,
+  // production included, since it actually delivers the code rather than
+  // exposing it. Falls back to the on-screen mock (unset creds, unapproved
+  // template, Meta API error, etc.) so the login/signup flow never fully
+  // breaks just because WhatsApp delivery did.
+  if (isWhatsAppOtpConfigured()) {
+    try {
+      await sendWhatsAppOtp(phone, otp);
+      return NextResponse.json({ phone, mock: false });
+    } catch (err) {
+      console.error('[send-otp] WhatsApp send failed, falling back to on-screen code:', err);
+    }
+  }
+
   // ── MOCK (blocked in real production) ───────────────────────────────────
-  // No SMS/WhatsApp provider is wired up yet, so outside real production we
-  // return the code directly for on-screen display — same pattern as the
-  // admin users page mock. This must NEVER happen in production: the OTP is
-  // the only thing standing between "know someone's phone number" and
-  // "log in as them", so returning it to whoever asked for it would let
-  // anyone take over (or create) any account just by knowing the number.
-  // In production, fail closed instead until a real provider is wired in.
+  // No WhatsApp configured (or the send above failed), so outside real
+  // production we return the code directly for on-screen display — same
+  // pattern as the admin users page mock. This must NEVER happen in
+  // production: the OTP is the only thing standing between "know someone's
+  // phone number" and "log in as them", so returning it to whoever asked
+  // for it would let anyone take over (or create) any account just by
+  // knowing the number. In production, fail closed instead.
   //
   // `NODE_ENV` alone isn't enough to tell dev/test apart from real
   // production here: Vercel sets NODE_ENV=production for Preview
