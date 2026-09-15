@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import { useCartStore } from '@/lib/cart-store';
 import { useAuthStore } from '@/lib/auth-store';
 import { useWishlistStore } from '@/lib/wishlist-store';
-import { getBooksByCategory, categoryMeta } from '@/lib/books';
+import { categoryMeta } from '@/lib/books';
 import { formatPrice, WHATSAPP_NUMBER } from '@/lib/utils';
 import BookCoverImage from '@/components/BookCoverImage';
 import BookCard from '@/components/BookCard';
@@ -27,7 +27,7 @@ const langLabels: Record<string, string> = {
   bilingual: 'Bilingual (Hindi + English)',
 };
 
-export default function BookDetailClient({ book }: { book: Book }) {
+export default function BookDetailClient({ book, related }: { book: Book; related: Book[] }) {
   const router   = useRouter();
   const addItem  = useCartStore((s) => s.addItem);
   const openCart = useCartStore((s) => s.openCart);
@@ -53,10 +53,6 @@ export default function BookDetailClient({ book }: { book: Book }) {
   );
   const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${whatsappMsg}`;
   const meta        = categoryMeta[book.category];
-
-  const related = getBooksByCategory(book.category)
-    .filter((b) => b.id !== book.id)
-    .slice(0, 4);
 
   return (
     <div className="min-h-screen bg-dark pt-20 lg:pt-24">
