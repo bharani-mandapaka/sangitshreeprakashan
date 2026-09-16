@@ -2,22 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fireNotifications } from '@/lib/notifications-sender';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { verifyRazorpaySignature } from '@/lib/razorpay';
+import { verifyRazorpaySignature, getRazorpayOrder } from '@/lib/razorpay';
 import { computeVerifiedSubtotal } from '@/lib/books-data';
 
 // Story 2 (razorpay-integration-user-stories.md): the ONLY place an order
-// actually gets written to Supabase and a customer notified, replacing
-// app/api/orders/create/route.ts's old behavior of saving unconditionally.
-// That route is left in place (nothing else calls it from the checkout flow
-// anymore) rather than deleted, in case anything still references it.
+// actually gets written to Supabase and a customer notified. The old
+// app/api/orders/create/route.ts, which saved unconditionally with no
+// payment involved at all, has been deleted — it was a complete bypass
+// around this entire flow and nothing called it anymore.
 //
-// Mirrors app/api/orders/create/route.ts's insert + notification logic
-// closely, with two differences: (1) the payment signature is verified
-// first, and the whole thing 400s if it doesn't check out — a forged or
-// replayed "success" from the client is rejected, not trusted (Story 2, AC2);
-// (2) the subtotal is recomputed from real book prices here too, exactly
-// like create-order did, rather than trusting whatever the client sends back
-// after payment.
+// Three checks stand between "the client says this succeeded" and actually
+// saving an order:
+//   1. The payment signature is genuine for the given order/payment id pair
+//      (rejects a forged or fabricated "success").
+//   2. What was actually paid on Razorpay's side for that specific order id
+//      matches the subtotal recomputed from the cart submitted *here* — not
+//      just that a signature is valid for *some* real payment. Without this,
+//      a genuinely-valid signature from paying for a cheap cart could be
+//      replayed against this endpoint with a different, more expensive
+//      cart, and it would save as confirmed with nothing paid for the
+//      difference.
+//   3. That specific razorpay_payment_id hasn't already been used to create
+//      an order — otherwise the same successful payment could be resubmitted
+//      repeatedly to create any number of orders from a single charge.
 const EXPECTED_DELIVERY_DAYS = 7;
 
 export async function POST(req: NextRequest) {
@@ -55,6 +62,23 @@ export async function POST(req: NextRequest) {
   );
   const admin = getSupabaseAdmin();
 
+  // ── 2. Reject a replayed payment — this exact payment id already paid for
+  //      an order, so it can't pay for a new one. A plain pre-check like this
+  //      still has a race window between two near-simultaneous requests for
+  //      the same payment id; the unique constraint on
+  //      orders.razorpay_payment_id (razorpay-columns.sql) is what actually
+  //      closes that, this just gives a clean error instead of a raw
+  //      constraint-violation for the common case. ──────────────────────────
+  const { data: existingOrder } = await admin
+    .from('orders')
+    .select('id')
+    .eq('razorpay_payment_id', razorpayPaymentId)
+    .maybeSingle();
+  if (existingOrder) {
+    console.error('[checkout/verify] REJECTED replayed payment', { razorpayPaymentId, existingOrderId: existingOrder.id });
+    return NextResponse.json({ error: 'This payment has already been used for an order.' }, { status: 409 });
+  }
+
   let userId: string | null = null;
   const authHeader = req.headers.get('authorization');
   if (authHeader?.startsWith('Bearer ')) {
@@ -63,7 +87,7 @@ export async function POST(req: NextRequest) {
     userId = verifiedUser?.id ?? null;
   }
 
-  // ── 2. Recompute the trusted subtotal, same as create-order ────────────────
+  // ── 3. Recompute the trusted subtotal, same as create-order ────────────────
   let subtotal: number;
   let priceByBookId: Record<string, number>;
   try {
@@ -80,10 +104,31 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // ── 4. Confirm the cart being saved actually matches what was paid —
+  //      the signature only proves the payment is real, not that it paid
+  //      for *this* cart. Without this, a genuinely-valid payment for a
+  //      cheap order could be replayed here with a different (pricier) cart
+  //      and it would save as confirmed with nothing paid for the gap. ──────
+  let razorpayOrder;
+  try {
+    razorpayOrder = await getRazorpayOrder(razorpayOrderId);
+  } catch (err) {
+    console.error('[checkout/verify] could not fetch Razorpay order:', err);
+    return NextResponse.json({ error: 'Could not confirm the payment. If you were charged, please contact support.' }, { status: 502 });
+  }
+  const expectedAmountPaise = Math.round(subtotal * 100);
+  if (razorpayOrder.status !== 'paid' || razorpayOrder.amount_paid !== expectedAmountPaise) {
+    console.error('[checkout/verify] REJECTED amount mismatch', {
+      razorpayOrderId, status: razorpayOrder.status,
+      amountPaid: razorpayOrder.amount_paid, expectedAmountPaise,
+    });
+    return NextResponse.json({ error: 'The amount paid does not match this order. If you were charged, please contact support.' }, { status: 400 });
+  }
+
   const expectedDeliveryDate = new Date(createdAt);
   expectedDeliveryDate.setDate(expectedDeliveryDate.getDate() + EXPECTED_DELIVERY_DAYS);
 
-  // ── 3. Save order to Supabase — only now that payment is verified ──────────
+  // ── 5. Save order to Supabase — only now that payment is verified ──────────
   const { error: orderError } = await admin.from('orders').insert({
     id,
     created_at:             createdAt,
@@ -108,7 +153,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: orderError.message }, { status: 500 });
   }
 
-  // ── 4. Save order items, with server-verified prices (not client-sent) ─────
+  // ── 6. Save order items, with server-verified prices (not client-sent) ─────
   const orderItems = items.map((item: {
     bookId: string; sku: string; titleEnglish: string; titleHindi: string; qty: number;
   }) => ({
@@ -124,7 +169,7 @@ export async function POST(req: NextRequest) {
   const { error: itemsError } = await admin.from('order_items').insert(orderItems);
   if (itemsError) console.error('[checkout/verify] items insert error:', itemsError);
 
-  // ── 5. Fire the order-placed notification — same as app/api/orders/create ──
+  // ── 7. Fire the order-placed notification ───────────────────────────────────
   const dateStr = new Date(createdAt).toLocaleDateString('en-IN', {
     day: 'numeric', month: 'long', year: 'numeric',
   });

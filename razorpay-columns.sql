@@ -15,3 +15,13 @@ comment on column orders.razorpay_order_id is
 comment on column orders.razorpay_payment_id is
   'The Razorpay payment id (pay_...) that successfully paid for this order, set only after '
   'POST /api/checkout/verify confirms the payment signature.';
+
+-- Second line of defense (alongside the pre-check in verify/route.ts) against
+-- the same successful payment being submitted more than once to create
+-- multiple orders — closes the race window a plain application-level check
+-- can't, between two near-simultaneous requests for the same payment id.
+-- Postgres unique indexes already treat NULL as distinct from other NULLs,
+-- so this doesn't block multiple orders with no Razorpay payment at all
+-- (there are none today, but nothing here assumes that stays true).
+create unique index if not exists orders_razorpay_payment_id_key
+  on orders (razorpay_payment_id);

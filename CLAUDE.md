@@ -61,7 +61,7 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 | Admin catalog management | Real — `/admin/books` lists, creates, edits, and deletes books (bundles are just books with `isBundle` checked, same form) via `app/api/admin/books/route.ts` |
 | Cart + checkout UI | Real |
 | Payments | Real, code-complete — checkout goes through Razorpay's actual hosted widget (`app/checkout/page.tsx` + `POST /api/checkout/create-order` + `POST /api/checkout/verify`); no order is saved until the payment signature is verified. Still needs real `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` in env — test-mode keys work today, live keys are blocked on Bharani's GST/PAN account approval. See "Payments (Razorpay)" below. |
-| Orders saved to DB | Real — `POST /api/orders/create` writes to Supabase via the service-role key |
+| Orders saved to DB | Real — `POST /api/checkout/verify` writes to Supabase via the service-role key, only after the payment signature and amount are verified (see "Payments (Razorpay)" below). The old unconditional-save route, `POST /api/orders/create`, has been deleted — it predated real payments and would create a confirmed order with no payment involved at all. |
 | Order-lifecycle notifications | Real, code-wise — placed/shipped/delivered each fire one email + WhatsApp to the customer via `fireNotifications()`, with a duplicate-send guard (`shipped_at`/`delivered_at` only ever get set once). Email delivery is currently blocked by the Resend domain issue above; WhatsApp is skipped until Meta Cloud API creds exist. |
 | Admin dashboard | Real — reads orders from Supabase |
 | Admin orders page | Real — reads from Supabase via a service-role API route; marking an order "Shipped" requires entering Tracking ID + Courier first |
@@ -148,6 +148,21 @@ before, and never unconditionally.**
   `verify` — from each book's real, current price in the `books` table
   (`lib/books-data.ts`'s `computeVerifiedSubtotal`), never from whatever the client sends. A
   tampered client-side total can't under-charge.
+- **The cart being saved is tied to what was actually paid**, not just to a valid signature.
+  `verify` fetches the real order from Razorpay (`lib/razorpay.ts`'s `getRazorpayOrder`) and checks
+  its `status`/`amount_paid` against the subtotal recomputed from the cart submitted *in that
+  request* — a signature alone only proves some real payment happened, not that it paid for the
+  cart about to be saved. Without this, a genuinely-valid payment for a cheap cart could be
+  replayed against `verify` with a different, pricier cart and save as confirmed with nothing paid
+  for the gap. (Flagged in PR #11's review.)
+- **A payment can only ever create one order.** `verify` rejects if `razorpay_payment_id` has
+  already been used on an existing order, and `orders.razorpay_payment_id` has a unique DB
+  constraint (`razorpay-columns.sql`) as a second line of defense against two near-simultaneous
+  requests for the same payment. Otherwise the same successful charge could be resubmitted
+  repeatedly to create any number of orders. (Also flagged in PR #11's review.)
+- **`POST /api/orders/create` has been deleted** — it predated real payments, saved a confirmed
+  order unconditionally with no payment involved at all, and was a complete bypass around this
+  entire flow. Nothing called it anymore. (Also flagged in PR #11's review.)
 - Cancelled/abandoned payments (closing the widget) use Razorpay's `modal.ondismiss` — the
   customer lands back on the payment step with their cart intact, no error shown. Razorpay-reported
   failures (declined card, etc.) use the widget's `payment.failed` event, surfacing Razorpay's own
@@ -229,7 +244,7 @@ notification_logs  (id, rule_id, rule_name, trigger, channel, recipients, status
 ```
 
 **RLS status, per table:**
-- `orders`/`order_items` — SELECT scoped to `auth.uid() = user_id`; no insert/update policies at all, so the anon key can't write to either table under any circumstance. All writes go through service-role-backed routes (`app/api/orders/create`, `app/api/admin/orders`).
+- `orders`/`order_items` — SELECT scoped to `auth.uid() = user_id`; no insert/update policies at all, so the anon key can't write to either table under any circumstance. All writes go through service-role-backed routes (`app/api/checkout/verify`, `app/api/admin/orders`).
 - `wishlist` — properly scoped to the owning user (select/insert/delete all check `auth.uid() = user_id`).
 - `phone_otps` — no policies whatsoever; service role only.
 - `books` — public SELECT (`for select using (true)`); no insert/update/delete policy for anon at all, so writes only happen through the service-role admin route.
@@ -237,14 +252,13 @@ notification_logs  (id, rule_id, rule_name, trigger, channel, recipients, status
 - **Storage bucket `covers`** — public bucket (`public = true`); no RLS policy at all on `storage.objects` for it, deliberately — a public bucket already serves files at their public URL without RLS, and adding a SELECT policy would only let the anon key *list* every uploaded filename via the API for no functional benefit. Uploads only happen through the service-role `upload-cover` route.
 
 ## API routes (live)
-- `POST /api/orders/create` — the old direct-save route from before real payments existed. **No longer called by checkout** (`app/checkout/page.tsx` now goes through the two Razorpay routes below instead) — left in place rather than deleted in case anything else still references it.
 - `POST /api/checkout/create-order` — Story 1: recomputes the cart's amount from real book prices (never trusts the client), creates a Razorpay order, returns `{ razorpayOrderId, amount, currency, keyId }`. Writes nothing to Supabase.
-- `POST /api/checkout/verify` — Story 2: verifies the Razorpay payment signature server-side (rejects a forged/replayed "success"), recomputes the subtotal again the same way, and only then inserts order + items and fires the `order_placed` notification — the only place a real checkout ever creates an order now.
+- `POST /api/checkout/verify` — Story 2: verifies the Razorpay payment signature server-side (rejects a forged/replayed "success"), confirms the actual amount paid on Razorpay's side matches the subtotal recomputed from the submitted cart (rejects a valid-but-replayed payment paired with a different, pricier cart), rejects a `razorpay_payment_id` already used for an order (rejects the same payment being reused to create multiple orders), and only then inserts order + items and fires the `order_placed` notification — the only place a real checkout ever creates an order now. The old unconditional-save route, `POST /api/orders/create`, has been deleted (it predated real payments, was a full bypass around this whole flow, and nothing called it anymore).
 - `GET /api/admin/orders` — all orders + items, service-role, admin-cookie gated
 - `PATCH /api/admin/orders` — updates order status; requires `trackingId`/`courierService` the first time it's set to "shipped"; fires `order_shipped`/`order_delivered` notifications only on the first transition into that status
 - `GET /api/admin/orders/[id]/invoice` — order + items for the admin "Print Invoice" page; service-role, admin-cookie gated; lazily assigns and persists `invoice_number` on first call if the order doesn't have one yet
 - `GET /api/admin/orders/invoice-batch?ids=a,b,c` — same as above but for the "Print Selected" bulk flow; returns the orders in the same order `ids` was given, assigning invoice numbers sequentially (not in parallel) for any that don't have one yet
-- `GET /api/orders/[id]/invoice` — customer-facing "Download Invoice"; NOT admin-cookie gated — verifies the caller's Supabase Auth bearer token instead (same pattern as `POST /api/orders/create`) and checks `order.user_id` matches before returning anything; 404s (not 403) if the order doesn't belong to the caller, so it doesn't confirm which order ids exist
+- `GET /api/orders/[id]/invoice` — customer-facing "Download Invoice"; NOT admin-cookie gated — verifies the caller's Supabase Auth bearer token instead (same pattern as `POST /api/checkout/verify`) and checks `order.user_id` matches before returning anything; 404s (not 403) if the order doesn't belong to the caller, so it doesn't confirm which order ids exist
 - `POST /api/admin/login` — checks `ADMIN_PASSWORD`, sets the signed session cookie
 - `POST /api/admin/logout` — clears the session cookie
 - `POST /api/admin/books` — create a book (or bundle); service-role, admin-cookie gated

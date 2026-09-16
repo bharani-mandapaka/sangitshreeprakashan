@@ -28,6 +28,13 @@ export interface RazorpayOrder {
   currency: string;
 }
 
+export interface RazorpayOrderStatus {
+  id: string;
+  amount: number;       // paise — what the order was created for
+  amount_paid: number;  // paise — what has actually been paid against it
+  status: string;        // 'created' | 'attempted' | 'paid'
+}
+
 /**
  * Creates an order on Razorpay's servers (Story 1, AC1) — this is what the
  * browser's checkout widget needs before it can open. `amountPaise` must
@@ -58,6 +65,31 @@ export async function createRazorpayOrder(amountPaise: number, receipt: string):
     throw new Error(data?.error?.description ?? `Razorpay order creation failed (${res.status}).`);
   }
   return { id: data.id, amount: data.amount, currency: data.currency };
+}
+
+/**
+ * Fetches an order's real state directly from Razorpay — used by
+ * app/api/checkout/verify/route.ts to confirm that what's about to be saved
+ * (the cart submitted in the verify request) actually matches what was
+ * charged for that specific order. The signature check alone only proves
+ * "this payment_id/order_id/signature triple is authentic" — it says
+ * nothing about whether the order being saved matches what was paid for,
+ * since a genuinely-valid payment for a cheap order could otherwise be
+ * replayed against verify with a different, more expensive cart.
+ */
+export async function getRazorpayOrder(orderId: string): Promise<RazorpayOrderStatus> {
+  const { keyId, keySecret } = getCredentials();
+  const basicAuth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
+
+  const res = await fetch(`https://api.razorpay.com/v1/orders/${orderId}`, {
+    headers: { Authorization: `Basic ${basicAuth}` },
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error?.description ?? `Could not fetch Razorpay order (${res.status}).`);
+  }
+  return { id: data.id, amount: data.amount, amount_paid: data.amount_paid, status: data.status };
 }
 
 /**
