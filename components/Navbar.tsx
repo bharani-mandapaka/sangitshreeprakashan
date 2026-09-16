@@ -18,6 +18,15 @@ const navLinks = [
 export default function Navbar() {
   const [scrolled,   setScrolled]   = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Cart persists to localStorage, which doesn't exist on the server — the
+  // server always renders an empty cart, but the client rehydrates from
+  // localStorage right away and may have items already. Rendering the badge
+  // before we know we're past hydration causes a server/client mismatch
+  // ("Hydration failed") whenever a returning visitor already has items in
+  // their cart. Gating it behind a mounted flag (false until this effect
+  // runs, which only happens post-hydration) keeps the first client render
+  // identical to the server's, then lets the real count show a tick later.
+  const [mounted, setMounted] = useState(false);
   const itemCount  = useCartStore((s) => s.itemCount);
   const toggleCart = useCartStore((s) => s.toggleCart);
   const user       = useAuthStore((s) => s.user);
@@ -27,6 +36,8 @@ export default function Navbar() {
     window.addEventListener('scroll', handler, { passive: true });
     return () => window.removeEventListener('scroll', handler);
   }, []);
+
+  useEffect(() => { setMounted(true); }, []);
 
   return (
     <>
@@ -101,7 +112,7 @@ export default function Navbar() {
                 title="Cart"
               >
                 <ShoppingCart size={20} />
-                {itemCount() > 0 && (
+                {mounted && itemCount() > 0 && (
                   <motion.span
                     key={itemCount()}
                     initial={{ scale: 0 }}

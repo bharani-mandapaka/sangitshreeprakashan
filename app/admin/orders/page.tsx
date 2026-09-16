@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronUp, Download, MapPin, Phone, Mail, Package, RefreshCw, Truck } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, MapPin, Phone, Mail, Package, RefreshCw, Truck, Printer } from 'lucide-react';
 import { type DbOrder } from '@/lib/supabase';
 import { type OrderStatus } from '@/lib/orders-store';
 import { formatPrice } from '@/lib/utils';
@@ -24,9 +24,13 @@ function fmtDate(iso: string) {
 function OrderRow({
   order,
   onStatusChange,
+  selected,
+  onToggleSelect,
 }: {
   order: DbOrder;
   onStatusChange: (id: string, status: OrderStatus, extra?: Partial<DbOrder>) => void;
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -115,6 +119,14 @@ function OrderRow({
         className="border-b border-gold/5 hover:bg-white/2 transition-colors cursor-pointer"
         onClick={() => setExpanded((p) => !p)}
       >
+        <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggleSelect(order.id)}
+            className="accent-[#C9A84C] w-3.5 h-3.5 cursor-pointer"
+          />
+        </td>
         <td className="px-4 py-3">
           <p className="font-cinzel text-gold text-xs font-bold">{order.id}</p>
           <p className="text-cream/35 text-[10px] mt-0.5">{fmtDate(order.created_at)}</p>
@@ -147,7 +159,7 @@ function OrderRow({
 
       {expanded && (
         <tr className="bg-[#060000]">
-          <td colSpan={7} className="px-4 py-5">
+          <td colSpan={8} className="px-4 py-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 text-sm">
 
               {/* Customer */}
@@ -224,6 +236,20 @@ function OrderRow({
                   )}
                 </div>
 
+                {/* Print Invoice — opens the admin-only Bill of Supply page
+                    (app/admin/orders/[id]/invoice) in a new tab. Available
+                    regardless of order status, since admins may want to
+                    print ahead of marking an order "Shipped". */}
+                <a
+                  href={`/admin/orders/${order.id}/invoice`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-3 inline-flex items-center gap-1.5 border border-gold/20 hover:border-gold/40 text-gold/70 hover:text-gold font-cinzel text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <Printer size={11} /> Print Invoice
+                </a>
+
                 {/* Inline tracking-info prompt — required the first time an
                     order is marked shipped, since that's what goes into the
                     customer's "Order Shipped" notification. */}
@@ -295,6 +321,7 @@ export default function OrdersPage() {
   const [query,   setQuery]   = useState('');
   const [status,  setStatus]  = useState<OrderStatus | 'all'>('all');
   const [sort,    setSort]    = useState<'newest' | 'oldest' | 'highest'>('newest');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -348,6 +375,38 @@ export default function OrdersPage() {
     if (sort === 'highest') list = [...list].sort((a, b) => b.subtotal - a.subtotal);
     return list;
   }, [orders, query, status, sort]);
+
+  // Bulk "Print Selected" — see app/admin/orders/print-batch/page.tsx.
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every((o) => selected.has(o.id));
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      if (allFilteredSelected) {
+        // Deselect just what's currently visible, leave any other selections
+        // (from a different filter view) intact.
+        const next = new Set(prev);
+        filtered.forEach((o) => next.delete(o.id));
+        return next;
+      }
+      const next = new Set(prev);
+      filtered.forEach((o) => next.add(o.id));
+      return next;
+    });
+  };
+
+  const handlePrintSelected = () => {
+    if (selected.size === 0) return;
+    const ids = Array.from(selected).join(',');
+    window.open(`/admin/orders/print-batch?ids=${encodeURIComponent(ids)}`, '_blank', 'noopener,noreferrer');
+  };
 
   const totalRevenue = useMemo(
     () => filtered.filter((o) => o.status !== 'cancelled').reduce((s, o) => s + o.subtotal, 0),
@@ -410,6 +469,14 @@ export default function OrdersPage() {
           >
             <Download size={13} /> Export CSV
           </button>
+          <button
+            onClick={handlePrintSelected}
+            disabled={selected.size === 0}
+            className="flex items-center gap-2 border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-4 py-2 rounded-xl transition-all disabled:opacity-40"
+            title={selected.size === 0 ? 'Select orders below to print their invoices' : undefined}
+          >
+            <Printer size={13} /> Print Selected{selected.size > 0 ? ` (${selected.size})` : ''}
+          </button>
         </div>
       </div>
 
@@ -464,6 +531,16 @@ export default function OrdersPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gold/10">
+                  <th className="px-3 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      onChange={toggleSelectAll}
+                      disabled={filtered.length === 0}
+                      className="accent-[#C9A84C] w-3.5 h-3.5 cursor-pointer disabled:opacity-30"
+                      title="Select all"
+                    />
+                  </th>
                   {['Order ID / Date', 'Customer', 'Items', 'Total', 'Status', 'Payment', ''].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-[10px] font-cinzel uppercase tracking-widest text-cream/35">
                       {h}
@@ -474,7 +551,7 @@ export default function OrdersPage() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-16 text-center">
+                    <td colSpan={8} className="px-4 py-16 text-center">
                       <Package size={28} className="text-cream/10 mx-auto mb-3" />
                       <p className="font-cinzel text-cream/30 text-sm">
                         {orders.length === 0 ? 'No orders yet — place an order from the storefront to see it here.' : 'No orders match your filters.'}
@@ -483,7 +560,13 @@ export default function OrdersPage() {
                   </tr>
                 ) : (
                   filtered.map((order) => (
-                    <OrderRow key={order.id} order={order} onStatusChange={handleStatusChange} />
+                    <OrderRow
+                      key={order.id}
+                      order={order}
+                      onStatusChange={handleStatusChange}
+                      selected={selected.has(order.id)}
+                      onToggleSelect={toggleSelect}
+                    />
                   ))
                 )}
               </tbody>

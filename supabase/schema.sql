@@ -53,6 +53,25 @@ alter table orders add column if not exists shipped_at             timestamptz;
 alter table orders add column if not exists delivered_at           timestamptz;
 alter table orders add column if not exists expected_delivery_date timestamptz;
 
+-- ── Orders: invoice numbering (admin "Print Invoice" feature) ────────────────────
+-- See invoice-number-column.sql for the one-time migration notes (in particular:
+-- set the sequence's starting value to continue from whatever number the
+-- business's existing invoicing process last issued, e.g. Invoice #469).
+-- invoice_number is assigned lazily — on first admin print, not at order-creation
+-- time — so only orders someone actually prints ever consume a number.
+create sequence if not exists orders_invoice_number_seq start with 470;
+alter table orders add column if not exists invoice_number bigint;
+
+-- Lets the Supabase JS client advance the sequence via .rpc('next_invoice_number')
+-- — there's no direct nextval() call from the JS client otherwise.
+create or replace function next_invoice_number()
+returns bigint
+language sql
+security definer
+as $$
+  select nextval('orders_invoice_number_seq');
+$$;
+
 -- ── Row Level Security ────────────────────────────────────────────────────────
 -- Orders/order_items used to have permissive policies for every operation
 -- (using (true) / with check (true)) so the anon-key client — used directly
