@@ -87,16 +87,20 @@ was ruled out — no GSTIN/HSN/tax fields, just a plain Bill of Supply.
 
 ### Payments — code-complete, blocked on real API keys
 All three stories in `razorpay-integration-user-stories.md` are built:
-- [x] `orders.razorpay_order_id` / `orders.razorpay_payment_id` columns (`razorpay-columns.sql`)
-- [x] `lib/razorpay.ts` — order creation (raw fetch + Basic Auth, no new npm dependency) + signature verification (Node `crypto` HMAC)
+- [x] `orders.razorpay_order_id` / `orders.razorpay_payment_id` columns (`razorpay-columns.sql`) — **run against the live database, confirmed**; also now includes a unique index on `razorpay_payment_id` (see replay-block item below)
+- [x] `lib/razorpay.ts` — order creation (raw fetch + Basic Auth, no new npm dependency) + signature verification (Node `crypto` HMAC) + `getRazorpayOrder()` (fetches the real order state, used by the amount-tie check below)
 - [x] `lib/books-data.ts`'s `computeVerifiedSubtotal()` — recomputes the cart total from real book prices, used by both routes below so the client's price/subtotal is never trusted
 - [x] `POST /api/checkout/create-order` (Story 1) — creates the Razorpay order, writes nothing to Supabase
 - [x] `POST /api/checkout/verify` (Story 2) — verifies the signature server-side, only then saves the order + fires `order_placed`; rejects and logs an invalid/forged signature (Story 3, AC5)
 - [x] `app/checkout/page.tsx` rewritten — real Razorpay checkout.js widget replaces the old mock UI entirely; handles success, `payment.failed` (Story 3, AC2), and widget dismissal/cancel (Story 3, AC1) without leaving the customer confused or creating orphaned orders
 - [x] Retry behavior resolved: each retry creates a **fresh** Razorpay order (no reuse/idempotency) — since nothing is saved to Supabase until `verify` succeeds, this can't create duplicates (Story 3, AC4)
-- [ ] **Before this can actually run:** `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` need to be real values in `.env.local`/Vercel — test-mode keys (available immediately from the Razorpay dashboard, no approval needed) are enough to test the whole flow now; live keys need Bharani's GST/PAN account verification to go live for real
-- [ ] Run `razorpay-columns.sql` in Supabase before testing (adds the two new columns)
-- [ ] End-to-end test once test-mode keys exist: pay with Razorpay's documented test card/UPI, confirm the order actually saves, then deliberately fail/cancel a payment and confirm no order is created
+- [x] **Cart tied to the actual payment** (PR #11 review) — `verify` used to recompute the subtotal from whatever cart was submitted in the request, without checking it against what was actually charged for that Razorpay order. A genuinely-valid signature from paying for a cheap cart could've been replayed against `verify` with a different, pricier cart and saved as confirmed with nothing paid for the gap. Now fetches the real order via `getRazorpayOrder()` and rejects unless `status === 'paid'` and `amount_paid` matches the recomputed subtotal exactly.
+- [x] **Payment replay blocked** (PR #11 review) — `verify` rejects if `razorpay_payment_id` is already attached to an existing order, backed by a unique DB index as a second line of defense against two near-simultaneous requests for the same payment.
+- [x] **`POST /api/orders/create` deleted** (PR #11 review) — confirmed nothing called it anymore; it created a confirmed order unconditionally with no payment involved at all, a full bypass around the payment flow.
+- [x] Cart-badge hydration mismatch and checkout step-transition/padding bugs found while testing this branch end-to-end — fixed (not originally part of the review, surfaced during manual testing).
+- [ ] **Before this can actually run:** `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` need to be real values in `.env.local`/Vercel — test-mode keys (available immediately from the Razorpay dashboard, no approval needed) are enough to test the whole flow now; live keys need Bharani's GST/PAN account verification to go live for real. Same Razorpay account as the existing sangitshreeprakashan.com site — generating test keys doesn't touch anything live there.
+- [ ] End-to-end test once test-mode keys exist: pay with Razorpay's documented test card/UPI, confirm the order actually saves, then deliberately fail/cancel a payment and confirm no order is created — **and specifically try to replay a payment or tamper with the cart to confirm the new amount-tie/replay-block protections actually hold**
+- [ ] Blocked on PRs #9 and #10 merging first (this branch is stacked on top of both)
 
 ### Book content
 - [ ] Final copy for descriptions, table of contents, author bios

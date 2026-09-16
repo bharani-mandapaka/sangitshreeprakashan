@@ -173,6 +173,19 @@ before, and never unconditionally.**
 - Not covered here: refunds/cancellations after an order exists (would be its own story set), and
   reconciling failed attempts beyond server logs (`console.error` in both routes) — no dedicated
   admin view of failed payment attempts exists.
+- `razorpay-columns.sql` has been run against the live database — confirmed both columns and the
+  unique index exist. Still blocked on real `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` to actually
+  run end-to-end; same Razorpay account as the existing sangitshreeprakashan.com site, so
+  generating test-mode keys doesn't touch anything live there.
+- Two UI bugs surfaced while manually testing this branch (not part of the original PR #11
+  review, found during verification) — both fixed: a cart-badge hydration mismatch in
+  `components/Navbar.tsx` (same root cause and fix as documented under "Book catalog" issues
+  elsewhere — localStorage-backed state rendering differently on server vs. first client render),
+  and `app/checkout/page.tsx` not scrolling to top on step transitions (`handleDetailsSubmit` /
+  the "Edit shipping details" back button), which combined with the checkout container's
+  redundant top padding (`py-10` stacked on top of the page wrapper's own `pt-20 lg:pt-24` navbar
+  clearance) left the customer looking at a mid-scroll position or an oversized empty gap instead
+  of the top of the new step.
 
 ## Data stores (`lib/`)
 Zustand + `persist` to localStorage for client-side state. Orders and notification rules are the source of truth in Supabase, not these stores.

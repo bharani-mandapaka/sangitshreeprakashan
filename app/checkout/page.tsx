@@ -90,6 +90,12 @@ export default function CheckoutPage() {
   const handleDetailsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setStep('payment');
+    // Without this, the page keeps whatever scroll position the (often
+    // long) shipping form left it at — after filling the form, that's
+    // usually scrolled down near the bottom, so the payment step's heading
+    // and summary render off-screen above the viewport and the customer
+    // has to scroll up to see them.
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Real Razorpay flow (razorpay-integration-user-stories.md):
@@ -291,7 +297,7 @@ export default function CheckoutPage() {
       {/* Razorpay's own checkout widget — loaded once, opened from handlePay() */}
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
         {/* Back */}
         <Link
           href="/books"
@@ -423,7 +429,7 @@ export default function CheckoutPage() {
                   </div>
 
                   <button
-                    onClick={() => setStep('details')}
+                    onClick={() => { setStep('details'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                     disabled={paying}
                     className="mt-4 text-cream/40 hover:text-cream text-sm flex items-center gap-1.5 transition-colors font-cinzel disabled:opacity-40"
                   >
