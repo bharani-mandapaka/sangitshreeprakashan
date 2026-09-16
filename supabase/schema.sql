@@ -62,6 +62,12 @@ alter table orders add column if not exists expected_delivery_date timestamptz;
 create sequence if not exists orders_invoice_number_seq start with 470;
 alter table orders add column if not exists invoice_number bigint;
 
+-- ── Orders: Razorpay payment tracing ──────────────────────────────────────────
+-- See razorpay-columns.sql for the one-time migration notes. Populated by
+-- app/api/checkout/verify/route.ts once a payment is signature-verified.
+alter table orders add column if not exists razorpay_order_id   text;
+alter table orders add column if not exists razorpay_payment_id text;
+
 -- Lets the Supabase JS client advance the sequence via .rpc('next_invoice_number')
 -- — there's no direct nextval() call from the JS client otherwise.
 create or replace function next_invoice_number()

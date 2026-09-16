@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Script from 'next/script';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, CheckCircle, Lock, CreditCard, Smartphone, Building2, ChevronRight } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Lock, ChevronRight, ShieldCheck, RefreshCw } from 'lucide-react';
 import { useCartStore } from '@/lib/cart-store';
 import { useOrdersStore } from '@/lib/orders-store';
 import { useAnalyticsStore } from '@/lib/analytics-store';
@@ -13,8 +14,39 @@ import { getSupabase } from '@/lib/supabase';
 import { formatPrice, generateOrderId } from '@/lib/utils';
 import BookCoverImage from '@/components/BookCoverImage';
 
-type PayMethod = 'upi' | 'card' | 'netbanking';
-type CheckoutStep = 'details' | 'payment' | 'processing' | 'success';
+type CheckoutStep = 'details' | 'payment' | 'success';
+
+// Minimal shape of Razorpay's checkout.js global — just what this page uses.
+// See lib/razorpay.ts for the server-side half of this integration.
+interface RazorpayFailureResponse {
+  error: { description?: string; reason?: string };
+}
+interface RazorpaySuccessResponse {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}
+interface RazorpayInstance {
+  open: () => void;
+  on: (event: 'payment.failed', handler: (response: RazorpayFailureResponse) => void) => void;
+}
+interface RazorpayOptions {
+  key: string;
+  amount: number;
+  currency: string;
+  order_id: string;
+  name: string;
+  description: string;
+  prefill: { name: string; email: string; contact: string };
+  theme: { color: string };
+  handler: (response: RazorpaySuccessResponse) => void;
+  modal: { ondismiss: () => void };
+}
+declare global {
+  interface Window {
+    Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
+  }
+}
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -24,9 +56,9 @@ export default function CheckoutPage() {
   const user          = useAuthStore((s) => s.user);
 
   const [step,      setStep]      = useState<CheckoutStep>('details');
-  const [method,    setMethod]    = useState<PayMethod>('upi');
-  const [upiId,     setUpiId]     = useState('');
   const [orderId,   setOrderId]   = useState('');
+  const [paying,       setPaying]       = useState(false);
+  const [paymentError, setPaymentError] = useState('');
 
   // Shipping form — pre-filled from the account when signed in, still editable
   // and still usable as a guest (no account required to check out).
@@ -58,60 +90,135 @@ export default function CheckoutPage() {
   const handleDetailsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setStep('payment');
+    // Without this, the page keeps whatever scroll position the (often
+    // long) shipping form left it at — after filling the form, that's
+    // usually scrolled down near the bottom, so the payment step's heading
+    // and summary render off-screen above the viewport and the customer
+    // has to scroll up to see them.
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Real Razorpay flow (razorpay-integration-user-stories.md):
+  // create-order -> open widget -> verify -> only then save + notify.
+  // Replaces the old mock flow that always saved the order regardless of any
+  // "payment" outcome.
   const handlePay = async () => {
-    setStep('processing');
-    const id        = generateOrderId();
+    if (!window.Razorpay) {
+      setPaymentError('Payment couldn’t load. Please refresh the page and try again.');
+      return;
+    }
+
+    setPaying(true);
+    setPaymentError('');
+
+    const id        = orderId || generateOrderId();
     const createdAt = new Date().toISOString();
     setOrderId(id);
 
-    const orderPayload = {
-      id,
-      createdAt,
-      customer: { name: form.name, email: form.email, phone: form.phone },
-      billingAddress: {
-        line1:   form.address,
-        city:    form.city,
-        state:   form.state,
-        pincode: form.pincode,
-      },
-      items: items.map(({ book, quantity }) => ({
-        bookId:       book.id,
-        sku:          `SSP-${book.id.toUpperCase().slice(0, 6)}`,
-        titleEnglish: book.titleEnglish,
-        titleHindi:   book.titleHindi,
-        qty:          quantity,
-        price:        book.price,
-      })),
-      subtotal: subtotal(),
-      paymentMethod: method,
-    };
+    const itemsPayload = items.map(({ book, quantity }) => ({
+      bookId:       book.id,
+      sku:          `SSP-${book.id.toUpperCase().slice(0, 6)}`,
+      titleEnglish: book.titleEnglish,
+      titleHindi:   book.titleHindi,
+      qty:          quantity,
+      price:        book.price, // display only — both server routes recompute this from the books table
+    }));
 
-    // Signed-in users attach their session token so the server can verify who
-    // they are itself — we never send a raw userId the client could fake.
     const { data: { session } } = await getSupabase().auth.getSession();
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
 
-    // Run API call + minimum spinner delay in parallel
-    await Promise.all([
-      // Save to Supabase + send confirmation email
-      fetch('/api/orders/create', {
-        method:  'POST',
+    // ── Story 1: start a real payment ─────────────────────────────────────────
+    let createOrderRes: Response;
+    try {
+      createOrderRes = await fetch('/api/checkout/create-order', {
+        method: 'POST',
         headers,
-        body:    JSON.stringify(orderPayload),
-      }).catch((err) => console.error('[checkout] API error:', err)),
+        body: JSON.stringify({ orderId: id, items: itemsPayload }),
+      });
+    } catch {
+      setPaymentError('Couldn’t reach the payment server. Please check your connection and try again.');
+      setPaying(false);
+      return;
+    }
+    const createOrderBody = await createOrderRes.json().catch(() => ({}));
+    if (!createOrderRes.ok) {
+      setPaymentError(createOrderBody.error ?? 'Couldn’t start payment. Please try again.');
+      setPaying(false);
+      return;
+    }
 
-      // Minimum 2.8 s processing UX
-      new Promise((resolve) => setTimeout(resolve, 2800)),
-    ]);
+    const { razorpayOrderId, amount, currency, keyId } = createOrderBody;
 
-    // Also keep local store in sync (used by dashboard analytics)
-    addOrder({ ...orderPayload, status: 'confirmed' });
-    trackCartAdd();
-    clearCart();
-    setStep('success');
+    const rzp = new window.Razorpay({
+      key: keyId,
+      amount,
+      currency,
+      order_id: razorpayOrderId,
+      name: 'Sangit Shree Prakashan',
+      description: `Order ${id}`,
+      prefill: { name: form.name, email: form.email, contact: form.phone },
+      theme: { color: '#8B0000' },
+
+      // ── Story 2: confirm the order only after verified payment ─────────────
+      handler: async (response) => {
+        try {
+          const verifyRes = await fetch('/api/checkout/verify', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              id, createdAt,
+              customer: { name: form.name, email: form.email, phone: form.phone },
+              billingAddress: {
+                line1: form.address, city: form.city, state: form.state, pincode: form.pincode,
+              },
+              items: itemsPayload,
+              paymentMethod: 'razorpay',
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            }),
+          });
+          const verifyBody = await verifyRes.json().catch(() => ({}));
+          if (!verifyRes.ok) {
+            setPaymentError(verifyBody.error ?? 'We couldn’t verify your payment. If you were charged, please contact support.');
+            setPaying(false);
+            return;
+          }
+          addOrder({
+            id, createdAt,
+            customer: { name: form.name, email: form.email, phone: form.phone },
+            billingAddress: { line1: form.address, city: form.city, state: form.state, pincode: form.pincode },
+            items: itemsPayload,
+            subtotal: subtotal(),
+            paymentMethod: 'razorpay',
+            status: 'confirmed',
+          });
+          trackCartAdd();
+          clearCart();
+          setPaying(false);
+          setStep('success');
+        } catch {
+          setPaymentError('We couldn’t verify your payment. If you were charged, please contact support.');
+          setPaying(false);
+        }
+      },
+
+      // ── Story 3: cancelled/abandoned — back to checkout, cart intact ────────
+      modal: {
+        ondismiss: () => {
+          setPaying(false);
+        },
+      },
+    });
+
+    // ── Story 3: Razorpay-reported failure (declined card, etc.) ────────────
+    rzp.on('payment.failed', (response) => {
+      setPaymentError(response.error?.description || 'Payment failed. Please try again.');
+      setPaying(false);
+    });
+
+    rzp.open();
   };
 
   if (items.length === 0 && step !== 'success') {
@@ -185,47 +292,12 @@ export default function CheckoutPage() {
     );
   }
 
-  // ── PROCESSING ───────────────────────────────────────────────────────────────
-  if (step === 'processing') {
-    return (
-      <div className="min-h-screen bg-dark pt-24 flex items-center justify-center px-4">
-        <div className="text-center">
-          {/* Razorpay-like spinner */}
-          <div className="relative w-20 h-20 mx-auto mb-6">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
-              className="w-20 h-20 rounded-full border-4 border-gold/20 border-t-gold"
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Lock size={22} className="text-gold" />
-            </div>
-          </div>
-          <h2 className="font-cinzel text-cream text-xl font-bold mb-2">Processing Payment</h2>
-          <p className="text-cream/40 text-sm">Please do not close this window…</p>
-          <motion.div
-            className="mt-6 flex justify-center gap-1"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-          >
-            {[0, 1, 2].map((i) => (
-              <motion.span
-                key={i}
-                animate={{ opacity: [0.2, 1, 0.2] }}
-                transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.3 }}
-                className="w-2 h-2 rounded-full bg-gold"
-              />
-            ))}
-          </motion.div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-dark pt-20 lg:pt-24">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      {/* Razorpay's own checkout widget — loaded once, opened from handlePay() */}
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
         {/* Back */}
         <Link
           href="/books"
@@ -320,139 +392,46 @@ export default function CheckoutPage() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
                 >
-                  {/* ── Mock Razorpay UI ─────────────────────────────────── */}
-                  <div className="rounded-2xl overflow-hidden border border-[#0A2D5C]/60 shadow-2xl">
-                    {/* Razorpay header */}
-                    <div className="bg-[#072654] px-6 py-4 flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-0.5">
-                          {/* Razorpay logo text */}
-                          <svg viewBox="0 0 100 20" className="h-5 w-auto" fill="none">
-                            <text x="0" y="16" fontFamily="sans-serif" fontWeight="bold" fontSize="16" fill="#02BBD9">Razorpay</text>
-                          </svg>
-                        </div>
-                        <p className="text-white/50 text-xs">Sangit Shree Prakashan</p>
+                  <div className="bg-[#0A0000] border border-gold/15 rounded-2xl p-6 sm:p-8 text-center">
+                    <div className="w-16 h-16 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center mx-auto mb-5">
+                      <ShieldCheck size={28} className="text-gold" />
+                    </div>
+                    <h2 className="font-cinzel text-cream text-xl font-bold mb-2">Ready to Pay</h2>
+                    <p className="text-cream/50 text-sm mb-6">
+                      You&apos;ll be taken to Razorpay&apos;s secure checkout to pay by UPI, card, or net banking.
+                      We never see or store your payment details.
+                    </p>
+
+                    {paymentError && (
+                      <div className="bg-red-500/10 border border-red-500/25 rounded-xl px-4 py-3 text-red-400 text-sm mb-5 text-left">
+                        {paymentError}
                       </div>
-                      <div className="text-right">
-                        <p className="font-bold text-white text-lg">{formatPrice(total)}</p>
-                        <p className="text-white/40 text-xs">{form.name}</p>
-                      </div>
-                    </div>
+                    )}
 
-                    {/* Payment method tabs */}
-                    <div className="bg-white flex border-b border-gray-200">
-                      {([
-                        { id: 'upi',        label: 'UPI',         icon: <Smartphone size={14} /> },
-                        { id: 'card',       label: 'Card',        icon: <CreditCard size={14} /> },
-                        { id: 'netbanking', label: 'Net Banking', icon: <Building2 size={14} /> },
-                      ] as { id: PayMethod; label: string; icon: React.ReactNode }[]).map((m) => (
-                        <button
-                          key={m.id}
-                          onClick={() => setMethod(m.id)}
-                          className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-colors border-b-2 ${
-                            method === m.id
-                              ? 'border-[#072654] text-[#072654] bg-blue-50/50'
-                              : 'border-transparent text-gray-500 hover:text-gray-700'
-                          }`}
-                        >
-                          {m.icon} {m.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Payment form body */}
-                    <div className="bg-white p-6 min-h-[260px]">
-                      <AnimatePresence mode="wait">
-                        {method === 'upi' && (
-                          <motion.div key="upi" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
-                            <p className="text-gray-600 text-sm font-semibold">Pay using UPI</p>
-                            {/* Fake QR */}
-                            <div className="flex items-start gap-6">
-                              <div className="border-2 border-gray-200 rounded-lg p-2 flex-shrink-0">
-                                <svg viewBox="0 0 80 80" className="w-20 h-20">
-                                  {[...Array(8)].map((_, r) =>
-                                    [...Array(8)].map((_, c) => {
-                                      const filled = (r + c + r * c) % 3 !== 1;
-                                      return filled ? (
-                                        <rect key={`${r}-${c}`} x={c * 10} y={r * 10} width="9" height="9" fill="#1a1a1a" />
-                                      ) : null;
-                                    })
-                                  )}
-                                </svg>
-                              </div>
-                              <div>
-                                <p className="text-gray-500 text-xs mb-2">Scan with any UPI app</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {['GPay', 'PhonePe', 'Paytm', 'BHIM'].map((app) => (
-                                    <span key={app} className="border border-gray-200 rounded px-2 py-0.5 text-[10px] text-gray-600">{app}</span>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="relative">
-                              <div className="absolute inset-x-0 top-1/2 h-px bg-gray-200" />
-                              <span className="relative bg-white px-3 text-gray-400 text-xs block w-max mx-auto">or enter UPI ID</span>
-                            </div>
-                            <input
-                              value={upiId}
-                              onChange={(e) => setUpiId(e.target.value)}
-                              placeholder="yourname@upi"
-                              className="w-full border border-gray-300 focus:border-[#072654] outline-none rounded-lg px-3 py-2.5 text-sm text-gray-800 transition-colors"
-                            />
-                          </motion.div>
-                        )}
-
-                        {method === 'card' && (
-                          <motion.div key="card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
-                            <p className="text-gray-600 text-sm font-semibold">Pay using Debit / Credit Card</p>
-                            <input placeholder="Card Number" maxLength={19} className="w-full border border-gray-300 focus:border-[#072654] outline-none rounded-lg px-3 py-2.5 text-sm text-gray-800 transition-colors" />
-                            <div className="grid grid-cols-2 gap-3">
-                              <input placeholder="MM / YY" maxLength={5} className="w-full border border-gray-300 focus:border-[#072654] outline-none rounded-lg px-3 py-2.5 text-sm text-gray-800 transition-colors" />
-                              <input placeholder="CVV" maxLength={3} type="password" className="w-full border border-gray-300 focus:border-[#072654] outline-none rounded-lg px-3 py-2.5 text-sm text-gray-800 transition-colors" />
-                            </div>
-                            <input placeholder="Name on Card" className="w-full border border-gray-300 focus:border-[#072654] outline-none rounded-lg px-3 py-2.5 text-sm text-gray-800 transition-colors" />
-                            {/* Card logos */}
-                            <div className="flex gap-2 items-center">
-                              {['VISA', 'MC', 'RUPAY', 'AMEX'].map((c) => (
-                                <span key={c} className="border border-gray-200 rounded px-2 py-0.5 text-[9px] font-bold text-gray-500">{c}</span>
-                              ))}
-                            </div>
-                          </motion.div>
-                        )}
-
-                        {method === 'netbanking' && (
-                          <motion.div key="nb" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
-                            <p className="text-gray-600 text-sm font-semibold">Select your Bank</p>
-                            <div className="grid grid-cols-3 gap-2">
-                              {['SBI', 'HDFC', 'ICICI', 'Axis', 'Kotak', 'Other'].map((bank) => (
-                                <button key={bank} className="border border-gray-200 hover:border-[#072654] rounded-lg py-2.5 text-xs text-gray-600 hover:text-[#072654] transition-colors font-medium">
-                                  {bank}
-                                </button>
-                              ))}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-
-                    {/* Pay button */}
-                    <div className="bg-white px-6 pb-6 pt-2">
-                      <button
-                        onClick={handlePay}
-                        className="w-full bg-[#072654] hover:bg-[#0a3875] text-white font-bold py-3.5 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
-                      >
-                        <Lock size={14} />
-                        Pay {formatPrice(total)} Securely
-                      </button>
-                      <p className="text-gray-400 text-[10px] text-center mt-2 flex items-center justify-center gap-1">
-                        <Lock size={9} /> Secured by Razorpay · 256-bit SSL
-                      </p>
-                    </div>
+                    <button
+                      onClick={handlePay}
+                      disabled={paying}
+                      className="w-full bg-[#072654] hover:bg-[#0a3875] text-white font-bold py-3.5 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-60"
+                    >
+                      {paying ? (
+                        <>
+                          <RefreshCw size={14} className="animate-spin" /> Opening secure checkout…
+                        </>
+                      ) : (
+                        <>
+                          <Lock size={14} /> Pay {formatPrice(total)} Securely
+                        </>
+                      )}
+                    </button>
+                    <p className="text-cream/30 text-[10px] text-center mt-3 flex items-center justify-center gap-1">
+                      <Lock size={9} /> Secured by Razorpay · 256-bit SSL
+                    </p>
                   </div>
 
                   <button
-                    onClick={() => setStep('details')}
-                    className="mt-4 text-cream/40 hover:text-cream text-sm flex items-center gap-1.5 transition-colors font-cinzel"
+                    onClick={() => { setStep('details'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    disabled={paying}
+                    className="mt-4 text-cream/40 hover:text-cream text-sm flex items-center gap-1.5 transition-colors font-cinzel disabled:opacity-40"
                   >
                     <ArrowLeft size={13} /> Edit shipping details
                   </button>
