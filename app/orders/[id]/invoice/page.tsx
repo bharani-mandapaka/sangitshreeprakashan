@@ -70,9 +70,13 @@ export default function CustomerOrderInvoicePage({ params }: { params: { id: str
   }
 
   return (
-    <div className="min-h-screen bg-[#e8e8e8] print:bg-white font-sans">
-      {/* Screen-only toolbar */}
-      <div className="print:hidden sticky top-0 bg-white border-b border-black/10 px-6 py-3 flex items-center justify-between">
+    <div className="min-h-screen bg-[#e8e8e8] print:bg-white font-sans pt-16 lg:pt-20 print:pt-0">
+      {/* Screen-only toolbar. Sticks just below the site's fixed Navbar
+          (h-16 lg:h-20, see components/Navbar.tsx) rather than at the very
+          top of the viewport — otherwise this toolbar and the Navbar overlap,
+          since the Navbar is transparent until scrolled and this page (unlike
+          every other page) had no top padding accounting for it. */}
+      <div className="print:hidden sticky top-16 lg:top-20 bg-white border-b border-black/10 px-6 py-3 flex items-center justify-between z-10">
         <Link href="/profile" className="flex items-center gap-1.5 text-black/60 hover:text-black text-sm">
           <ArrowLeft size={15} /> Back to My Orders
         </Link>
