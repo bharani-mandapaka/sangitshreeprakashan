@@ -62,7 +62,7 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 | Admin users-page OTP | Mock — separate from the above, still just a UI simulation |
 | WhatsApp notifications | Wired in code (`fireNotifications()` calls Meta's Cloud API) but silently skipped — no `WHATSAPP_PHONE_NUMBER_ID`/`WHATSAPP_TOKEN` configured yet. Customer OTP delivery (`lib/whatsapp-otp.ts`) uses the same credentials via a separate Authentication-template send — see "Phone auth" below. |
 | Google OAuth (admin sign-in) | Simulated UI — no real token (separate from customer accounts below) |
-| Customer accounts | Real — Supabase Auth, email/password works out of the box; Google sign-in needs a one-time setup (Google Cloud OAuth app + Supabase provider config — see tasks.md) |
+| Customer accounts | Real — Supabase Auth, email/password works out of the box. Google sign-in (`/login`, `/signup` "Continue with Google") is now live — Google Cloud OAuth app + Supabase provider config completed (was blocking PR #8's review, confirmed working now). One open issue before this should reach real customers: every sign-in triggers a Google security email titled "You shared some Google Account data with `kypqmrfgxeybqzkawogb.supabase.co`" — Supabase's raw domain instead of the brand name, which could read as suspicious to a non-technical customer. Fix needs Supabase's paid Custom Domain feature — see `tasks.md`. |
 | Wishlist | Real — `wishlist` table in Supabase, heart icon on book cards and detail pages |
 | Customer order history | Real — `/profile` Orders tab, filtered by `orders.user_id` (guest checkout still works; those orders just aren't linked to an account) |
 | Book images | Real — all 36 books have real cover photos |
