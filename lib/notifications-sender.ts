@@ -158,7 +158,7 @@ export async function fireNotifications(
           // failed send was silently logged as "sent" with no clue why the
           // customer never got the email.
           const { error: sendError } = await resend.emails.send({
-            from:    'Sangit Shree Prakashan <orders@sangitshreeprakashan.com>',
+            from:    `Sangit Shree Prakashan <${process.env.RESEND_FROM_EMAIL || 'orders@sangitshreeprakashan.com'}>`,
             to,
             subject,
             html,

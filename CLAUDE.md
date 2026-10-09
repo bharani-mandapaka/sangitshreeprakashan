@@ -9,7 +9,7 @@ E-commerce site for a classical Indian music book publisher based in Kanpur, UP.
 - Framer Motion for animations
 - Zustand v4 + persist middleware (localStorage) for client-side state
 - Supabase (Postgres) for orders database — live
-- Resend for transactional email — live (domain verified)
+- Resend for transactional email — code complete, but sending is blocked until a sending domain is verified (see status table)
 - Lucide React icons
 - Deployed on Vercel, source on GitHub
 
@@ -54,13 +54,13 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 | Cart + checkout UI | Real |
 | Payments | Mock — no Razorpay yet |
 | Orders saved to DB | Real — `POST /api/orders/create` writes to Supabase on checkout |
-| Order confirmation email | Real — Resend sends from `orders@sangitshreeprakashan.com` |
+| Order confirmation email | Code real, delivery blocked — Resend rejects sends because `sangitshreeprakashan.com` is unverified (it's claimed by another Resend team, so don't claim it before asking Bharani). Sender is `RESEND_FROM_EMAIL`, default `orders@sangitshreeprakashan.com`; plan is to verify the `mail.` subdomain via 3 DNS records (TXT DKIM + 2 CNAMEs) and set `RESEND_FROM_EMAIL=orders@mail.sangitshreeprakashan.com` |
 | Admin dashboard | Real — reads orders from Supabase |
 | Admin orders page | Real — reads from Supabase, status updates write back |
 | Admin analytics | localStorage — visits/clicks tracked client-side via analytics-store |
 | Customer phone-login OTP | Real send path code-complete via WhatsApp (`lib/whatsapp-otp.ts`, Meta Cloud API Authentication template) — falls back to the mock (code returned in the API response, shown on screen) whenever `WHATSAPP_PHONE_NUMBER_ID`/`WHATSAPP_TOKEN` aren't set or the send fails. Blocked on Meta Business verification + an approved Authentication template, same as WhatsApp notifications below. |
 | Admin users-page OTP | Mock — separate from the above, still just a UI simulation |
-| WhatsApp notifications | Wired in code (`fireNotifications()` calls Meta's Cloud API) but silently skipped — no `WHATSAPP_PHONE_NUMBER_ID`/`WHATSAPP_TOKEN` configured yet. Customer OTP delivery (`lib/whatsapp-otp.ts`) uses the same credentials via a separate Authentication-template send — see "Phone auth" below. |
+| WhatsApp notifications | Wired in code (`fireNotifications()` calls Meta's Cloud API). Works locally against Meta's free test number (+1 555-179-0517) with a never-expiring System User token — free-text messages only reach verified test recipients inside a 24h window; real customers need the verified business number. Silently skipped when `WHATSAPP_PHONE_NUMBER_ID`/`WHATSAPP_TOKEN` are unset. Customer OTP delivery (`lib/whatsapp-otp.ts`) uses the same credentials via a separate Authentication-template send — see "Phone auth" below. |
 | Google OAuth (admin sign-in) | Simulated UI — no real token (separate from customer accounts below) |
 | Customer accounts | Real — Supabase Auth, email/password works out of the box. Google sign-in (`/login`, `/signup` "Continue with Google") is now live — Google Cloud OAuth app + Supabase provider config completed (was blocking PR #8's review, confirmed working now). One open issue before this should reach real customers: every sign-in triggers a Google security email titled "You shared some Google Account data with `kypqmrfgxeybqzkawogb.supabase.co`" — Supabase's raw domain instead of the brand name, which could read as suspicious to a non-technical customer. Fix needs Supabase's paid Custom Domain feature — see `tasks.md`. |
 | Wishlist | Real — `wishlist` table in Supabase, heart icon on book cards and detail pages |
@@ -81,6 +81,7 @@ each one needs. Keep it updated when adding a variable.
 NEXT_PUBLIC_SUPABASE_URL       # required
 NEXT_PUBLIC_SUPABASE_ANON_KEY  # required
 RESEND_API_KEY                 # required
+RESEND_FROM_EMAIL              # optional — sender address on a Resend-verified domain; defaults to orders@sangitshreeprakashan.com
 CRON_SECRET                    # optional — Bearer token for the digest cron routes
 WHATSAPP_PHONE_NUMBER_ID       # optional — unset means WhatsApp sends are skipped
 WHATSAPP_TOKEN                 # optional
@@ -227,7 +228,7 @@ the layout's own route.
 | What | Service | Status |
 |------|---------|--------|
 | Database | Supabase (Postgres) | Live — orders, order_items, notification_rules, notification_logs |
-| Transactional email | Resend | Live — domain `sangitshreeprakashan.com` verified |
+| Transactional email | Resend | Blocked — `sangitshreeprakashan.com` unverified and claimed by another Resend team; subdomain `mail.` added in Resend, awaiting DNS records |
 | Payments | Razorpay | Not started — needs GST/PAN account verification |
 | SEO | Next.js generateMetadata + sitemap | Live — merged via PR #2 + PR #3 (fix) |
 

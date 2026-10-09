@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     for (const to of resolvedTo) {
       try {
         await resend.emails.send({
-          from:    'Sangit Shree Prakashan <orders@sangitshreeprakashan.com>',
+          from:    `Sangit Shree Prakashan <${process.env.RESEND_FROM_EMAIL || 'orders@sangitshreeprakashan.com'}>`,
           to,
           subject: `[TEST] ${subject}`,
           html: `

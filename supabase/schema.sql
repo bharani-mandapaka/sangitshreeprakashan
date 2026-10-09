@@ -39,7 +39,12 @@ create index if not exists order_items_order_id_idx on order_items(order_id);
 -- ── Orders: link to authenticated customer account ──────────────────────────────
 -- Nullable — guest checkout (no account) is still fully supported. Set from the
 -- client's Supabase Auth session at checkout time when the customer is signed in.
-alter table orders add column if not exists user_id uuid references auth.users(id);
+alter table orders add column if not exists user_id uuid references auth.users(id) on delete set null;
+-- Already-deployed databases keep the original FK (no ON DELETE), which blocks deleting an
+-- auth user who has orders ("Database error deleting user"). Run once:
+--   alter table orders drop constraint orders_user_id_fkey;
+--   alter table orders add constraint orders_user_id_fkey
+--     foreign key (user_id) references auth.users(id) on delete set null;
 create index if not exists orders_user_id_idx on orders(user_id);
 
 -- ── Orders: lifecycle notification fields ────────────────────────────────────────

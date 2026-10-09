@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { normalizePhone, generateOtp } from '@/lib/phone-auth';
 import { isWhatsAppOtpConfigured, sendWhatsAppOtp } from '@/lib/whatsapp-otp';
 
-const OTP_TTL_MS = 5 * 60 * 1000;      // codes are valid for 5 minutes
+const OTP_TTL_MS = 15 * 60 * 1000;     // codes are valid for 15 minutes
 const RESEND_COOLDOWN_MS = 30 * 1000;  // don't let the same phone spam requests
 
 export async function POST(req: NextRequest) {
