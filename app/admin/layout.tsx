@@ -31,6 +31,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setAuthed(localStorage.getItem('ssp-admin-auth') === '1');
   }, []);
 
+  // The session cookie can expire while the localStorage flag above still says
+  // "logged in" — pages would then just show "Not authenticated" errors. Any
+  // 401 from an admin API route sends the user back to the login form instead.
+  useEffect(() => {
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const res = await originalFetch(...args);
+      const input = args[0];
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+      if (res.status === 401 && url.includes('/api/admin/') && !url.includes('/api/admin/login')) {
+        localStorage.removeItem('ssp-admin-auth');
+        setAuthed(false);
+        setError('Your session expired. Please sign in again.');
+      }
+      return res;
+    };
+    return () => { window.fetch = originalFetch; };
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');

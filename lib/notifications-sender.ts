@@ -178,19 +178,23 @@ export async function fireNotifications(
       (rule.channel === 'whatsapp' || rule.channel === 'both') &&
       (rule.whatsapp_numbers as string[])?.length > 0
     ) {
-      try {
-        const message = interpolate(rule.whatsapp_message, vars);
-        // Resolve dynamic placeholders e.g. {{customer_phone}}, drop unresolved.
-        const resolvedPhones = (rule.whatsapp_numbers as string[])
-          .map((p) => interpolate(p, vars))
-          .filter((p) => p && !p.includes('['));
-        for (const phone of resolvedPhones) {
+      const message = interpolate(rule.whatsapp_message, vars);
+      // Resolve dynamic placeholders e.g. {{customer_phone}}, drop unresolved.
+      const resolvedPhones = (rule.whatsapp_numbers as string[])
+        .map((p) => interpolate(p, vars))
+        .filter((p) => p && !p.includes('['));
+      // One bad number (e.g. not on Meta's test-recipient list) must not stop
+      // the rest of this rule's recipients from being messaged.
+      const waErrors: string[] = [];
+      for (const phone of resolvedPhones) {
+        try {
           await sendWhatsAppMessage(phone, message);
+        } catch (err) {
+          waErrors.push(String(err));
+          console.error(`[notifications] whatsapp failed for rule ${rule.id} (${phone}):`, err);
         }
-      } catch (err) {
-        waError = String(err);
-        console.error(`[notifications] whatsapp failed for rule ${rule.id}:`, err);
       }
+      if (waErrors.length > 0) waError = waErrors.join(' | ');
     }
 
     // ── Determine overall status ───────────────────────────────────────────────
