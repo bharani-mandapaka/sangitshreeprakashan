@@ -208,10 +208,10 @@ All three stories in `razorpay-integration-user-stories.md` are built:
 
 ### Needed before real customers
 - [ ] **Legal pages** — no Privacy Policy, Terms & Conditions, or Shipping/Returns/Refund page exists (no routes for them). Razorpay requires them for live-key approval and Meta Business Verification often asks for them.
-- [ ] **Forgot/reset password** — no reset page or route exists, so an email-account customer who forgets their password has no way back in.
+- [x] ~~Forgot/reset password~~ — **not needed (added in error, corrected 2026-10-12):** customers sign in with phone + OTP or Google, never a password they could forget; the reset flow was already built and then removed for that reason (see Customer accounts above). Only revisit if email/password login is ever brought back.
 - [ ] **Domain cutover plan** — `sangitshreeprakashan.com` already serves the old live website (and the existing site's email may depend on that DNS). Decide when/how the new site replaces it, how DNS changes without taking either down, and where each site's email keeps working.
 - [ ] **Production environment on Vercel** — every secret set for Production + Preview + Development (Supabase URL/anon/service-role, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `WHATSAPP_*`, Razorpay keys, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, `PHONE_AUTH_SECRET`, `CRON_SECRET`); then one real end-to-end test on the deployed URL.
-- [ ] **Supabase Auth emails** — signup/confirmation emails show Supabase/Google branding rather than the shop's. Needs a verified sending domain (see the Resend items) plus custom SMTP in Supabase.
+- [ ] **Google sign-in branding** (corrected 2026-10-12 — this is not about Supabase emails: phone and Google accounts don't receive any Supabase sign-up email). The real issue is the Google security email "You shared some Google Account data with `<project>.supabase.co`", which shows Supabase's raw domain instead of the shop's name and could look suspicious to customers. Fix needs Supabase's paid Custom Domain feature (tracked earlier in this file); the Google Cloud OAuth consent screen's app name/logo should also be set to the shop's.
 
 ### Worth doing soon
 - [ ] **Cancellations, returns & refunds** — no customer or admin flow for them; `cancelled` exists as a status only, and Razorpay refunds aren't handled.
