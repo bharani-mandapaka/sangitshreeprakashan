@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { isAdminRequest } from '@/lib/admin-auth';
 
 function interpolate(template: string, vars: Record<string, string>) {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `[${key}]`);
@@ -49,10 +50,12 @@ const TEST_VARS: Record<string, string> = {
 };
 
 export async function POST(req: NextRequest) {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
+  // Sends real emails/WhatsApp to a rule's recipients — admin only.
+  if (!isAdminRequest(req)) {
+    return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
+  }
+
+  const supabase = getSupabaseAdmin();
   const resend = new Resend(process.env.RESEND_API_KEY);
 
   const { ruleId } = await req.json();

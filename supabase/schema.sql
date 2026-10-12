@@ -260,8 +260,12 @@ create index if not exists notif_logs_sent_at_idx on notification_logs(sent_at d
 alter table notification_rules enable row level security;
 alter table notification_logs  enable row level security;
 
+-- RLS on with NO anon/authenticated policy = those roles can't touch these tables
+-- at all. The public anon key ships in the browser bundle, so the old
+-- "for all to anon using (true)" policies let anyone rewrite notification rules
+-- (recipients, templates) or read the logs. Only the server-side service-role
+-- key (which bypasses RLS) reads/writes them: lib/notifications-sender.ts,
+-- app/api/admin/notifications and app/api/notifications/test (admin-cookie gated).
 drop policy if exists "anon_all_notification_rules" on notification_rules;
 drop policy if exists "anon_all_notification_logs"  on notification_logs;
-create policy "anon_all_notification_rules" on notification_rules for all to anon using (true) with check (true);
-create policy "anon_all_notification_logs"  on notification_logs  for all to anon using (true) with check (true);
 

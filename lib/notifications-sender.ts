@@ -5,8 +5,8 @@
  *
  * Import only in API routes / server code — never in client components.
  */
-import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 // ── Template interpolation ─────────────────────────────────────────────────────
 function interpolate(template: string, vars: Record<string, string>): string {
@@ -115,10 +115,8 @@ export async function fireNotifications(
 
   // Created per-invocation (not at module load) so `next build` can import this
   // file without the Supabase/Resend env vars being present at build time.
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
+  // Service-role client: notification_rules/notification_logs have no anon policy.
+  const supabase = getSupabaseAdmin();
   const resend = new Resend(process.env.RESEND_API_KEY);
 
   const { data: rules, error } = await supabase

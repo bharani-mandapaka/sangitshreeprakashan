@@ -6,7 +6,7 @@ import {
   Edit3, Check, X, ChevronDown, ChevronUp, Layers, Users,
   CheckCircle, Phone, RefreshCw, History, AlertCircle,
 } from 'lucide-react';
-import { getSupabase, type DbNotificationRule, type DbNotificationLog } from '@/lib/supabase';
+import type { DbNotificationRule, DbNotificationLog } from '@/lib/supabase';
 import {
   parseDescription,
   type NotificationTrigger,
@@ -532,18 +532,13 @@ export default function NotificationsPage() {
     setLoading(true);
     setDbError('');
     try {
-      const [rulesRes, logsRes] = await Promise.all([
-        getSupabase().from('notification_rules').select('*').order('created_at', { ascending: false }),
-        getSupabase().from('notification_logs').select('*').order('sent_at', { ascending: false }).limit(30),
-      ]);
-      if (rulesRes.error) setDbError(rulesRes.error.message);
-      setRules((rulesRes.data as DbNotificationRule[]) ?? []);
-      setLogs((logsRes.data  as DbNotificationLog[])  ?? []);
+      const res  = await fetch('/api/admin/notifications');
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) setDbError(body.error ?? 'Failed to load notifications.');
+      setRules((body.rules as DbNotificationRule[]) ?? []);
+      setLogs((body.logs   as DbNotificationLog[])  ?? []);
     } catch (err) {
-      // getSupabase() throws synchronously if the Supabase env vars aren't
-      // configured — without this catch the page was stuck on the loading
-      // spinner forever with no indication why.
-      setDbError(err instanceof Error ? err.message : 'Failed to connect to the database.');
+      setDbError(err instanceof Error ? err.message : 'Failed to connect to the server.');
     } finally {
       setLoading(false);
     }
@@ -556,18 +551,25 @@ export default function NotificationsPage() {
     const rule = rules.find((r) => r.id === id);
     if (!rule) return;
     setRules((prev) => prev.map((r) => r.id === id ? { ...r, active: !r.active } : r));
-    await getSupabase().from('notification_rules').update({ active: !rule.active }).eq('id', id);
+    await patchRule(id, { active: !rule.active });
   };
 
   const handleDelete = async (id: string) => {
     setRules((prev) => prev.filter((r) => r.id !== id));
-    await getSupabase().from('notification_rules').delete().eq('id', id);
+    await fetch(`/api/admin/notifications?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
   };
 
   const handleUpdate = async (id: string, patch: Partial<DbNotificationRule>) => {
     setRules((prev) => prev.map((r) => r.id === id ? { ...r, ...patch } : r));
-    await getSupabase().from('notification_rules').update(patch).eq('id', id);
+    await patchRule(id, patch);
   };
+
+  const patchRule = (id: string, patch: Partial<DbNotificationRule>) =>
+    fetch('/api/admin/notifications', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ id, patch }),
+    });
 
   // ── NLP create form state ────────────────────────────────────────────────────
   const [desc,       setDesc]       = useState('');
@@ -660,9 +662,8 @@ export default function NotificationsPage() {
     if (!parsed) return;
     setCreating(true);
 
-    const newRule: Omit<DbNotificationRule, 'created_at'> & { created_at: string } = {
-      id:               crypto.randomUUID(),
-      name:             parsed.name.replace(/\(.*\)/, `(${CHANNEL_META[channel].label})`),
+    const newRule = {
+      name:            parsed.name.replace(/\(.*\)/, `(${CHANNEL_META[channel].label})`),
       description:      desc,
       trigger:          parsed.trigger,
       channel,
@@ -672,22 +673,26 @@ export default function NotificationsPage() {
       whatsapp_numbers: phones.split(',').map((p) => p.trim()).filter(Boolean),
       whatsapp_message: waMsg,
       active:           true,
-      created_at:       new Date().toISOString(),
       // Rules built here use the staff-facing "Dear Admin" templates
       // (see EMAIL_TEMPLATES in lib/notifications-store.ts) — only the
       // seeded order-lifecycle rules in supabase/schema.sql are 'customer'.
       audience:         'admin',
     };
 
-    const { error } = await getSupabase().from('notification_rules').insert(newRule);
-    if (!error) {
-      setRules((prev) => [newRule as DbNotificationRule, ...prev]);
+    const res  = await fetch('/api/admin/notifications', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(newRule),
+    });
+    const created = await res.json().catch(() => ({}));
+    if (res.ok && created.rule) {
+      setRules((prev) => [created.rule as DbNotificationRule, ...prev]);
       setSaved(true);
       setDesc(''); setParsed(null); setAutoGroups([]);
       setSubject(''); setBody(''); setEmails('');
       setWaMsg(''); setPhones('');
     } else {
-      console.error('[notifications] create error:', error);
+      console.error('[notifications] create error:', created.error);
     }
     setCreating(false);
   };
