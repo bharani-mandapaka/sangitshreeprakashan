@@ -199,3 +199,27 @@ All three stories in `razorpay-integration-user-stories.md` are built:
 ### Users
 - [ ] Real Google OAuth replaces the simulated sign-in flow
 - [ ] Admin users stored in Supabase (not localStorage)
+
+---
+
+## Launch readiness — gaps not tracked anywhere before
+
+> Found by comparing the site's routes/code against what a live Indian e-commerce store needs (checked in code on 2026-10-12; not a full audit, so more may turn up).
+
+### Needed before real customers
+- [ ] **Legal pages** — no Privacy Policy, Terms & Conditions, or Shipping/Returns/Refund page exists (no routes for them). Razorpay requires them for live-key approval and Meta Business Verification often asks for them.
+- [ ] **Forgot/reset password** — no reset page or route exists, so an email-account customer who forgets their password has no way back in.
+- [ ] **Domain cutover plan** — `sangitshreeprakashan.com` already serves the old live website (and the existing site's email may depend on that DNS). Decide when/how the new site replaces it, how DNS changes without taking either down, and where each site's email keeps working.
+- [ ] **Production environment on Vercel** — every secret set for Production + Preview + Development (Supabase URL/anon/service-role, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `WHATSAPP_*`, Razorpay keys, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, `PHONE_AUTH_SECRET`, `CRON_SECRET`); then one real end-to-end test on the deployed URL.
+- [ ] **Supabase Auth emails** — signup/confirmation emails show Supabase/Google branding rather than the shop's. Needs a verified sending domain (see the Resend items) plus custom SMTP in Supabase.
+
+### Worth doing soon
+- [ ] **Cancellations, returns & refunds** — no customer or admin flow for them; `cancelled` exists as a status only, and Razorpay refunds aren't handled.
+- [ ] **Stock / availability** — no inventory tracking, so out-of-stock books can still be bought.
+- [ ] **Real analytics** — admin visit/click numbers come from browser localStorage, not a real measure of traffic.
+- [ ] **Error monitoring & backups** — nothing alerts anyone when checkout or an API route fails; no scheduled Supabase backup/restore plan.
+- [ ] **Abuse limits** — rate-limit OTP requests (there's only a 30 s per-number cooldown), signup, and the admin login attempts.
+- [x] **GST — resolved:** Bharani/owner confirmed there is no GST on books, so the existing "Bill of Supply" format on `feature/admin-invoice-printing` (PR #10) is the right one; nothing to add.
+- [ ] **Invoice numbering must start at 1 for the real site** (decided 2026-10-12). `feature/admin-invoice-printing` currently does `create sequence orders_invoice_number_seq start with 470` (to continue the old business's #469) in both `supabase/schema.sql` and `invoice-number-column.sql`. To do on that branch (PR #10): change both to `start with 1` and drop the "continue from #469" notes. Numbers are assigned lazily on the first admin print, so every test invoice printed so far has consumed a number — **before launch**, once the test orders are cleared, run `alter sequence orders_invoice_number_seq restart with 1; update orders set invoice_number = null;` (or start from a clean production database). Invoice numbers should stay gap-free and in order once real invoices begin — confirm with the accountant whether they want one running series or a fresh series each financial year.
+- [ ] **Checkout validation** — phone (10-digit Indian mobile) and PIN (6 digits), client and server side — do in the Razorpay PR (#11).
+- [ ] **Set `CRON_SECRET`** in Vercel so only Vercel Cron can call `/api/cron/*`.
