@@ -158,6 +158,11 @@ All three stories in `razorpay-integration-user-stories.md` are built:
   - **Still to do, only after this branch is deployed everywhere that shares the Supabase project:** run `drop policy if exists "anon_all_notification_rules" on notification_rules; drop policy if exists "anon_all_notification_logs" on notification_logs;` in the Supabase SQL editor. Running it earlier breaks any deployment still on the old code (admin Notifications page and every order notification use the anon key there).
   - Also fixed: the daily/weekly digest cron routes read `orders` with the anon key, which `orders` RLS blocks, so every digest would have reported 0 orders. They now use `getSupabaseAdmin()` and return a 500 (instead of sending a false "0 orders" digest) if the query fails. No digest rules exist in the live DB yet, so nothing was being sent; tested both routes locally (200, sent 0).
   - **Heads-up:** `CRON_SECRET` is optional and unset locally — when unset, `/api/cron/*` is callable by anyone. Set it in Vercel (Production) so only Vercel Cron can trigger digests.
+- [~] **QA walkthrough (public side, run in the browser pane; logged-in parts still need a manual pass)**
+  - Passed: homepage, `/books` (36 books, search narrows correctly), book detail, add to cart + navbar badge, checkout page + empty-form blocking, `/contact`, `/about`, `/sitemap.xml`, 404 page; no horizontal scroll at 375px on home/books/detail/checkout/contact.
+  - **Fixed:** the cart drawer's open/closed state was saved to localStorage along with the cart, so leaving with the drawer open made it reopen over the next page (it covered the checkout form). `lib/cart-store.ts` now persists only `items` and ignores any old saved `isOpen`.
+  - **Not fixed — found on this branch's checkout (will conflict with the Razorpay rewrite in PR #11, so do it there):** shipping form only checks "not empty" (+ a 6-char limit on PIN). A 5-digit phone or 2-digit PIN code is accepted, which means unreachable orders and failed WhatsApp sends. Needs phone (10-digit Indian mobile) and PIN (6 digits) validation, ideally server-side too.
+  - Still manual (needs a login): Google/phone sign-in, profile + wishlist + order history, admin Notifications page (now behind `/api/admin/notifications`: list loads, toggle, create, delete, send test), admin orders and users pages.
 
 ---
 

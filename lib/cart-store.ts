@@ -67,6 +67,17 @@ export const useCartStore = create<CartStore>()(
       itemCount: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
       subtotal:  () => get().items.reduce((sum, i) => sum + i.book.price * i.quantity, 0),
     }),
-    { name: 'ssp-cart' },
+    {
+      name: 'ssp-cart',
+      // Only the cart contents persist — if `isOpen` were saved too, the drawer
+      // would reopen by itself on the next page load (covering e.g. the
+      // checkout form) whenever the shopper left the site with it open.
+      partialize: (state) => ({ items: state.items }),
+      // Carts saved before this change still contain `isOpen` — ignore it.
+      merge: (persisted, current) => ({
+        ...current,
+        items: (persisted as Partial<CartStore> | undefined)?.items ?? current.items,
+      }),
+    },
   ),
 );
