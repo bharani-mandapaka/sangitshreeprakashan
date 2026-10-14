@@ -49,3 +49,7 @@ export const WHATSAPP_MESSAGE = encodeURIComponent(
   'Hello! I visited sangitshreeprakashan.com and would like to enquire about your books.',
 );
 export const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_MESSAGE}`;
+
+/** WhatsApp chat link with a ready-typed message (e.g. a return or cancellation request). */
+export const whatsappLink = (message: string) =>
+  `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;

@@ -146,7 +146,8 @@ export default function Footer() {
 
       {/* Bottom bar */}
       <div className="border-t border-gold/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+        {/* Extra bottom padding keeps the legal links clear of the fixed "Enquire on WhatsApp" button */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-24 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="text-cream/30 text-xs">
             © {new Date().getFullYear()} Sangit Shree Prakashan. All rights reserved.
           </p>

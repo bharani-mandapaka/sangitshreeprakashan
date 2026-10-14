@@ -216,7 +216,7 @@ All three stories in `razorpay-integration-user-stories.md` are built:
 - [ ] **Google sign-in branding** (corrected 2026-10-12 — this is not about Supabase emails: phone and Google accounts don't receive any Supabase sign-up email). The real issue is the Google security email "You shared some Google Account data with `<project>.supabase.co`", which shows Supabase's raw domain instead of the shop's name and could look suspicious to customers. Fix needs Supabase's paid Custom Domain feature (tracked earlier in this file); the Google Cloud OAuth consent screen's app name/logo should also be set to the shop's.
 
 ### Worth doing soon
-- [ ] **Cancellations, returns & refunds** — no customer or admin flow for them; `cancelled` exists as a status only, and Razorpay refunds aren't handled.
+- [~] **Cancellations, returns & refunds** — first step done 2026-10-15 on `feature/legal-pages`: `/profile` → Orders now shows "Return or report a problem" on delivered orders (only within 7 days of delivery, then a "window has ended" note) and "Cancel this order" on pending/confirmed orders; both open WhatsApp to the shop number with the order ID pre-typed, plus a link to `/shipping-returns`. Still open: an actual in-site request form, an admin "cancel/refund" action, status tracking for return requests, and Razorpay refunds.
 - [ ] **Stock / availability** — no inventory tracking, so out-of-stock books can still be bought.
 - [ ] **Real analytics** — admin visit/click numbers come from browser localStorage, not a real measure of traffic.
 - [ ] **Error monitoring & backups** — nothing alerts anyone when checkout or an API route fails; no scheduled Supabase backup/restore plan.

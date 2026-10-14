@@ -9,13 +9,21 @@ import { useAuthStore } from '@/lib/auth-store';
 import { useWishlistStore } from '@/lib/wishlist-store';
 import { getSupabase, type DbOrder } from '@/lib/supabase';
 import { getBookById } from '@/lib/books';
-import { formatPrice } from '@/lib/utils';
+import { formatPrice, whatsappLink } from '@/lib/utils';
 import BookCard from '@/components/BookCard';
 
 type Tab = 'overview' | 'wishlist' | 'orders';
 
+// Matches the policy on /shipping-returns: report a damaged/wrong book within 7 days of delivery.
+const RETURN_WINDOW_DAYS = 7;
+
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function withinReturnWindow(order: DbOrder) {
+  const deliveredAt = new Date(order.delivered_at ?? order.created_at).getTime();
+  return Date.now() - deliveredAt <= RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 }
 
 export default function ProfilePage() {
@@ -281,6 +289,46 @@ export default function ProfilePage() {
                       <span className="text-cream/40 text-xs font-cinzel uppercase">Total</span>
                       <span className="font-cinzel text-gold font-bold text-sm">{formatPrice(order.subtotal)}</span>
                     </div>
+
+                    {/* Return / cancel — handled over WhatsApp; see /shipping-returns */}
+                    {order.status === 'delivered' && (
+                      <div className="border-t border-gold/10 mt-3 pt-3">
+                        {withinReturnWindow(order) ? (
+                          <a
+                            href={whatsappLink(`Hello, I'd like to return or report a problem with order ${order.id}. The issue is: `)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 bg-gold hover:bg-gold-300 text-dark text-xs font-cinzel font-bold px-4 py-2 rounded-full transition-colors"
+                          >
+                            Return or report a problem
+                          </a>
+                        ) : (
+                          <p className="text-cream/40 text-xs">
+                            The {RETURN_WINDOW_DAYS}-day window to report a problem with this order has ended.
+                          </p>
+                        )}
+                        <p className="text-cream/35 text-[11px] mt-2">
+                          Damaged or wrong books only, within {RETURN_WINDOW_DAYS} days of delivery.{' '}
+                          <Link href="/shipping-returns" className="text-gold/70 hover:text-gold underline">Returns policy</Link>
+                        </p>
+                      </div>
+                    )}
+                    {(order.status === 'pending' || order.status === 'confirmed') && (
+                      <div className="border-t border-gold/10 mt-3 pt-3">
+                        <a
+                          href={whatsappLink(`Hello, I'd like to cancel order ${order.id}.`)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 bg-gold hover:bg-gold-300 text-dark text-xs font-cinzel font-bold px-4 py-2 rounded-full transition-colors"
+                        >
+                          Cancel this order
+                        </a>
+                        <p className="text-cream/35 text-[11px] mt-2">
+                          You can cancel until it ships.{' '}
+                          <Link href="/shipping-returns" className="text-gold/70 hover:text-gold underline">Cancellation policy</Link>
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
