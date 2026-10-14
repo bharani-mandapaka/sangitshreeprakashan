@@ -49,6 +49,7 @@ export interface DbOrder {
   courier_service: string | null;
   shipped_at: string | null;
   delivered_at: string | null;
+  returned_at: string | null;
   expected_delivery_date: string | null;
   order_items: DbOrderItem[];
 }
