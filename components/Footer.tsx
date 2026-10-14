@@ -18,6 +18,12 @@ const quickLinks = [
   { href: '/contact', label: 'Contact' },
 ];
 
+const legalLinks = [
+  { href: '/privacy',          label: 'Privacy Policy' },
+  { href: '/terms',            label: 'Terms & Conditions' },
+  { href: '/shipping-returns', label: 'Shipping & Returns' },
+];
+
 export default function Footer() {
   return (
     <footer className="bg-[#050000] border-t border-gold/10 mt-auto">
@@ -144,9 +150,13 @@ export default function Footer() {
           <p className="text-cream/30 text-xs">
             © {new Date().getFullYear()} Sangit Shree Prakashan. All rights reserved.
           </p>
-          <p className="text-cream/20 text-xs">
-            Publisher of Hindustani Classical Music Books · Kanpur, India
-          </p>
+          <nav aria-label="Legal" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+            {legalLinks.map((l) => (
+              <Link key={l.href} href={l.href} className="text-cream/40 hover:text-gold text-xs transition-colors">
+                {l.label}
+              </Link>
+            ))}
+          </nav>
         </div>
       </div>
     </footer>
