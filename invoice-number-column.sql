@@ -6,13 +6,16 @@
 -- everything after it (this bit the books-table migration earlier; see
 -- CLAUDE.md's Known Issues history).
 --
--- IMPORTANT — set the starting number before running:
--- Sangit Shree Prakashan already issues invoices today (e.g. Invoice #469)
--- through a process outside this codebase. Replace 470 below with whatever
--- number comes immediately after the last one actually issued, so this new
--- sequence doesn't collide with or restart behind it.
+-- Numbering starts at 1 on the website. Decided by the owner: the website's
+-- invoices are their own series, separate from the manual process the business
+-- used before (e.g. its Invoice #469), so there is nothing to continue from.
+--
+-- If this ever has to be reset after test invoices were printed (every printed
+-- invoice consumes a number), clear the test data first, then run:
+--   alter sequence orders_invoice_number_seq restart with 1;
+--   update orders set invoice_number = null;
 
-create sequence if not exists orders_invoice_number_seq start with 470;
+create sequence if not exists orders_invoice_number_seq start with 1;
 
 alter table orders add column if not exists invoice_number bigint;
 

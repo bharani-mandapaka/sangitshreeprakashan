@@ -58,7 +58,7 @@ Since Invoice #469 already exists, whatever currently produces this document isn
 
 ## Open Questions (for whoever picks these up)
 
-- **What's the last invoice number issued by the current process?** Needed to seed Story 1's counter so the website's new sequence continues from Invoice #469 (or whatever the latest actually is) instead of restarting or colliding.
+- **What's the last invoice number issued by the current process?** *Resolved:* the owner decided the website's invoices start at 1 as their own series, separate from the business's earlier manual invoices (e.g. #469), so the counter doesn't continue from them.
 - **What currently generates Invoice #469 today?** Worth knowing whether it's a manual template, a separate tool, or something on the existing `sangitshreeprakashan.com` site — affects whether that process needs to be retired once this ships, so two systems don't both claim the same numbers.
 - **PDF vs. browser print:** is a print-styled HTML page (via the browser's own "Print to PDF") sufficient, or does the business want an actual server-generated PDF file?
 - **Delivery Fee line:** confirm it should always read ₹0.00 for now (no shipping-charge feature exists anywhere in the codebase today), rather than this feature quietly needing to build one.

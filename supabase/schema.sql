@@ -54,12 +54,12 @@ alter table orders add column if not exists delivered_at           timestamptz;
 alter table orders add column if not exists expected_delivery_date timestamptz;
 
 -- ── Orders: invoice numbering (admin "Print Invoice" feature) ────────────────────
--- See invoice-number-column.sql for the one-time migration notes (in particular:
--- set the sequence's starting value to continue from whatever number the
--- business's existing invoicing process last issued, e.g. Invoice #469).
+-- See invoice-number-column.sql for the one-time migration notes. Numbering starts
+-- at 1: the website's invoices are their own series, separate from the business's
+-- earlier manual invoicing.
 -- invoice_number is assigned lazily — on first admin print, not at order-creation
 -- time — so only orders someone actually prints ever consume a number.
-create sequence if not exists orders_invoice_number_seq start with 470;
+create sequence if not exists orders_invoice_number_seq start with 1;
 alter table orders add column if not exists invoice_number bigint;
 
 -- Lets the Supabase JS client advance the sequence via .rpc('next_invoice_number')
