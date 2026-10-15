@@ -61,7 +61,7 @@
 - [x] Removed the old hardcoded duplicate order-confirmation email in `app/api/orders/create` — `fireNotifications()` is now the sole sender
 - [x] Fixed a real bug found during testing: `resend.emails.send()` doesn't throw on API-level failures, so a rejected send was being logged as `status: 'sent'` with no error — now checked and surfaced
 - [x] `notification-workflow-user-stories.md` and product-manager framing written before the build
-- [x] **Customer OTP delivery via WhatsApp** (this branch, `feature/whatsapp-otp`) — `lib/whatsapp-otp.ts`, wired into `POST /api/auth/phone/send-otp`, chosen over a paid SMS provider (MSG91/Twilio) since it reuses the same Meta Business verification already planned for order notifications instead of a second paid integration. Falls back to the existing on-screen mock (outside real production, per the security fix above) until `WHATSAPP_PHONE_NUMBER_ID`/`WHATSAPP_TOKEN` are set **and** an Authentication-category template is created + approved in Meta's WhatsApp Manager (name/language must match `WHATSAPP_OTP_TEMPLATE_NAME`/`WHATSAPP_OTP_TEMPLATE_LANG` in `.env.example`).
+- [x] **Customer OTP delivery via WhatsApp** (this branch, `feature/whatsapp-otp`) — `lib/whatsapp-otp.ts`, wired into `POST /api/auth/phone/send-otp`, chosen over a paid SMS provider (MSG91/Twilio) — **decision confirmed 2026-10-15: SMS is dropped, WhatsApp is the only OTP channel** — since it reuses the same Meta Business verification already planned for order notifications instead of a second paid integration. Falls back to the existing on-screen mock (outside real production, per the security fix above) until `WHATSAPP_PHONE_NUMBER_ID`/`WHATSAPP_TOKEN` are set **and** an Authentication-category template is created + approved in Meta's WhatsApp Manager (name/language must match `WHATSAPP_OTP_TEMPLATE_NAME`/`WHATSAPP_OTP_TEMPLATE_LANG` in `.env.example`).
 
 ### Catalog management (books table + admin UI) — built on `feature/admin-catalog-management`, not yet on this branch
 - [x] New Supabase `books` table (public SELECT, service-role-only writes) seeded with all 36 books migrated from the static `lib/books.ts` array
@@ -178,7 +178,7 @@ All three stories in `razorpay-integration-user-stories.md` are built:
 
 ### Accounts to create first
 - [ ] Meta Business account + WhatsApp Cloud API — start immediately, verification takes 2–4 weeks. Gates three things once approved: order-lifecycle WhatsApp notifications, customer OTP delivery (see Notifications above), and an Authentication-category message template (separate approval from the account itself — see `.env.example`'s WhatsApp OTP section)
-- [ ] Admin users-page OTP mock — still needs its own real provider decision (MSG91/Twilio, or reuse the Meta WhatsApp setup above); not covered by the customer-flow WhatsApp OTP work
+- [ ] Admin users-page OTP mock — provider decided (2026-10-15): reuse the Meta WhatsApp setup above (SMS/MSG91/Twilio is dropped). Still a mock until Business Verification + an approved Authentication template exist; then wire it to `lib/whatsapp-otp.ts` like the customer flow. Not covered by the customer-flow WhatsApp OTP work.
 
 ### Auth
 - [x] Admin login is no longer a client-side-only localStorage flag — it's a real password check server-side plus a signed httpOnly session cookie. Still a single shared password though, not per-person accounts.
@@ -196,7 +196,7 @@ All three stories in `razorpay-integration-user-stories.md` are built:
 ### Notifications
 - [x] ~~Real email via Resend — wire existing templates to actual sends~~ — wired; blocked on the Resend domain re-verification, not on code.
 - [x] ~~Real OTP for the customer phone-login flow~~ — code-complete via WhatsApp (`lib/whatsapp-otp.ts`, this branch). Blocked on Meta verification + approved template, not code.
-- [ ] Real OTP for the admin users page — separate mock, not yet addressed
+- [ ] Real OTP for the admin users page — separate mock; will use WhatsApp (SMS dropped), once Meta verification and the Authentication template are in place
 - [ ] Real WhatsApp via Meta Cloud API — code already calls it, just needs credentials
 - [x] ~~Notification logs — history of what was sent, to whom, and status~~ — done, `notification_logs` table + admin UI.
 - [x] ~~Notification rules stored in Supabase (not localStorage)~~ — done; the old `notifications-store.ts` Zustand store is no longer actually read from for rules.
