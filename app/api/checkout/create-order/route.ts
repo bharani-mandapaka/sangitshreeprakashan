@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRazorpayOrder } from '@/lib/razorpay';
 import { computeVerifiedSubtotal } from '@/lib/books-data';
+import { validateCheckoutDetails } from '@/lib/checkout-validation';
 
 // Story 1 (razorpay-integration-user-stories.md): starts a real payment.
 // Deliberately does NOT touch Supabase's orders table at all — no order
@@ -18,6 +19,16 @@ export async function POST(req: NextRequest) {
 
   if (!Array.isArray(items) || items.length === 0 || typeof clientOrderId !== 'string') {
     return NextResponse.json({ error: 'Cart items and an order id are required.' }, { status: 400 });
+  }
+
+  // Check the shipping details *before* a payment exists. Rejecting them later,
+  // in verify, would leave a customer charged with no order saved.
+  const { errors } = validateCheckoutDetails({ ...body?.customer, ...body?.billingAddress, address: body?.billingAddress?.line1 });
+  if (Object.keys(errors).length > 0) {
+    return NextResponse.json(
+      { error: 'Please correct your shipping details and try again.', fieldErrors: errors },
+      { status: 400 },
+    );
   }
 
   try {

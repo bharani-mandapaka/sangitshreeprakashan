@@ -12,6 +12,7 @@ import { useAnalyticsStore } from '@/lib/analytics-store';
 import { useAuthStore } from '@/lib/auth-store';
 import { getSupabase } from '@/lib/supabase';
 import { formatPrice, generateOrderId } from '@/lib/utils';
+import { validateCheckoutDetails, type CheckoutErrors } from '@/lib/checkout-validation';
 import BookCoverImage from '@/components/BookCoverImage';
 
 type CheckoutStep = 'details' | 'payment' | 'success';
@@ -65,6 +66,17 @@ export default function CheckoutPage() {
   const [form, setForm] = useState({
     name: '', email: '', phone: '', address: '', city: '', state: '', pincode: '',
   });
+  const [fieldErrors, setFieldErrors] = useState<CheckoutErrors>({});
+
+  // Updating a field also clears that field's error message.
+  const setField = (key: keyof typeof form, value: string) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    setFieldErrors((errs) => (errs[key] ? { ...errs, [key]: undefined } : errs));
+  };
+  const fieldClass = (key: keyof typeof form) =>
+    `input-gold${fieldErrors[key] ? ' !border-red-400/70' : ''}`;
+  const fieldError = (key: keyof typeof form) =>
+    fieldErrors[key] ? <p className="text-red-400 text-xs mt-1.5">{fieldErrors[key]}</p> : null;
 
   useEffect(() => {
     if (!user) return;
@@ -89,6 +101,18 @@ export default function CheckoutPage() {
 
   const handleDetailsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Catch bad details (e.g. a 5-digit phone, a 2-digit PIN) before anyone
+    // reaches payment — the server re-checks the same rules before charging.
+    const { errors, clean } = validateCheckoutDetails(form);
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      const first = (['name', 'email', 'phone', 'address', 'city', 'state', 'pincode'] as const).find((k) => errors[k]);
+      if (first) document.getElementById(`checkout-${first}`)?.focus();
+      return;
+    }
+    setFieldErrors({});
+    setForm(clean);
     setStep('payment');
     // Without this, the page keeps whatever scroll position the (often
     // long) shipping form left it at — after filling the form, that's
@@ -134,7 +158,12 @@ export default function CheckoutPage() {
       createOrderRes = await fetch('/api/checkout/create-order', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ orderId: id, items: itemsPayload }),
+        body: JSON.stringify({
+          orderId: id,
+          items: itemsPayload,
+          customer: { name: form.name, email: form.email, phone: form.phone },
+          billingAddress: { line1: form.address, city: form.city, state: form.state, pincode: form.pincode },
+        }),
       });
     } catch {
       setPaymentError('Couldn’t reach the payment server. Please check your connection and try again.');
@@ -142,6 +171,15 @@ export default function CheckoutPage() {
       return;
     }
     const createOrderBody = await createOrderRes.json().catch(() => ({}));
+    if (createOrderBody.fieldErrors) {
+      // The server rejected the shipping details before any payment started —
+      // send the customer back to fix them.
+      setFieldErrors(createOrderBody.fieldErrors);
+      setStep('details');
+      setPaying(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     if (!createOrderRes.ok) {
       setPaymentError(createOrderBody.error ?? 'Couldn’t start payment. Please try again.');
       setPaying(false);
@@ -343,36 +381,43 @@ export default function CheckoutPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">Full Name *</label>
-                      <input className="input-gold" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Your full name" />
+                      <input id="checkout-name" className={fieldClass('name')} required autoComplete="name" value={form.name} onChange={(e) => setField('name', e.target.value)} placeholder="Your full name" />
+                      {fieldError('name')}
                     </div>
                     <div>
                       <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">Email *</label>
-                      <input className="input-gold" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@email.com" />
+                      <input id="checkout-email" className={fieldClass('email')} type="email" required autoComplete="email" value={form.email} onChange={(e) => setField('email', e.target.value)} placeholder="you@email.com" />
+                      {fieldError('email')}
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">Phone *</label>
-                    <input className="input-gold" type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+91 99999 99999" />
+                    <input id="checkout-phone" className={fieldClass('phone')} type="tel" inputMode="tel" required autoComplete="tel" value={form.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="+91 99999 99999" />
+                    {fieldError('phone')}
                   </div>
 
                   <div>
                     <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">Address *</label>
-                    <textarea className="input-gold h-20 resize-none" required value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="House/Flat No., Street, Area" />
+                    <textarea id="checkout-address" className={`${fieldClass('address')} h-20 resize-none`} required autoComplete="street-address" value={form.address} onChange={(e) => setField('address', e.target.value)} placeholder="House/Flat No., Street, Area" />
+                    {fieldError('address')}
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">City *</label>
-                      <input className="input-gold" required value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="City" />
+                      <input id="checkout-city" className={fieldClass('city')} required autoComplete="address-level2" value={form.city} onChange={(e) => setField('city', e.target.value)} placeholder="City" />
+                      {fieldError('city')}
                     </div>
                     <div>
                       <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">State *</label>
-                      <input className="input-gold" required value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} placeholder="State" />
+                      <input id="checkout-state" className={fieldClass('state')} required autoComplete="address-level1" value={form.state} onChange={(e) => setField('state', e.target.value)} placeholder="State" />
+                      {fieldError('state')}
                     </div>
                     <div>
                       <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">PIN Code *</label>
-                      <input className="input-gold" required value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value })} placeholder="110001" maxLength={6} />
+                      <input id="checkout-pincode" className={fieldClass('pincode')} required inputMode="numeric" autoComplete="postal-code" value={form.pincode} onChange={(e) => setField('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="110001" maxLength={6} />
+                      {fieldError('pincode')}
                     </div>
                   </div>
 
