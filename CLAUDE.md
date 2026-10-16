@@ -60,7 +60,10 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 | Admin analytics | localStorage — visits/clicks tracked client-side via analytics-store |
 | OTP verification | Mock — code shown on screen |
 | WhatsApp notifications | UI only — no Meta/Twilio API |
-| Google OAuth | Simulated UI — no real token |
+| Google OAuth (admin sign-in) | Simulated UI — no real token (separate from customer accounts below) |
+| Customer accounts | Real — Supabase Auth, email/password works out of the box; Google sign-in needs a one-time setup (Google Cloud OAuth app + Supabase provider config — see tasks.md) |
+| Wishlist | Real — `wishlist` table in Supabase, heart icon on book cards and detail pages |
+| Customer order history | Real — `/profile` Orders tab, filtered by `orders.user_id` (guest checkout still works; those orders just aren't linked to an account) |
 | Book images | Real — all 36 books have real cover photos |
 | Admin auth | localStorage password gate (`ssp@admin`) |
 | SEO metadata | Real — generateMetadata() on all public pages |

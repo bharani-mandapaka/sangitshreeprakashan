@@ -710,6 +710,10 @@ export function getBookBySlug(slug: string): Book | undefined {
   return books.find((b) => b.slug === slug);
 }
 
+export function getBookById(id: string): Book | undefined {
+  return books.find((b) => b.id === id);
+}
+
 export function getBooksByCategory(category: BookCategory): Book[] {
   return books.filter((b) => b.category === category);
 }

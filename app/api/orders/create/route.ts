@@ -2,19 +2,43 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { fireNotifications } from '@/lib/notifications-sender';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export async function POST(req: NextRequest) {
+  // Only used to verify the caller's bearer token below — a plain anon-key
+  // client is fine for that, it's just checking a JWT's signature.
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );
+  // The actual inserts use the service-role client instead. insert_orders and
+  // insert_order_items used to be `with check (true)` so the anon-key client
+  // could write here — but that meant anyone could also POST straight to
+  // Supabase's PostgREST API with the public anon key and forge orders into
+  // another customer's history, bypassing this route (and its userId
+  // verification above) entirely. Those permissive policies are now dropped;
+  // only the service-role key can insert into these tables at all.
+  const admin = getSupabaseAdmin();
   const resend = new Resend(process.env.RESEND_API_KEY);
 
   const body = await req.json();
   const { id, createdAt, customer, billingAddress, items, subtotal, paymentMethod } = body;
 
+  // ── 0. Resolve the signed-in user from the request's own bearer token ──────
+  // We never trust a userId sent in the body — the client-supplied value is
+  // discarded (see checkout/page.tsx, which no longer sends one) and instead
+  // we verify the session's access_token ourselves. Guests simply send no
+  // Authorization header, which resolves to a null user_id below.
+  let userId: string | null = null;
+  const authHeader = req.headers.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice('Bearer '.length);
+    const { data: { user: verifiedUser } } = await supabase.auth.getUser(token);
+    userId = verifiedUser?.id ?? null;
+  }
+
   // ── 1. Save order to Supabase ───────────────────────────────────────────────
-  const { error: orderError } = await supabase.from('orders').insert({
+  const { error: orderError } = await admin.from('orders').insert({
     id,
     created_at:      createdAt,
     status:          'confirmed',
@@ -27,6 +51,7 @@ export async function POST(req: NextRequest) {
     address_pincode: billingAddress.pincode,
     subtotal,
     payment_method:  paymentMethod,
+    user_id:         userId ?? null, // null for guest checkout (no account)
   });
 
   if (orderError) {
@@ -47,7 +72,7 @@ export async function POST(req: NextRequest) {
     price:         item.price,
   }));
 
-  const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+  const { error: itemsError } = await admin.from('order_items').insert(orderItems);
   if (itemsError) console.error('[orders/create] items insert error:', itemsError);
 
   // ── 3. Build shared variables ───────────────────────────────────────────────

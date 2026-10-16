@@ -15,31 +15,48 @@ const NAV = [
   { href: '/admin/users',         icon: Users,           label: 'Users'         },
 ];
 
-const ADMIN_PASSWORD = 'ssp@admin';
-
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname          = usePathname();
   const [authed, setAuthed] = useState(false);
   const [pw, setPw]         = useState('');
   const [error, setError]   = useState('');
+  const [loading, setLoading] = useState(false);
   const [sideOpen, setSideOpen] = useState(false);
 
+  // This flag is just UI state — whether to show the sidebar or the login
+  // form. It carries no real authority: every admin API route checks its own
+  // signed, httpOnly session cookie (see lib/admin-auth.ts) server-side, so
+  // faking this in devtools doesn't grant access to any real data.
   useEffect(() => {
     setAuthed(localStorage.getItem('ssp-admin-auth') === '1');
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pw === ADMIN_PASSWORD) {
-      localStorage.setItem('ssp-admin-auth', '1');
-      setAuthed(true);
-      setError('');
-    } else {
-      setError('Incorrect password.');
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw }),
+      });
+      if (res.ok) {
+        localStorage.setItem('ssp-admin-auth', '1');
+        setAuthed(true);
+      } else {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error ?? 'Incorrect password.');
+      }
+    } catch {
+      setError('Could not reach the server. Try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await fetch('/api/admin/logout', { method: 'POST' }).catch(() => {});
     localStorage.removeItem('ssp-admin-auth');
     setAuthed(false);
   };
@@ -73,14 +90,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
             <button
               type="submit"
-              className="w-full bg-gold hover:bg-gold-300 text-dark font-cinzel font-bold py-3 rounded-xl transition-colors"
+              disabled={loading}
+              className="w-full bg-gold hover:bg-gold-300 text-dark font-cinzel font-bold py-3 rounded-xl transition-colors disabled:opacity-50"
             >
-              Sign In
+              {loading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
-          <p className="text-cream/20 text-xs text-center mt-4 font-cinzel">
-            Default: ssp@admin
-          </p>
         </div>
       </div>
     );

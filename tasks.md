@@ -55,6 +55,26 @@
 - [x] Founder timeline — mobile scroll fix done (PR #4); real photos and refined content still blocked on Bharani
 - [ ] Prerender book detail pages — add `generateStaticParams()` to `app/books/[slug]`; currently server-rendered per request despite the catalog being a static array
 
+### Customer accounts
+- [x] Sign up / sign in with email + password — Supabase Auth, `/login` and `/signup` pages
+- [x] Sign in with Google — code is in place (`signInWithOAuth`), but **needs manual setup before it works**:
+      1. Create an OAuth 2.0 Client ID in Google Cloud Console (Web application), with
+         authorized redirect URI `https://<your-project-ref>.supabase.co/auth/v1/callback`
+      2. In the Supabase dashboard → Authentication → Providers → Google, paste the Client ID
+         and Client Secret, and enable the provider
+      Email/password works right now without this step.
+- [x] `/profile` page — account overview, Wishlist tab, Orders tab (tab-based, one route)
+- [x] Wishlist — heart icon on book cards and detail pages, backed by a new `wishlist` Supabase
+      table, properly scoped to the signed-in user via RLS
+- [x] Order history — `orders` table gained a nullable `user_id` column, set at checkout when the
+      customer is signed in; guest checkout (no account) still works exactly as before
+- [x] **Run the SQL migration** — `supabase/schema.sql` was updated with the `orders.user_id`
+      column and the new `wishlist` table + RLS policies. Applied to the live Supabase project on
+      2026-08-27.
+- [ ] Confirm-email UX — Supabase's default email templates are used for the sign-up confirmation
+      link (not the branded Resend templates used for order confirmations). Fine for now; revisit
+      if it needs to match the brand.
+
 ---
 
 ## Security & maintenance
@@ -70,9 +90,15 @@
       and `HANDOVER.md`, and the GitHub repo is public, so it is publicly readable. It only guards
       a localStorage gate today, so nothing is genuinely protected either way — but it should not
       survive into the NextAuth.js work below.
-- [ ] **Tighten Supabase RLS** — policies are currently permissive: anon can insert, select and
-      update on all four tables (`orders`, `order_items`, `notification_rules`,
-      `notification_logs`). Depends on real auth landing first.
+- [ ] **Tighten Supabase RLS** — policies are still permissive on `orders`, `order_items`,
+      `notification_rules` and `notification_logs`: anon can insert, select and update freely.
+      Real auth has now landed for customers (Supabase Auth, see "Customer accounts" above), but
+      `orders` SELECT was deliberately left open rather than scoped to `auth.uid() = user_id`,
+      because the admin panel reads all orders through this same anon-key client with no Supabase
+      Auth session of its own (it's still just the localStorage password gate). Restricting
+      `orders` SELECT today would silently break admin. Revisit once admin gets real accounts
+      (NextAuth.js, below) — at that point `orders`/`order_items` can get the same properly-scoped
+      RLS the new `wishlist` table already has.
 
 ---
 

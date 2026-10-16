@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,6 +8,8 @@ import { ArrowLeft, CheckCircle, Lock, CreditCard, Smartphone, Building2, Chevro
 import { useCartStore } from '@/lib/cart-store';
 import { useOrdersStore } from '@/lib/orders-store';
 import { useAnalyticsStore } from '@/lib/analytics-store';
+import { useAuthStore } from '@/lib/auth-store';
+import { getSupabase } from '@/lib/supabase';
 import { formatPrice, generateOrderId } from '@/lib/utils';
 import BookCoverImage from '@/components/BookCoverImage';
 
@@ -19,16 +21,36 @@ export default function CheckoutPage() {
   const { items, subtotal, clearCart } = useCartStore();
   const addOrder     = useOrdersStore((s) => s.addOrder);
   const trackCartAdd = useAnalyticsStore((s) => s.trackCartAdd);
+  const user          = useAuthStore((s) => s.user);
 
   const [step,      setStep]      = useState<CheckoutStep>('details');
   const [method,    setMethod]    = useState<PayMethod>('upi');
   const [upiId,     setUpiId]     = useState('');
   const [orderId,   setOrderId]   = useState('');
 
-  // Shipping form
+  // Shipping form — pre-filled from the account when signed in, still editable
+  // and still usable as a guest (no account required to check out).
   const [form, setForm] = useState({
     name: '', email: '', phone: '', address: '', city: '', state: '', pincode: '',
   });
+
+  useEffect(() => {
+    if (!user) return;
+    // user.email is a real address for Google accounts, but an internal
+    // synthetic one for phone accounts (see lib/phone-auth.ts) — never
+    // pre-fill that. Phone accounts instead prefill their verified phone
+    // number and, if they've added one, their optional real_email.
+    const isPhoneAccount = !!user.user_metadata?.phone;
+    const prefillEmail = isPhoneAccount
+      ? (user.user_metadata?.real_email as string | undefined) ?? ''
+      : user.email ?? '';
+    setForm((f) => ({
+      ...f,
+      name:  f.name  || (user.user_metadata?.full_name as string | undefined) || '',
+      email: f.email || prefillEmail,
+      phone: f.phone || (user.user_metadata?.phone as string | undefined) || '',
+    }));
+  }, [user]);
 
   const shipping = 0;   // Free shipping for now
   const total    = subtotal() + shipping;
@@ -66,12 +88,18 @@ export default function CheckoutPage() {
       paymentMethod: method,
     };
 
+    // Signed-in users attach their session token so the server can verify who
+    // they are itself — we never send a raw userId the client could fake.
+    const { data: { session } } = await getSupabase().auth.getSession();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+
     // Run API call + minimum spinner delay in parallel
     await Promise.all([
       // Save to Supabase + send confirmation email
       fetch('/api/orders/create', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body:    JSON.stringify(orderPayload),
       }).catch((err) => console.error('[checkout] API error:', err)),
 
