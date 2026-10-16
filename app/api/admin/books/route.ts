@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { isAdminRequest } from '@/lib/admin-auth';
+
+// The storefront (homepage, /books, book detail pages, sitemap) reads books
+// through statically-rendered pages with no revalidate/dynamic export, so
+// Next.js caches that data indefinitely once built — an admin edit here
+// would otherwise never show up on the live site without a full redeploy.
+// Revalidating the affected paths on every write keeps pages fast (still
+// served from cache for the common case: a shopper browsing, not editing)
+// while making admin changes appear immediately, no redeploy needed.
+function revalidateStorefront(slugs: string[]) {
+  revalidatePath('/');
+  revalidatePath('/books');
+  revalidatePath('/sitemap.xml');
+  for (const slug of slugs) revalidatePath(`/books/${slug}`);
+}
 
 // Reads (list/detail) go straight through the anon-key client from the admin
 // UI, since `books` RLS already allows public SELECT (see supabase/schema.sql)
@@ -95,6 +110,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
+  revalidateStorefront([body.slug.trim()]);
   return NextResponse.json({ success: true, id });
 }
 
@@ -110,7 +126,16 @@ export async function PATCH(req: NextRequest) {
   const validationError = validate(body);
   if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
 
-  const { error } = await getSupabaseAdmin().from('books').update(toRow(body)).eq('id', body.id);
+  const admin = getSupabaseAdmin();
+
+  // Fetch the pre-edit slug so we can revalidate its detail page too —
+  // id and slug aren't always the same value (the original 36 seeded books
+  // have hand-picked short-code ids like "sv-1" distinct from their slug),
+  // and an edit can change the slug itself, leaving a stale cached page at
+  // the old URL if we only revalidate the new one.
+  const { data: existing } = await admin.from('books').select('slug').eq('id', body.id).maybeSingle();
+
+  const { error } = await admin.from('books').update(toRow(body)).eq('id', body.id);
   if (error) {
     const message = error.code === '23505'
       ? 'Another book already uses this slug — please choose a different one.'
@@ -118,6 +143,8 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
+  const slugs = [body.slug.trim(), existing?.slug].filter(Boolean) as string[];
+  revalidateStorefront(slugs);
   return NextResponse.json({ success: true });
 }
 
@@ -133,8 +160,12 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'A book id is required.' }, { status: 400 });
   }
 
-  const { error } = await getSupabaseAdmin().from('books').delete().eq('id', id);
+  const admin = getSupabaseAdmin();
+  const { data: existing } = await admin.from('books').select('slug').eq('id', id).maybeSingle();
+
+  const { error } = await admin.from('books').delete().eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  revalidateStorefront(existing?.slug ? [existing.slug] : []);
   return NextResponse.json({ success: true });
 }

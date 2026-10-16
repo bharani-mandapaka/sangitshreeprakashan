@@ -49,11 +49,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // ── MOCK ─────────────────────────────────────────────────────────────────
-  // We return the code directly instead of sending a real SMS, matching the
-  // existing mock OTP pattern in the admin users page. Swap this block for a
-  // real SMS provider call (Twilio/MSG91/etc.) once one is set up — nothing
-  // else in this flow needs to change: the client just stops being shown the
-  // code and instead waits for a real text message.
-  return NextResponse.json({ phone, otp, mock: true });
+  // ── MOCK (blocked in real production) ───────────────────────────────────
+  // No SMS/WhatsApp provider is wired up yet, so outside real production we
+  // return the code directly for on-screen display — same pattern as the
+  // admin users page mock. This must NEVER happen in production: the OTP is
+  // the only thing standing between "know someone's phone number" and
+  // "log in as them", so returning it to whoever asked for it would let
+  // anyone take over (or create) any account just by knowing the number.
+  // In production, fail closed instead until a real provider is wired in.
+  //
+  // `NODE_ENV` alone isn't enough to tell dev/test apart from real
+  // production here: Vercel sets NODE_ENV=production for Preview
+  // deployments too (it's a `next build` artifact, not environment-specific),
+  // which would fail-close preview URLs as well and block reviewers from
+  // testing phone login there. VERCEL_ENV is what actually distinguishes
+  // "preview" from "production" on Vercel; fall back to NODE_ENV off Vercel
+  // (e.g. local `next start`).
+  const isRealProduction = process.env.VERCEL_ENV
+    ? process.env.VERCEL_ENV === 'production'
+    : process.env.NODE_ENV === 'production';
+
+  if (!isRealProduction) {
+    return NextResponse.json({ phone, otp, mock: true });
+  }
+
+  return NextResponse.json(
+    { error: 'OTP delivery is not available right now. Please try again later.' },
+    { status: 503 },
+  );
 }
