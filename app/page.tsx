@@ -4,7 +4,8 @@ import { ArrowRight, Star, Package } from 'lucide-react';
 import HeroScroll from '@/components/HeroScroll';
 import BookCard from '@/components/BookCard';
 import GallerySlideshow from '@/components/GallerySlideshow';
-import { getFeaturedBooks, categoryMeta, type BookCategory } from '@/lib/books';
+import { categoryMeta, type BookCategory } from '@/lib/books';
+import { getFeaturedBooks } from '@/lib/books-data';
 import { categoryColors } from '@/components/BookCover';
 import { WHATSAPP_URL } from '@/lib/utils';
 
@@ -39,8 +40,8 @@ export const metadata = {
   },
 };
 
-export default function HomePage() {
-  const featured = getFeaturedBooks().slice(0, 8);
+export default async function HomePage() {
+  const featured = (await getFeaturedBooks()).slice(0, 8);
 
   return (
     <>
