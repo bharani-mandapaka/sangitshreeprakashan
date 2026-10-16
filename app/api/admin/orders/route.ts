@@ -4,7 +4,7 @@ import { isAdminRequest } from '@/lib/admin-auth';
 import { fireNotifications } from '@/lib/notifications-sender';
 import { CONTACT } from '@/lib/utils';
 
-const ALL_STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
+const ALL_STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'returned', 'cancelled'];
 
 // Admin reads/writes go through here instead of the anon-key client directly,
 // because orders/order_items SELECT is scoped to `auth.uid() = user_id` (see
@@ -53,9 +53,9 @@ function itemsListFrom(items: { title_english: string; qty: number; price: numbe
 // That policy is now dropped entirely; only this route (service-role,
 // admin-gated) can update an order.
 //
-// This also fires the order_shipped/order_delivered customer notifications
-// (see supabase/schema.sql for the seeded rules) — but only the first time an
-// order transitions into that status. shipped_at/delivered_at start null and
+// This also fires the order_shipped/order_delivered/order_returned customer
+// notifications (see supabase/schema.sql for the seeded rules) — but only the
+// first time an order transitions into that status. shipped_at/delivered_at/returned_at start null and
 // only ever get set once, which both supplies the "date & time" shown to the
 // customer and guards against re-sending if the status is later toggled
 // around (the "no duplicate notifications" requirement from the story doc).
@@ -88,6 +88,15 @@ export async function PATCH(req: NextRequest) {
 
   const firstShip = status === 'shipped' && !existing.shipped_at;
   const firstDeliver = status === 'delivered' && !existing.delivered_at;
+  const firstReturn = status === 'returned' && !existing.returned_at;
+
+  // A book can only come back after it was delivered.
+  if (status === 'returned' && existing.status !== 'delivered' && existing.status !== 'returned') {
+    return NextResponse.json(
+      { error: 'Only a delivered order can be marked as returned.' },
+      { status: 400 },
+    );
+  }
 
   if (firstShip && (!trackingId || !courierService)) {
     return NextResponse.json(
@@ -109,6 +118,9 @@ export async function PATCH(req: NextRequest) {
   }
   if (firstDeliver) {
     patch.delivered_at = new Date().toISOString();
+  }
+  if (firstReturn) {
+    patch.returned_at = new Date().toISOString();
   }
 
   const { error: updateError } = await admin.from('orders').update(patch).eq('id', id);
@@ -142,6 +154,22 @@ export async function PATCH(req: NextRequest) {
       customer_phone: existing.customer_phone,
       items_list: itemsListFrom(existing.order_items ?? []),
       delivered_at: deliveredAtStr,
+      support_email: CONTACT.email1,
+      support_phone: CONTACT.phone1,
+    }).catch(notifyError);
+  }
+
+  if (firstReturn) {
+    const returnedAtStr = new Date(patch.returned_at as string).toLocaleString('en-IN', {
+      day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+    fireNotifications('order_returned', {
+      order_id: id,
+      customer_name: existing.customer_name,
+      customer_email: existing.customer_email,
+      customer_phone: existing.customer_phone,
+      items_list: itemsListFrom(existing.order_items ?? []),
+      returned_at: returnedAtStr,
       support_email: CONTACT.email1,
       support_phone: CONTACT.phone1,
     }).catch(notifyError);

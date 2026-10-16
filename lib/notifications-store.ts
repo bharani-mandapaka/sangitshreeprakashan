@@ -5,6 +5,7 @@ export type NotificationTrigger =
   | 'order_placed'
   | 'order_shipped'
   | 'order_delivered'
+  | 'order_returned'
   | 'daily_digest'
   | 'weekly_digest'
   | 'cart_abandoned';
@@ -95,6 +96,21 @@ ORDER DETAILS
 Order ID        : {{order_id}}
 Customer        : {{customer_name}}
 Delivered At    : {{delivered_at}}
+
+Regards,
+Sangit Shree Prakashan`,
+  },
+  order_returned: {
+    subject: 'Order Returned: {{order_id}}',
+    body: `Dear Admin,
+
+A returned order has been marked as received on Sangit Shree Prakashan.
+
+ORDER DETAILS
+-------------
+Order ID        : {{order_id}}
+Customer        : {{customer_name}}
+Received At     : {{returned_at}}
 
 Regards,
 Sangit Shree Prakashan`,
@@ -193,6 +209,13 @@ View order: https://sangit-shree-prakashan.vercel.app/admin/orders`,
 
 View order: https://sangit-shree-prakashan.vercel.app/admin/orders`,
 
+  order_returned: `*Order Returned* 📦
+*Order ID:* {{order_id}}
+*Customer:* {{customer_name}}
+*Received At:* {{returned_at}}
+
+View order: https://sangit-shree-prakashan.vercel.app/admin/orders`,
+
   daily_digest: `*Daily Sales Report - {{date}}*
 
 *Orders:* {{orders_count}}
@@ -251,6 +274,7 @@ export function parseDescription(desc: string): {
   else if (lower.includes('daily'))                        trigger = 'daily_digest';
   else if (lower.includes('abandon') || (lower.includes('cart') && !lower.includes('order')))
                                                            trigger = 'cart_abandoned';
+  else if (lower.includes('return'))                       trigger = 'order_returned';
   else if (lower.includes('deliver'))                      trigger = 'order_delivered';
   else if (lower.includes('ship') || lower.includes('dispatch')) trigger = 'order_shipped';
   else if (lower.includes('order'))                        trigger = 'order_placed';
@@ -266,6 +290,7 @@ export function parseDescription(desc: string): {
     order_placed:    'Order Placed',
     order_shipped:   'Order Shipped',
     order_delivered: 'Order Delivered',
+    order_returned:  'Order Returned',
     daily_digest:    'Daily Digest',
     weekly_digest:   'Weekly Digest',
     cart_abandoned:  'Abandoned Cart',

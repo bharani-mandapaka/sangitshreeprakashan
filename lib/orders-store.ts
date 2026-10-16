@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
+export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'returned' | 'cancelled';
 // 'razorpay' covers the real payment flow (app/checkout/page.tsx) — the
 // specific method (UPI/card/netbanking) the customer picked lives inside
 // Razorpay's own dashboard, not something this client-side analytics-only

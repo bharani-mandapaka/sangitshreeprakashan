@@ -12,6 +12,7 @@ const STATUS_COLORS: Record<string, string> = {
   confirmed: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
   shipped:   'bg-purple-500/15 text-purple-300 border-purple-500/30',
   delivered: 'bg-green-500/15 text-green-300 border-green-500/30',
+  returned:  'bg-orange-500/15 text-orange-300 border-orange-500/30',
   cancelled: 'bg-red-500/15 text-red-300 border-red-500/30',
 };
 

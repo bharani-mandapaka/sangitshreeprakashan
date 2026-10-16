@@ -11,10 +11,11 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
   confirmed: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
   shipped:   'bg-purple-500/15 text-purple-300 border-purple-500/30',
   delivered: 'bg-green-500/15 text-green-300 border-green-500/30',
+  returned:  'bg-orange-500/15 text-orange-300 border-orange-500/30',
   cancelled: 'bg-red-500/15 text-red-300 border-red-500/30',
 };
 
-const ALL_STATUSES: OrderStatus[] = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
+const ALL_STATUSES: OrderStatus[] = ['pending', 'confirmed', 'shipped', 'delivered', 'returned', 'cancelled'];
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -74,6 +75,8 @@ function OrderRow({
             }
           : newStatus === 'delivered'
           ? { delivered_at: order.delivered_at ?? new Date().toISOString() }
+          : newStatus === 'returned'
+          ? { returned_at: order.returned_at ?? new Date().toISOString() }
           : undefined;
       onStatusChange(order.id, newStatus, patch);
       setShipModalOpen(false);
@@ -232,7 +235,10 @@ function OrderRow({
                     className="input-gold text-xs py-1.5 w-full cursor-pointer disabled:opacity-50"
                   >
                     {ALL_STATUSES.map((s) => (
-                      <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                      // "Returned" only makes sense for a book that was delivered first
+                      <option key={s} value={s} disabled={s === 'returned' && status !== 'delivered' && status !== 'returned'}>
+                        {s === 'returned' ? 'Returned (book received back)' : s.charAt(0).toUpperCase() + s.slice(1)}
+                      </option>
                     ))}
                   </select>
                   {updating && (
