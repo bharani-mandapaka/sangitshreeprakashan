@@ -1,0 +1,28 @@
+# Normalize all text files to LF in the repository.
+#
+# Without this, Git stored whatever line endings each contributor's machine
+# produced. On Windows (core.autocrlf=true) that meant some files landed in
+# history with CRLF and others with LF, and a branch that happened to
+# normalize a file turned every line into a change — producing whole-file
+# merge conflicts that look real but aren't (this bit PR #10's
+# app/admin/orders/page.tsx).
+#
+# text=auto lets Git detect text vs binary; eol=lf fixes the in-repo form.
+# Working copies on Windows still get CRLF on checkout via core.autocrlf.
+* text=auto eol=lf
+
+# Binary assets — never touch these.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.avif binary
+*.ico  binary
+*.pdf  binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.mp4 binary
+*.webm binary

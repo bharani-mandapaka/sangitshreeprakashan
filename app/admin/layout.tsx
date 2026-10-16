@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import {
-  LayoutDashboard, ShoppingBag, Bell, Users, LogOut, Menu, X,
+  LayoutDashboard, ShoppingBag, Bell, Users, LogOut, Menu, X, BookOpen,
 } from 'lucide-react';
 
 const NAV = [
   { href: '/admin',               icon: LayoutDashboard, label: 'Dashboard'     },
   { href: '/admin/orders',        icon: ShoppingBag,     label: 'Orders'        },
+  { href: '/admin/books',         icon: BookOpen,        label: 'Catalog'       },
   { href: '/admin/notifications', icon: Bell,            label: 'Notifications' },
   { href: '/admin/users',         icon: Users,           label: 'Users'         },
 ];

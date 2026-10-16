@@ -12,7 +12,7 @@
 - [x] Project setup — Next.js 14, Tailwind, Framer Motion, Zustand
 - [x] Book catalog with category filter and search
 - [x] Shopping cart with localStorage persist
-- [x] Checkout page with order summary and payment flow (payment step goes through Razorpay's real widget on `feature/razorpay-integration` — see Phase 1's Payments section; not yet on this branch)
+- [x] Checkout page with order summary and payment flow (payment step now goes through Razorpay's real widget — see Phase 1's Payments section)
 - [x] Homepage with gallery slideshow
 - [x] About page with auto-scrolling founder timeline
 - [x] Contact page
@@ -63,7 +63,7 @@
 - [x] `notification-workflow-user-stories.md` and product-manager framing written before the build
 - [x] **Customer OTP delivery via WhatsApp** (this branch, `feature/whatsapp-otp`) — `lib/whatsapp-otp.ts`, wired into `POST /api/auth/phone/send-otp`, chosen over a paid SMS provider (MSG91/Twilio) since it reuses the same Meta Business verification already planned for order notifications instead of a second paid integration. Falls back to the existing on-screen mock (outside real production, per the security fix above) until `WHATSAPP_PHONE_NUMBER_ID`/`WHATSAPP_TOKEN` are set **and** an Authentication-category template is created + approved in Meta's WhatsApp Manager (name/language must match `WHATSAPP_OTP_TEMPLATE_NAME`/`WHATSAPP_OTP_TEMPLATE_LANG` in `.env.example`).
 
-### Catalog management (books table + admin UI) — built on `feature/admin-catalog-management`, not yet on this branch
+### Catalog management (books table + admin UI)
 - [x] New Supabase `books` table (public SELECT, service-role-only writes) seeded with all 36 books migrated from the static `lib/books.ts` array
 - [x] `lib/books-data.ts` — async, server-safe reads (`getAllBooks`, `getBookBySlug`, `getBookById`, `getBooksByIds`, `getBooksByCategory`, `getFeaturedBooks`)
 - [x] `app/api/admin/books` (POST/PATCH/DELETE) — service-role, admin-cookie gated, validates category/level/language and catches duplicate-slug conflicts
@@ -76,7 +76,7 @@
 - [x] **Storefront now picks up catalog changes without a redeploy** (PR #9 review) — `/admin/books` writes call `revalidatePath()` for `/`, `/books`, the affected book's detail page, and `/sitemap.xml`, since those pages had no revalidate/dynamic export and were caching indefinitely.
 - [x] **Admin edit-form staleness fix** (found while testing PR #9/#10) — opening a book's Edit form now refetches that book's current row fresh from Supabase, instead of trusting a possibly-stale in-memory list; the form always resends every field on save, so a stale cached row could silently revert changes made elsewhere.
 
-### Admin invoice printing (Bill of Supply) — built on `feature/admin-invoice-printing`, not yet on this branch
+### Admin invoice printing (Bill of Supply)
 Scoped to a single admin-panel-only story — see `order-invoice-user-stories.md`. Modeled on
 the business's real existing invoice (Invoice #469), not the earlier Amazon.in example that
 was ruled out — no GSTIN/HSN/tax fields, just a plain Bill of Supply.
@@ -87,7 +87,7 @@ was ruled out — no GSTIN/HSN/tax fields, just a plain Bill of Supply.
 - [x] "Print Invoice" link added to each order row on `/admin/orders`
 - [x] Invoice markup extracted to `components/admin/InvoiceSheet.tsx` for reuse
 - [x] Bulk printing: per-order checkboxes + header "select all" (scoped to the current filter) on `/admin/orders`, a "Print Selected (N)" button, `GET /api/admin/orders/invoice-batch` (sequential invoice-number assignment, preserves selection order), and `/admin/orders/print-batch` — renders every selected invoice with a page break between them and auto-opens the print dialog once loaded
-- [x] `invoice-number-column.sql` run against the live database, sequence reset to start at **1** (business decision — this app's invoices are a separate number range from whatever the business's prior manual process used, so no collision risk)
+- [ ] **Before this goes live:** `invoice-number-column.sql` has been run in Supabase and works. The owner decided the website's invoices start at **1** (a separate series from the business's earlier manual invoices), and the SQL files now say so. Because test invoices consume numbers (assigned on first print), once the test orders are cleared run `alter sequence orders_invoice_number_seq restart with 1; update orders set invoice_number = null;`. Still to confirm with the accountant: one running series, or a fresh series each financial year.
 - [x] Customer-facing "Download Invoice" — `/profile` Orders tab only (logged-in customers). `GET /api/orders/[id]/invoice` (bearer-token auth, ownership-checked, 404s rather than 403s on mismatch) + `/orders/[id]/invoice` page, both reusing `InvoiceSheet`.
 - [x] Customer invoice page header-overlap fix (found while testing) — the page had no top padding accounting for the site's fixed Navbar, and its own toolbar was `sticky top-0`, both fighting for the same spot at the top of the viewport.
 - [ ] Checkout-success-screen "Download Invoice" and guest-checkout access — deliberately not built yet (only order-history access was in scope for this round), see Open Questions in `order-invoice-user-stories.md`
@@ -97,23 +97,25 @@ was ruled out — no GSTIN/HSN/tax fields, just a plain Bill of Supply.
 ## Phase 1 — Customer-facing (make it real for buyers)
 
 > Goal: a customer can browse, pay, and receive confirmation. Orders land in a real database.
-> Supabase ✓ · Customer accounts ✓ · Order-lifecycle notifications ✓ (code-complete, blocked on Resend domain) · Razorpay ✓ code-complete on `feature/razorpay-integration`, blocked on real keys.
+> Supabase ✓ · Customer accounts ✓ · Order-lifecycle notifications ✓ (code-complete, blocked on Resend domain) · Razorpay ✓ code-complete, blocked on real keys.
 
-### Payments — code-complete on `feature/razorpay-integration`, not yet on this branch; blocked on real API keys
+### Payments — code-complete, blocked on real API keys
 All three stories in `razorpay-integration-user-stories.md` are built:
-- [x] `orders.razorpay_order_id` / `orders.razorpay_payment_id` columns (`razorpay-columns.sql`) — run against the live database, confirmed; also includes a unique index on `razorpay_payment_id` (replay-block item below)
+- [x] `orders.razorpay_order_id` / `orders.razorpay_payment_id` columns (`razorpay-columns.sql`) — **run against the live database, confirmed**; also now includes a unique index on `razorpay_payment_id` (see replay-block item below)
 - [x] `lib/razorpay.ts` — order creation (raw fetch + Basic Auth, no new npm dependency) + signature verification (Node `crypto` HMAC) + `getRazorpayOrder()` (fetches the real order state, used by the amount-tie check below)
 - [x] `lib/books-data.ts`'s `computeVerifiedSubtotal()` — recomputes the cart total from real book prices, used by both routes below so the client's price/subtotal is never trusted
 - [x] `POST /api/checkout/create-order` (Story 1) — creates the Razorpay order, writes nothing to Supabase
 - [x] `POST /api/checkout/verify` (Story 2) — verifies the signature server-side, only then saves the order + fires `order_placed`; rejects and logs an invalid/forged signature (Story 3, AC5)
 - [x] `app/checkout/page.tsx` rewritten — real Razorpay checkout.js widget replaces the old mock UI entirely; handles success, `payment.failed` (Story 3, AC2), and widget dismissal/cancel (Story 3, AC1) without leaving the customer confused or creating orphaned orders
 - [x] Retry behavior resolved: each retry creates a **fresh** Razorpay order (no reuse/idempotency) — since nothing is saved to Supabase until `verify` succeeds, this can't create duplicates (Story 3, AC4)
-- [x] **Cart tied to the actual payment** (PR #11 review) — `verify` used to recompute the subtotal from whatever cart was submitted in the request, without checking it against what was actually charged for that Razorpay order. Now fetches the real order via `getRazorpayOrder()` and rejects unless `status === 'paid'` and `amount_paid` matches the recomputed subtotal exactly.
-- [x] **Payment replay blocked** (PR #11 review) — `verify` rejects if `razorpay_payment_id` is already attached to an existing order, backed by a unique DB index.
+- [x] **Cart tied to the actual payment** (PR #11 review) — `verify` used to recompute the subtotal from whatever cart was submitted in the request, without checking it against what was actually charged for that Razorpay order. A genuinely-valid signature from paying for a cheap cart could've been replayed against `verify` with a different, pricier cart and saved as confirmed with nothing paid for the gap. Now fetches the real order via `getRazorpayOrder()` and rejects unless `status === 'paid'` and `amount_paid` matches the recomputed subtotal exactly.
+- [x] **Payment replay blocked** (PR #11 review) — `verify` rejects if `razorpay_payment_id` is already attached to an existing order, backed by a unique DB index as a second line of defense against two near-simultaneous requests for the same payment.
 - [x] **`POST /api/orders/create` deleted** (PR #11 review) — confirmed nothing called it anymore; it created a confirmed order unconditionally with no payment involved at all, a full bypass around the payment flow.
-- [ ] **Before this can actually run:** `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` need to be real values in `.env.local`/Vercel — test-mode keys (available immediately from the Razorpay dashboard, no approval needed) are enough to test the whole flow now; live keys need Bharani's GST/PAN account verification to go live for real. Same Razorpay account as the existing sangitshreeprakashan.com site.
-- [ ] End-to-end test once test-mode keys exist: pay with Razorpay's documented test card/UPI, confirm the order actually saves, then deliberately fail/cancel a payment and confirm no order is created — and specifically try to replay a payment or tamper with the cart to confirm the amount-tie/replay-block protections hold
-- [ ] Blocked on PRs #9 and #10 merging first (that branch is stacked on top of both)
+- [x] **Shipping-details validation** (found in QA 2026-10-12: a 5-digit phone and a 2-digit PIN went straight through) — new `lib/checkout-validation.ts` (name, email, 10-digit Indian mobile starting 6–9 with optional +91/0 prefix normalised to `+91XXXXXXXXXX`, address, city, state, 6-digit PIN not starting 0). The checkout form shows the specific message under each bad field, outlines it in red, focuses the first one and stays on the details step. `POST /api/checkout/create-order` re-checks the same rules and answers 400 + `fieldErrors` **before** a Razorpay order exists (rejecting later, in `verify`, would leave a customer charged with no order); the page then returns them to the details step. 20 checker cases pass, plus bad/missing/valid requests against the route and the form in a browser. Note: `verify` still trusts the details the page sends it (it can't reject after payment), so this stops honest mistakes rather than a deliberately forged request.
+- [x] Cart-badge hydration mismatch and checkout step-transition/padding bugs found while testing this branch end-to-end — fixed (not originally part of the review, surfaced during manual testing).
+- [ ] **Before this can actually run:** `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` need to be real values in `.env.local`/Vercel — test-mode keys (available immediately from the Razorpay dashboard, no approval needed) are enough to test the whole flow now; live keys need Bharani's GST/PAN account verification to go live for real. Same Razorpay account as the existing sangitshreeprakashan.com site — generating test keys doesn't touch anything live there.
+- [ ] End-to-end test once test-mode keys exist: pay with Razorpay's documented test card/UPI, confirm the order actually saves, then deliberately fail/cancel a payment and confirm no order is created — **and specifically try to replay a payment or tamper with the cart to confirm the new amount-tie/replay-block protections actually hold**
+- [ ] Blocked on PRs #9 and #10 merging first (this branch is stacked on top of both)
 
 ### Book content
 - [ ] Final copy for descriptions, table of contents, author bios
@@ -183,8 +185,8 @@ All three stories in `razorpay-integration-user-stories.md` are built:
 - [ ] Role-based access — staff sees orders only, admin sees everything
 
 ### Catalog management
-- [x] ~~Edit existing book / create new book from admin panel / create and edit bundles / migrate to Supabase `books` table~~ — done on `feature/admin-catalog-management`, see Catalog management above.
-- [x] ~~Upload book cover to Supabase Storage~~ — done on `feature/admin-catalog-management`, see Catalog management above.
+- [x] ~~Edit existing book / create new book from admin panel / create and edit bundles / migrate to Supabase `books` table~~ — done, see Catalog management above and `/admin/books`.
+- [x] ~~Upload book cover to Supabase Storage~~ — done, see Catalog management above and `/admin/books`.
 
 ### Orders
 - [x] ~~Order status change triggers notification email to customer~~ — done, see Order-lifecycle notifications above.

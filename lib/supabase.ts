@@ -50,6 +50,9 @@ export interface DbOrder {
   shipped_at: string | null;
   delivered_at: string | null;
   expected_delivery_date: string | null;
+  invoice_number: number | null;
+  razorpay_order_id: string | null;
+  razorpay_payment_id: string | null;
   order_items: DbOrderItem[];
 }
 

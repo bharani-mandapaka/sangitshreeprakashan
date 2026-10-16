@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Admin invoice print page (app/admin/orders/[id]/invoice) ────────────── */
+@media print {
+  @page { size: A4; margin: 0; }
+}
+
 /* ── CSS Custom Properties ─────────────────────────────────────────── */
 :root {
   --crimson:       #8B0000;
