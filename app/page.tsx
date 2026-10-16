@@ -1,10 +1,12 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowRight, Star, Package } from 'lucide-react';
 import HeroScroll from '@/components/HeroScroll';
 import BookCard from '@/components/BookCard';
 import GallerySlideshow from '@/components/GallerySlideshow';
 import { categoryMeta, type BookCategory } from '@/lib/books';
 import { getFeaturedBooks } from '@/lib/books-data';
+import { categoryColors } from '@/components/BookCover';
 import { WHATSAPP_URL } from '@/lib/utils';
 
 const primaryCategories: BookCategory[] = ['instrumental', 'vocal', 'raag-theory', 'kathak'];
@@ -65,24 +67,39 @@ export default async function HomePage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {primaryCategories.map((cat) => {
               const meta = categoryMeta[cat];
+              const { accent } = categoryColors[cat];
               return (
                 <Link
                   key={cat}
                   href={`/books?category=${cat}`}
-                  className="group gold-border rounded-2xl p-6 bg-[#0A0000] hover:bg-[#150000] transition-all duration-300 flex flex-col items-center text-center gap-3"
+                  className="group relative overflow-hidden rounded-2xl p-6 border border-gold/15 bg-[#0A0000] hover:border-gold/40 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center text-center gap-3"
                 >
-                  <span className="font-devanagari text-4xl text-gold/80 group-hover:text-gold transition-colors leading-none">{meta.icon}</span>
-                  <div>
+                  {/* Per-category color wash, revealed on hover */}
+                  <div
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+                    style={{ background: `radial-gradient(circle at 50% 0%, ${accent}22 0%, transparent 65%)` }}
+                  />
+                  <span
+                    className="relative w-16 h-16 rounded-full flex items-center justify-center font-devanagari text-3xl border transition-all duration-300 group-hover:scale-110"
+                    style={{
+                      color: accent,
+                      borderColor: `${accent}40`,
+                      background: `${accent}14`,
+                    }}
+                  >
+                    {meta.icon}
+                  </span>
+                  <div className="relative">
                     <h3 className="font-cinzel text-cream font-semibold text-sm group-hover:text-gold transition-colors">
                       {meta.label}
                     </h3>
                     <p className="font-devanagari text-gold/50 text-xs mt-0.5">{meta.labelHindi}</p>
                   </div>
-                  <p className="text-cream/40 text-xs leading-relaxed hidden sm:block">
+                  <p className="relative text-cream/40 text-xs leading-relaxed hidden sm:block">
                     {meta.description}
                   </p>
-                  <span className="text-gold/50 group-hover:text-gold transition-colors text-xs flex items-center gap-1 mt-auto">
-                    View books <ArrowRight size={12} />
+                  <span className="relative text-gold/50 group-hover:text-gold transition-colors text-xs flex items-center gap-1 mt-auto">
+                    View books <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
                   </span>
                 </Link>
               );
@@ -156,28 +173,52 @@ export default async function HomePage() {
 
       {/* ── About Snippet ──────────────────────────────────────────────── */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#0F0000] to-dark">
-        <div className="max-w-4xl mx-auto text-center">
-          <p className="font-cinzel text-gold/70 text-xs uppercase tracking-[0.3em] mb-4">
-            Our Story
-          </p>
-          <h2 className="font-cinzel text-3xl sm:text-4xl font-bold text-cream mb-6">
-            Preserving the Legacy of{' '}
-            <span className="text-gold-gradient">Hindustani Classical Music</span>
-          </h2>
-          <p className="font-devanagari text-gold/60 text-xl mb-8">हिन्दुस्तानी शास्त्रीय संगीत की विरासत</p>
-          <p className="text-cream/60 text-base sm:text-lg leading-relaxed mb-8 max-w-3xl mx-auto">
-            Sangit Shree Prakashan has been at the heart of Hindustani Classical Music education
-            for decades. Based in Kanpur, Uttar Pradesh, we publish authoritative books used by
-            students, teachers and musicians across India - from Class 9 through Post-Graduation,
-            covering Prayag Sangit Samiti, Pracheen Kala Kendra, Gandharv Mahavidyalay, CBSE,
-            ICSE, and University syllabi.
-          </p>
-          <Link
-            href="/about"
-            className="inline-flex items-center gap-2 border border-gold/30 hover:border-gold text-cream hover:text-gold font-cinzel px-8 py-3 rounded-full transition-all duration-300 text-sm"
-          >
-            Learn More <ArrowRight size={16} />
-          </Link>
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          {/* Founder portrait — grounds "Our Story" in a real, specific person
+              rather than leaving it as text-only. Framed with a gold border
+              and offset corner accents to match the site's traditional,
+              hand-crafted visual language. */}
+          <div className="relative mx-auto lg:mx-0 max-w-sm w-full order-2 lg:order-1">
+            <div className="absolute -inset-3 border border-gold/25 rounded-2xl pointer-events-none hidden sm:block" />
+            <div className="relative aspect-[3/4] rounded-2xl overflow-hidden gold-border">
+              <Image
+                src="/founder.jpg"
+                alt="Pt. Satish Chandra Srivastava, founder of Sangit Shree Prakashan"
+                fill
+                className="object-cover object-[65%_20%] saturate-[0.9]"
+                sizes="(max-width: 1024px) 90vw, 420px"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0A0000] via-transparent to-transparent" />
+              <div className="absolute bottom-0 inset-x-0 p-5">
+                <p className="font-cinzel text-cream font-semibold text-sm">पं० सतीश चन्द्र श्रीवास्तव</p>
+                <p className="text-cream/50 text-xs mt-0.5">Founder, Sangit Shree Prakashan</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center lg:text-left order-1 lg:order-2">
+            <p className="font-cinzel text-gold/70 text-xs uppercase tracking-[0.3em] mb-4">
+              Our Story
+            </p>
+            <h2 className="font-cinzel text-3xl sm:text-4xl font-bold text-cream mb-6">
+              Preserving the Legacy of{' '}
+              <span className="text-gold-gradient">Hindustani Classical Music</span>
+            </h2>
+            <p className="font-devanagari text-gold/60 text-xl mb-8">हिन्दुस्तानी शास्त्रीय संगीत की विरासत</p>
+            <p className="text-cream/60 text-base sm:text-lg leading-relaxed mb-8">
+              Sangit Shree Prakashan has been at the heart of Hindustani Classical Music education
+              for decades. Based in Kanpur, Uttar Pradesh, we publish authoritative books used by
+              students, teachers and musicians across India - from Class 9 through Post-Graduation,
+              covering Prayag Sangit Samiti, Pracheen Kala Kendra, Gandharv Mahavidyalay, CBSE,
+              ICSE, and University syllabi.
+            </p>
+            <Link
+              href="/about"
+              className="inline-flex items-center gap-2 border border-gold/30 hover:border-gold text-cream hover:text-gold font-cinzel px-8 py-3 rounded-full transition-all duration-300 text-sm"
+            >
+              Learn More <ArrowRight size={16} />
+            </Link>
+          </div>
         </div>
       </section>
 

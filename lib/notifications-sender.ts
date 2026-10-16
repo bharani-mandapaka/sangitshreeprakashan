@@ -5,8 +5,8 @@
  *
  * Import only in API routes / server code — never in client components.
  */
-import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 // ── Template interpolation ─────────────────────────────────────────────────────
 function interpolate(template: string, vars: Record<string, string>): string {
@@ -115,10 +115,8 @@ export async function fireNotifications(
 
   // Created per-invocation (not at module load) so `next build` can import this
   // file without the Supabase/Resend env vars being present at build time.
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
+  // Service-role client: notification_rules/notification_logs have no anon policy.
+  const supabase = getSupabaseAdmin();
   const resend = new Resend(process.env.RESEND_API_KEY);
 
   const { data: rules, error } = await supabase
@@ -158,7 +156,7 @@ export async function fireNotifications(
           // failed send was silently logged as "sent" with no clue why the
           // customer never got the email.
           const { error: sendError } = await resend.emails.send({
-            from:    'Sangit Shree Prakashan <orders@sangitshreeprakashan.com>',
+            from:    `Sangit Shree Prakashan <${process.env.RESEND_FROM_EMAIL || 'orders@sangitshreeprakashan.com'}>`,
             to,
             subject,
             html,
@@ -178,19 +176,23 @@ export async function fireNotifications(
       (rule.channel === 'whatsapp' || rule.channel === 'both') &&
       (rule.whatsapp_numbers as string[])?.length > 0
     ) {
-      try {
-        const message = interpolate(rule.whatsapp_message, vars);
-        // Resolve dynamic placeholders e.g. {{customer_phone}}, drop unresolved.
-        const resolvedPhones = (rule.whatsapp_numbers as string[])
-          .map((p) => interpolate(p, vars))
-          .filter((p) => p && !p.includes('['));
-        for (const phone of resolvedPhones) {
+      const message = interpolate(rule.whatsapp_message, vars);
+      // Resolve dynamic placeholders e.g. {{customer_phone}}, drop unresolved.
+      const resolvedPhones = (rule.whatsapp_numbers as string[])
+        .map((p) => interpolate(p, vars))
+        .filter((p) => p && !p.includes('['));
+      // One bad number (e.g. not on Meta's test-recipient list) must not stop
+      // the rest of this rule's recipients from being messaged.
+      const waErrors: string[] = [];
+      for (const phone of resolvedPhones) {
+        try {
           await sendWhatsAppMessage(phone, message);
+        } catch (err) {
+          waErrors.push(String(err));
+          console.error(`[notifications] whatsapp failed for rule ${rule.id} (${phone}):`, err);
         }
-      } catch (err) {
-        waError = String(err);
-        console.error(`[notifications] whatsapp failed for rule ${rule.id}:`, err);
       }
+      if (waErrors.length > 0) waError = waErrors.join(' | ');
     }
 
     // ── Determine overall status ───────────────────────────────────────────────

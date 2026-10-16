@@ -1,5 +1,11 @@
 # Tasks — Sangit Shree Prakashan
 
+> This file tracks overall project status across all branches/PRs, not just what's checked out
+> right now. Where an item's code lives on a different branch than the one currently checked
+> out, that's noted inline (e.g. "built on feature/admin-catalog-management, not yet on this
+> branch") — this branch (`feature/whatsapp-otp`) itself only contains the phone-auth/WhatsApp-OTP
+> work plus what it inherited from `feature/order-notifications` (the OTP security fix).
+
 ## Done
 
 ### Foundation
@@ -33,6 +39,9 @@
 - [x] Wishlist — heart icon on book cards and detail pages, `wishlist` Supabase table, scoped to the signed-in user via RLS
 - [x] Order history — `orders.user_id` (nullable — guest checkout still works), `/profile` Orders tab filtered by it
 - [x] Checkout prefill never leaks the synthetic phone-auth email; uses the optional real email instead
+- [x] **Google sign-in confirmed working end-to-end** (resolves PR #8 review point 1) — Google Cloud OAuth app + Supabase provider config completed; tested a full round trip (redirect to Google, consent, redirect back, session persists across refresh).
+- [ ] **Not just cosmetic — worth prioritizing before real customers use this:** every customer who signs in with Google gets an automated email from Google titled *"You shared some Google Account data with kypqmrfgxeybqzkawogb.supabase.co"* — the raw Supabase domain, not "Sangit Shree Prakashan," right in the subject line (confirmed by inspecting the actual email, not just the mid-flow consent screen, which shows the same domain). To a non-technical customer this could read as a phishing/security warning and generate "is this a scam?" support messages, or scare people off completing sign-in. Root cause: Supabase's OAuth redirect runs through their own shared domain by default. Fix is Supabase's **Custom Domain** feature (paid add-on, needs Pro plan or above) to run auth on something like `auth.sangitshreeprakashan.com` instead, then re-point the Google OAuth Client's redirect URI and re-verify domain ownership in Google Cloud Console. Flagged in the PR #8 update comment.
+- [x] Cart-badge hydration mismatch fixed on this branch too (`components/Navbar.tsx`) — same root cause/fix as documented elsewhere, this branch forked before that fix existed and hit it again during Google-login testing.
 
 ### Security hardening (from Bharani's two PR #8 reviews)
 - [x] Order creation verifies `userId` server-side from the request's bearer token — never trusts a client-supplied value
@@ -40,6 +49,7 @@
 - [x] Admin API routes gated behind a signed httpOnly session cookie (`lib/admin-auth.ts`) instead of a client-side-only localStorage flag — the admin password now lives only in the server-side `ADMIN_PASSWORD` env var, never committed to the repo
 - [x] Admin order-status updates moved from the anon-key client to a service-role API route (`app/api/admin/orders` PATCH)
 - [x] Fixed the `useShallow` wishlist-selector re-render bug, the lost-wishlist-click-through-login redirect, the wrong post-signup copy, and the `app/books/layout.tsx` title-template regression
+- [x] **Phone-login OTP no longer leaks the code to anyone who asks for it in production** (from PR #9's review, code lives on `feature/order-notifications`, inherited here) — `send-otp` used to return the OTP in its response unconditionally, meaning anyone submitting any phone number got that number's login code back, enough to log into or create that account without owning the number. Now fails closed with a 503 in real production instead; still returns the code for on-screen display in dev/preview. Checks `VERCEL_ENV` rather than `NODE_ENV` alone, since Vercel sets `NODE_ENV=production` for Preview deployments too.
 
 ### Order-lifecycle notifications (email + WhatsApp)
 - [x] `notification_rules.trigger` widened to include `order_shipped`/`order_delivered` (previously only `order_placed`)
@@ -51,6 +61,7 @@
 - [x] Removed the old hardcoded duplicate order-confirmation email in `app/api/orders/create` — `fireNotifications()` is now the sole sender
 - [x] Fixed a real bug found during testing: `resend.emails.send()` doesn't throw on API-level failures, so a rejected send was being logged as `status: 'sent'` with no error — now checked and surfaced
 - [x] `notification-workflow-user-stories.md` and product-manager framing written before the build
+- [x] **Customer OTP delivery via WhatsApp** (this branch, `feature/whatsapp-otp`) — `lib/whatsapp-otp.ts`, wired into `POST /api/auth/phone/send-otp`, chosen over a paid SMS provider (MSG91/Twilio) since it reuses the same Meta Business verification already planned for order notifications instead of a second paid integration. Falls back to the existing on-screen mock (outside real production, per the security fix above) until `WHATSAPP_PHONE_NUMBER_ID`/`WHATSAPP_TOKEN` are set **and** an Authentication-category template is created + approved in Meta's WhatsApp Manager (name/language must match `WHATSAPP_OTP_TEMPLATE_NAME`/`WHATSAPP_OTP_TEMPLATE_LANG` in `.env.example`).
 
 ### Catalog management (books table + admin UI)
 - [x] New Supabase `books` table (public SELECT, service-role-only writes) seeded with all 36 books migrated from the static `lib/books.ts` array
@@ -62,6 +73,8 @@
 - [x] Default catalog ordering fixed — bundles first, then individual books grouped by series with parts in numeric order, instead of a flat alphabetical sort that scattered series and bundles randomly
 - [x] Real cover-image upload — public Supabase Storage `covers` bucket, `POST /api/admin/books/upload-cover` (service-role, 5MB limit, JPG/PNG/WebP/AVIF), live thumbnail preview + upload button in the admin form, with the path/URL still directly editable for the legacy `/covers/*.jpg` books. `next.config.mjs` allow-lists `*.supabase.co` for `next/image`.
 - [x] Fixed the admin book-form modal clipping at the top on shorter viewports (flexbox + `overflow-y-auto` scroll bug) — switched to a plain block layout with `mx-auto` centering that scrolls correctly
+- [x] **Storefront now picks up catalog changes without a redeploy** (PR #9 review) — `/admin/books` writes call `revalidatePath()` for `/`, `/books`, the affected book's detail page, and `/sitemap.xml`, since those pages had no revalidate/dynamic export and were caching indefinitely.
+- [x] **Admin edit-form staleness fix** (found while testing PR #9/#10) — opening a book's Edit form now refetches that book's current row fresh from Supabase, instead of trusting a possibly-stale in-memory list; the form always resends every field on save, so a stale cached row could silently revert changes made elsewhere.
 
 ### Admin invoice printing (Bill of Supply)
 Scoped to a single admin-panel-only story — see `order-invoice-user-stories.md`. Modeled on
@@ -76,6 +89,7 @@ was ruled out — no GSTIN/HSN/tax fields, just a plain Bill of Supply.
 - [x] Bulk printing: per-order checkboxes + header "select all" (scoped to the current filter) on `/admin/orders`, a "Print Selected (N)" button, `GET /api/admin/orders/invoice-batch` (sequential invoice-number assignment, preserves selection order), and `/admin/orders/print-batch` — renders every selected invoice with a page break between them and auto-opens the print dialog once loaded
 - [ ] **Before this goes live:** `invoice-number-column.sql` has been run in Supabase and works. The owner decided the website's invoices start at **1** (a separate series from the business's earlier manual invoices), and the SQL files now say so. Because test invoices consume numbers (assigned on first print), once the test orders are cleared run `alter sequence orders_invoice_number_seq restart with 1; update orders set invoice_number = null;`. Still to confirm with the accountant: one running series, or a fresh series each financial year.
 - [x] Customer-facing "Download Invoice" — `/profile` Orders tab only (logged-in customers). `GET /api/orders/[id]/invoice` (bearer-token auth, ownership-checked, 404s rather than 403s on mismatch) + `/orders/[id]/invoice` page, both reusing `InvoiceSheet`.
+- [x] Customer invoice page header-overlap fix (found while testing) — the page had no top padding accounting for the site's fixed Navbar, and its own toolbar was `sticky top-0`, both fighting for the same spot at the top of the viewport.
 - [ ] Checkout-success-screen "Download Invoice" and guest-checkout access — deliberately not built yet (only order-history access was in scope for this round), see Open Questions in `order-invoice-user-stories.md`
 
 ---
@@ -112,10 +126,24 @@ All three stories in `razorpay-integration-user-stories.md` are built:
 - [ ] Real photos and refined content (mobile scroll fix already done, PR #4)
 
 ### Notifications — remaining before this is fully live end-to-end
-> **On hold** (as of this session) — pausing further work here to study the domain situation before touching DNS, since `sangitshreeprakashan.com` already has an existing website live on it. The code is complete; a PR for `feature/order-notifications` is being opened against `master` now — no PR existed for it until this session, despite this doc previously claiming otherwise. Real email delivery is still parked until the domain question is resolved, but that's separate from merging the code.
-- [ ] **Re-verify `sangitshreeprakashan.com` on Resend** — currently shows unverified, so no customer email actually sends despite the code path being correct. Needs whoever owns the domain's DNS (Bharani). Email-sending DNS records (TXT/CNAME for SPF+DKIM) don't conflict with whatever's already routing the existing website — but confirm what's already in the domain's DNS before adding anything, in case there's an existing SPF record that needs merging rather than overwriting.
-- [ ] WhatsApp sends are still skipped — needs `WHATSAPP_PHONE_NUMBER_ID` + `WHATSAPP_TOKEN` (Meta Cloud API business verification, 2–4 weeks)
-- [x] ~~Fix: checkout never checked whether order-creation actually succeeded before showing the confirmation screen~~ — resolved as part of the Razorpay rewrite: `app/checkout/page.tsx` now only shows the success screen after `POST /api/checkout/verify` returns `res.ok`, not optimistically
+> **On hold** (as of this session) — pausing further work here to study the domain situation before touching DNS, since `sangitshreeprakashan.com` already has an existing website live on it. The code is complete; a PR for `feature/order-notifications` was opened against `master` as PR #12 this session — real email delivery is still parked until the domain question is resolved, but that's separate from merging the code.
+- [ ] **Re-verify `sangitshreeprakashan.com` on Resend** — **blocked:** adding the domain shows "in use by another Resend team — verifying will transfer it and revoke their access"; don't claim it until Bharani confirms who owns that other team. Currently shows unverified, so no customer email actually sends despite the code path being correct. Needs whoever owns the domain's DNS (Bharani). Email-sending DNS records (TXT/CNAME for SPF+DKIM) don't conflict with whatever's already routing the existing website — but confirm what's already in the domain's DNS before adding anything, in case there's an existing SPF record that needs merging rather than overwriting.
+- [ ] WhatsApp order-notification sends are still skipped for real customers — needs the real number's `WHATSAPP_PHONE_NUMBER_ID` + `WHATSAPP_TOKEN` (Meta Cloud API business verification, 2–4 weeks). Customer OTP delivery via WhatsApp is separately code-complete (see above) and shares the same credentials/verification.
+  - **Test-number progress:** a Meta Developer app ("Sangit Shree Prakashan", WhatsApp use case, unverified Business Portfolio) exists and the free built-in test number (+1 555-179-0517) delivered a `hello_world` template message to a verified test recipient — plumbing confirmed. `.env.local` has the test Phone Number ID + a temporary 24-hour token.
+  - **Order-placed WhatsApp confirmed working end-to-end (SSP-378V6TO6):** a test order delivered the customer WhatsApp message to the verified test number. An earlier order (SSP-8PM7P92W) had failed with `401 / code 190` because the 24-hour temp token expired; fixed by switching `WHATSAPP_TOKEN` to a never-expiring System User token (system user with the app assigned under Manage app + the test WhatsApp account, token generated with `whatsapp_business_messaging` + `whatsapp_business_management`, expiry Never).
+  - **Shipped and delivered WhatsApp messages also confirmed working** (order SSP-378V6TO6 marked shipped, then delivered, from the admin panel) — WhatsApp side succeeded for both; the only error logged on each is the unverified Resend domain (email).
+  - Fixed: a failing WhatsApp number no longer stops the remaining recipients of the same rule (per-number try/catch in `lib/notifications-sender.ts`; errors from all failed numbers are joined in the log).
+  - Fixed: when the admin session cookie expires, any 401 from `/api/admin/*` now returns the admin to the login form ("Your session expired") instead of showing "Database error: Not authenticated" (`app/admin/layout.tsx`).
+  - **Order-placed rules cleaned up (live DB, not in code):** the admin rule "Order Placed (WhatsApp)" now goes only to the admin number (`+917408452828`) — the customer was removed from it so they only get "Order Confirmation (Customer)". The old admin rule "Order Placed (Email)" was switched off (admin wants WhatsApp alerts only; it also duplicated the customer's email). Full flow (placed → shipped → delivered) verified end-to-end on the test number; the admin number itself can't receive until it's a verified Meta recipient or the real number is live.
+  - **Open question:** expected delivery date is a flat order date + 7 days (`EXPECTED_DELIVERY_DAYS` in `app/api/orders/create/route.ts`) — no regional or holiday logic. Waiting for the shipping side to confirm the real figure.
+  - **PR:** this branch (`feature/whatsapp-otp`) is PR #13, based on `feature/order-notifications` (#12) so it shows only the 4 new commits; PR #8 (`feature/customer-auth`) keeps the phone-login route and on-screen mock, WhatsApp delivery lives in #13.
+  - **Test-number limit:** the admin-alert WhatsApp rule failed with `131030 Recipient phone number not in allowed list` — the test number only sends to up to 5 manually-verified recipients; add staff numbers under API Setup → recipient list to test those, or wait for the real number.
+  - **Free-text order messages only deliver inside a 24-hour window** (the recipient must have messaged the test number first) — expected for the test number; real customers will need approved Utility templates for these.
+  - **Authentication templates are blocked** on the unverified business ("does not have permission to create message template"; a Utility draft got through) — so OTP over WhatsApp waits on Business Verification, same as production.
+- [x] ~~Fix: checkout never checked whether order-creation actually succeeded before showing the confirmation screen~~ — resolved as part of the Razorpay rewrite on `feature/razorpay-integration`: `app/checkout/page.tsx` now only shows the success screen after `POST /api/checkout/verify` returns `res.ok`, not optimistically
+- [x] Sender address is now configurable via `RESEND_FROM_EMAIL` (defaults to `orders@sangitshreeprakashan.com`) so a verified subdomain can be used for testing without code changes. Subdomain `mail.sangitshreeprakashan.com` is added in Resend (Tokyo region) — **waiting on 3 DNS records** (TXT `resend._domainkey.mail`, CNAME `rsend.mail`, CNAME `send.mail`) from whoever controls the domain's DNS. The domain is registered at GoDaddy but its nameservers point to `dns-parking.com`, and neither the GoDaddy nor the Hostinger account we tried holds it — ask Bharani which login does.
+- [x] Phone-login OTP validity raised from 5 to 15 minutes (`OTP_TTL_MS` in `send-otp/route.ts`); no WhatsApp cost impact.
+- [x] Fixed navbar cart badge not updating when items are added from other components (`components/Navbar.tsx`, Zustand selector now derives the count instead of selecting the getter).
 - [ ] Open question flagged in the story doc but intentionally not built: an OTP step on delivery confirmation ("need to confirm" per the original spec) — needs a product decision first
 
 ---
@@ -124,10 +152,19 @@ All three stories in `razorpay-integration-user-stories.md` are built:
 
 > Not tied to a phase.
 
-- [ ] **Patch the Next.js CVE** — `npm audit` flags information exposure in the dev server due to missing origin verification (currently on 14.2.21), plus high-severity issues in `ws` and `glob`. Patch within the 14.2.x line — do **not** jump to Next.js 15, which changes the `params` API this codebase relies on.
+- [~] **Patch the Next.js CVE** — partly done: Next 14.2.21 → 14.2.35 (the last 14.x release) plus `npm audit fix` for `ws`, `uuid`/`svix`/`resend`, `brace-expansion`, `source-map-js` etc.; `npm audit` went from 21 findings (1 critical) to 12. **What's left can't be fixed on 14.x:** the remaining `next` advisories (some only matter for features this site doesn't use — i18n Pages Router, custom servers, Windows hosting, AVIF image optimization) need Next 15/16, and the dev-only toolchain findings (`tailwindcss`, `eslint-config-next`, `glob`, `braces`, `micromatch`) need Tailwind 4 / eslint-config-next 16. Upgrading past 14.x changes the `params` API this codebase relies on, so it's a separate migration task. After pulling this, run `npm install` and restart the dev server.
 - [x] ~~Rotate or remove the hardcoded admin password~~ — done. `ADMIN_PASSWORD` is now a server-only env var, never committed; the old `ssp@admin` value documented in `CLAUDE.md`/`HANDOVER.md` is stale and no longer the real password.
 - [x] ~~Lock down `orders`/`order_items` RLS~~ — done (see Security hardening above).
-- [ ] **Tighten `notification_rules`/`notification_logs` RLS** — both still fully permissive to the anon key (`for all to anon using (true) with check (true)`). Lower urgency than `orders` was (no customer PII beyond what's already in the templates), but still worth scoping once admin has real per-person auth.
+- [x] ~~Phone-login OTP leaked to anyone who asked for it~~ — done, see Security hardening above.
+- [~] **Tighten `notification_rules`/`notification_logs` RLS** — code done, **live-database step deliberately not run yet.** Both tables were open to the public anon key (anyone could rewrite recipients/templates or read logs). Now: new `app/api/admin/notifications` route (GET/POST/PATCH/DELETE, admin-cookie gated, field-whitelisted); the admin Notifications page uses it instead of the browser Supabase client; `lib/notifications-sender.ts` and `app/api/notifications/test` use the service-role client; and `/api/notifications/test` — which sent real emails/WhatsApp to a rule's recipients with **no login check at all** — now requires the admin session. `schema.sql` no longer creates the anon policies.
+  - **Still to do, only after this branch is deployed everywhere that shares the Supabase project:** run `drop policy if exists "anon_all_notification_rules" on notification_rules; drop policy if exists "anon_all_notification_logs" on notification_logs;` in the Supabase SQL editor. Running it earlier breaks any deployment still on the old code (admin Notifications page and every order notification use the anon key there).
+  - Also fixed: the daily/weekly digest cron routes read `orders` with the anon key, which `orders` RLS blocks, so every digest would have reported 0 orders. They now use `getSupabaseAdmin()` and return a 500 (instead of sending a false "0 orders" digest) if the query fails. No digest rules exist in the live DB yet, so nothing was being sent; tested both routes locally (200, sent 0).
+  - **Heads-up:** `CRON_SECRET` is optional and unset locally — when unset, `/api/cron/*` is callable by anyone. Set it in Vercel (Production) so only Vercel Cron can trigger digests.
+- [~] **QA walkthrough (public side, run in the browser pane; logged-in parts still need a manual pass)**
+  - Passed: homepage, `/books` (36 books, search narrows correctly), book detail, add to cart + navbar badge, checkout page + empty-form blocking, `/contact`, `/about`, `/sitemap.xml`, 404 page; no horizontal scroll at 375px on home/books/detail/checkout/contact.
+  - **Fixed:** the cart drawer's open/closed state was saved to localStorage along with the cart, so leaving with the drawer open made it reopen over the next page (it covered the checkout form). `lib/cart-store.ts` now persists only `items` and ignores any old saved `isOpen`.
+  - **Not fixed — found on this branch's checkout (will conflict with the Razorpay rewrite in PR #11, so do it there):** shipping form only checks "not empty" (+ a 6-char limit on PIN). A 5-digit phone or 2-digit PIN code is accepted, which means unreachable orders and failed WhatsApp sends. Needs phone (10-digit Indian mobile) and PIN (6 digits) validation, ideally server-side too.
+  - Still manual (needs a login): Google/phone sign-in, profile + wishlist + order history, admin Notifications page (now behind `/api/admin/notifications`: list loads, toggle, create, delete, send test), admin orders and users pages.
 
 ---
 
@@ -137,8 +174,8 @@ All three stories in `razorpay-integration-user-stories.md` are built:
 > Depends on: Phase 1 complete.
 
 ### Accounts to create first
-- [ ] Meta Business account + WhatsApp Cloud API — start immediately, verification takes 2–4 weeks
-- [ ] MSG91 or Twilio Verify — for real OTP (replaces both the customer phone-login mock and the admin users-page mock)
+- [ ] Meta Business account + WhatsApp Cloud API — start immediately, verification takes 2–4 weeks. Gates three things once approved: order-lifecycle WhatsApp notifications, customer OTP delivery (see Notifications above), and an Authentication-category message template (separate approval from the account itself — see `.env.example`'s WhatsApp OTP section)
+- [ ] Admin users-page OTP mock — still needs its own real provider decision (MSG91/Twilio, or reuse the Meta WhatsApp setup above); not covered by the customer-flow WhatsApp OTP work
 
 ### Auth
 - [x] Admin login is no longer a client-side-only localStorage flag — it's a real password check server-side plus a signed httpOnly session cookie. Still a single shared password though, not per-person accounts.
@@ -147,7 +184,7 @@ All three stories in `razorpay-integration-user-stories.md` are built:
 
 ### Catalog management
 - [x] ~~Edit existing book / create new book from admin panel / create and edit bundles / migrate to Supabase `books` table~~ — done, see Catalog management above and `/admin/books`.
-- [ ] Upload book cover to Supabase Storage — today cover images are a manual path field (e.g. `/covers/foo.jpg` into `public/`), not a real upload
+- [x] ~~Upload book cover to Supabase Storage~~ — done, see Catalog management above and `/admin/books`.
 
 ### Orders
 - [x] ~~Order status change triggers notification email to customer~~ — done, see Order-lifecycle notifications above.
@@ -155,7 +192,8 @@ All three stories in `razorpay-integration-user-stories.md` are built:
 
 ### Notifications
 - [x] ~~Real email via Resend — wire existing templates to actual sends~~ — wired; blocked on the Resend domain re-verification, not on code.
-- [ ] Real OTP via MSG91 or Twilio — replace mock in both the customer phone-login flow and the admin users page
+- [x] ~~Real OTP for the customer phone-login flow~~ — code-complete via WhatsApp (`lib/whatsapp-otp.ts`, this branch). Blocked on Meta verification + approved template, not code.
+- [ ] Real OTP for the admin users page — separate mock, not yet addressed
 - [ ] Real WhatsApp via Meta Cloud API — code already calls it, just needs credentials
 - [x] ~~Notification logs — history of what was sent, to whom, and status~~ — done, `notification_logs` table + admin UI.
 - [x] ~~Notification rules stored in Supabase (not localStorage)~~ — done; the old `notifications-store.ts` Zustand store is no longer actually read from for rules.
@@ -163,3 +201,27 @@ All three stories in `razorpay-integration-user-stories.md` are built:
 ### Users
 - [ ] Real Google OAuth replaces the simulated sign-in flow
 - [ ] Admin users stored in Supabase (not localStorage)
+
+---
+
+## Launch readiness — gaps not tracked anywhere before
+
+> Found by comparing the site's routes/code against what a live Indian e-commerce store needs (checked in code on 2026-10-12; not a full audit, so more may turn up).
+
+### Needed before real customers
+- [ ] **Legal pages** — no Privacy Policy, Terms & Conditions, or Shipping/Returns/Refund page exists (no routes for them). Razorpay requires them for live-key approval and Meta Business Verification often asks for them.
+- [x] ~~Forgot/reset password~~ — **not needed (added in error, corrected 2026-10-12):** customers sign in with phone + OTP or Google, never a password they could forget; the reset flow was already built and then removed for that reason (see Customer accounts above). Only revisit if email/password login is ever brought back.
+- [ ] **Domain cutover plan** — `sangitshreeprakashan.com` already serves the old live website (and the existing site's email may depend on that DNS). Decide when/how the new site replaces it, how DNS changes without taking either down, and where each site's email keeps working.
+- [ ] **Production environment on Vercel** — every secret set for Production + Preview + Development (Supabase URL/anon/service-role, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `WHATSAPP_*`, Razorpay keys, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, `PHONE_AUTH_SECRET`, `CRON_SECRET`); then one real end-to-end test on the deployed URL.
+- [ ] **Google sign-in branding** (corrected 2026-10-12 — this is not about Supabase emails: phone and Google accounts don't receive any Supabase sign-up email). The real issue is the Google security email "You shared some Google Account data with `<project>.supabase.co`", which shows Supabase's raw domain instead of the shop's name and could look suspicious to customers. Fix needs Supabase's paid Custom Domain feature (tracked earlier in this file); the Google Cloud OAuth consent screen's app name/logo should also be set to the shop's.
+
+### Worth doing soon
+- [ ] **Cancellations, returns & refunds** — no customer or admin flow for them; `cancelled` exists as a status only, and Razorpay refunds aren't handled.
+- [ ] **Stock / availability** — no inventory tracking, so out-of-stock books can still be bought.
+- [ ] **Real analytics** — admin visit/click numbers come from browser localStorage, not a real measure of traffic.
+- [ ] **Error monitoring & backups** — nothing alerts anyone when checkout or an API route fails; no scheduled Supabase backup/restore plan.
+- [ ] **Abuse limits** — rate-limit OTP requests (there's only a 30 s per-number cooldown), signup, and the admin login attempts.
+- [x] **GST — resolved:** Bharani/owner confirmed there is no GST on books, so the existing "Bill of Supply" format on `feature/admin-invoice-printing` (PR #10) is the right one; nothing to add.
+- [ ] **Invoice numbering must start at 1 for the real site** (decided 2026-10-12). `feature/admin-invoice-printing` currently does `create sequence orders_invoice_number_seq start with 470` (to continue the old business's #469) in both `supabase/schema.sql` and `invoice-number-column.sql`. To do on that branch (PR #10): change both to `start with 1` and drop the "continue from #469" notes. Numbers are assigned lazily on the first admin print, so every test invoice printed so far has consumed a number — **before launch**, once the test orders are cleared, run `alter sequence orders_invoice_number_seq restart with 1; update orders set invoice_number = null;` (or start from a clean production database). Invoice numbers should stay gap-free and in order once real invoices begin — confirm with the accountant whether they want one running series or a fresh series each financial year.
+- [ ] **Checkout validation** — phone (10-digit Indian mobile) and PIN (6 digits), client and server side — do in the Razorpay PR (#11).
+- [ ] **Set `CRON_SECRET`** in Vercel so only Vercel Cron can call `/api/cron/*`.
