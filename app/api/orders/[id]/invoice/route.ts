@@ -9,7 +9,7 @@ import { getSupabaseServer } from '@/lib/supabase';
 //
 // Deliberately NOT admin-cookie gated like app/api/admin/orders/[id]/invoice
 // — this checks the *customer's* own Supabase Auth session instead, the same
-// way app/api/orders/create/route.ts verifies the caller's bearer token
+// way app/api/checkout/verify/route.ts verifies the caller's bearer token
 // rather than trusting anything in the request body. orders/order_items SELECT
 // is RLS-scoped to auth.uid() = user_id, so in principle the anon-key client
 // could be used directly here too -- using the service-role client plus an

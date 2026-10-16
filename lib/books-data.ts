@@ -106,6 +106,39 @@ export async function getBooksByIds(ids: string[]): Promise<Book[]> {
   return data ? (data as DbBookRow[]).map(mapDbBookToBook) : [];
 }
 
+/**
+ * Recomputes a cart's subtotal from each book's real, current price in the
+ * `books` table — used by the Razorpay checkout routes
+ * (app/api/checkout/create-order and .../verify) so the amount actually
+ * charged is never trusted from the client (a tampered `price` field in the
+ * request body can't under-charge). Throws if any bookId doesn't exist or
+ * any qty isn't a positive integer, rather than silently charging a partial
+ * amount.
+ */
+export async function computeVerifiedSubtotal(
+  items: { bookId: string; qty: number }[],
+): Promise<{ subtotal: number; priceByBookId: Record<string, number> }> {
+  if (items.length === 0) {
+    throw new Error('Cart is empty.');
+  }
+  const books = await getBooksByIds(items.map((i) => i.bookId));
+  const priceByBookId: Record<string, number> = {};
+  books.forEach((b) => { priceByBookId[b.id] = b.price; });
+
+  let subtotal = 0;
+  for (const item of items) {
+    const price = priceByBookId[item.bookId];
+    if (price === undefined) {
+      throw new Error(`Book "${item.bookId}" no longer exists.`);
+    }
+    if (!Number.isInteger(item.qty) || item.qty <= 0) {
+      throw new Error(`Invalid quantity for book "${item.bookId}".`);
+    }
+    subtotal += price * item.qty;
+  }
+  return { subtotal, priceByBookId };
+}
+
 export async function getBooksByCategory(category: BookCategory): Promise<Book[]> {
   const { data } = await getSupabaseServer()
     .from('books')
