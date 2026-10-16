@@ -1,104 +1,133 @@
 # Tasks — Sangit Shree Prakashan
 
 ## Done
+
+### Foundation
 - [x] Project setup — Next.js 14, Tailwind, Framer Motion, Zustand
 - [x] Book catalog with category filter and search
 - [x] Shopping cart with localStorage persist
-- [x] Checkout page with order summary and payment flow (UI only)
+- [x] Checkout page with order summary and payment flow (payment step now goes through Razorpay's real widget — see Phase 1's Payments section)
 - [x] Homepage with gallery slideshow
 - [x] About page with auto-scrolling founder timeline
 - [x] Contact page
 - [x] Replace all emojis — Devanagari letters for categories, Lucide icons for timeline
 - [x] BookCard — persistent View + Add to Cart buttons always visible
 - [x] Book detail pages — server component + BookDetailClient, 3D cover animation, specs, related books
-- [x] Admin panel with password gate and sidebar nav
-- [x] Admin dashboard — metrics, 7-day chart, top books, recent orders (reads from Supabase)
-- [x] Admin orders — expandable rows, status update, CSV export (reads from Supabase)
-- [x] Admin notifications — NL input, email + WhatsApp templates, live preview (prototype)
-- [x] Admin users — form + OTP mock, Google sign-in mock, role management
-- [x] Notifications user-aware NLP — "me", "all users", "staff", "admins" auto-populate
-- [x] User picker dropdown in notification recipients
-- [x] Supabase project + schema (orders, order_items tables, RLS policies)
-- [x] `POST /api/orders/create` — saves order to Supabase, sends Resend email on checkout
-- [x] Resend domain verified — sending from `orders@sangitshreeprakashan.com`
-- [x] Vercel env vars wired (SUPABASE_URL, SUPABASE_ANON_KEY, RESEND_API_KEY)
+- [x] Add missing books to catalog (Swar Vadan Part 1, Raag Shastra Parichay Part 3, Concepts of Vocal Music Class 9–12, Concepts of Instrumental Music Class 9–12, Sangit Saar Class 11, Bal Sangit Parts 1–3, Treasure of Raags & Taals) — 36 unique books
+- [x] Real book cover images for all 36 books, prices verified against the print catalogue
+- [x] SEO metadata + OG tags on all pages, dynamic per-book metadata, sitemap.xml
 - [x] CLAUDE.md and tasks.md
 - [x] GitHub repo + Vercel deployment
+
+### Orders & database
+- [x] Supabase project + schema (orders, order_items, RLS policies)
+- [x] `POST /api/orders/create` — saves order to Supabase, sends confirmation notification on checkout
+- [x] Resend domain verification completed once (status has since regressed — see Known Issues in `CLAUDE.md`)
+- [x] Vercel env vars wired
+
+### Customer accounts (phone-first, replacing the original email/password + Google plan)
+- [x] Phone number + OTP as the sole sign-up/login method — synthetic email + HMAC-derived password under Supabase Auth, mock OTP shown on screen (`lib/phone-auth.ts`, `app/api/auth/phone/*`)
+- [x] Separate `/login` (existing users) and `/signup` (new users, required Full Name + optional email) pages, sharing `components/PhoneAuthForm.tsx`
+- [x] Forgot/reset-password flow was built, then removed as moot once phone+OTP replaced password auth entirely
+- [x] `/profile` page — account overview, Wishlist tab, Orders tab
+- [x] Wishlist — heart icon on book cards and detail pages, `wishlist` Supabase table, scoped to the signed-in user via RLS
+- [x] Order history — `orders.user_id` (nullable — guest checkout still works), `/profile` Orders tab filtered by it
+- [x] Checkout prefill never leaks the synthetic phone-auth email; uses the optional real email instead
+
+### Security hardening (from Bharani's two PR #8 reviews)
+- [x] Order creation verifies `userId` server-side from the request's bearer token — never trusts a client-supplied value
+- [x] `orders`/`order_items` RLS: dropped permissive insert/update policies entirely; SELECT scoped to `auth.uid() = user_id`. All writes now go through service-role-backed routes.
+- [x] Admin API routes gated behind a signed httpOnly session cookie (`lib/admin-auth.ts`) instead of a client-side-only localStorage flag — the admin password now lives only in the server-side `ADMIN_PASSWORD` env var, never committed to the repo
+- [x] Admin order-status updates moved from the anon-key client to a service-role API route (`app/api/admin/orders` PATCH)
+- [x] Fixed the `useShallow` wishlist-selector re-render bug, the lost-wishlist-click-through-login redirect, the wrong post-signup copy, and the `app/books/layout.tsx` title-template regression
+
+### Order-lifecycle notifications (email + WhatsApp)
+- [x] `notification_rules.trigger` widened to include `order_shipped`/`order_delivered` (previously only `order_placed`)
+- [x] New `orders` columns: `tracking_id`, `courier_service`, `shipped_at`, `delivered_at`, `expected_delivery_date`
+- [x] Three customer-facing rules seeded (`audience = 'customer'`) with warm, branded copy — order placed, shipped, delivered — each interpolating `{{customer_email}}`/`{{customer_phone}}` dynamically per order
+- [x] Split the email HTML wrapper in `lib/notifications-sender.ts` into admin-facing vs customer-facing, so customer emails no longer render an "ADMIN NOTIFICATION" label
+- [x] `app/api/admin/orders` PATCH requires Tracking ID + Courier the first time an order is marked "Shipped"; admin UI (`app/admin/orders/page.tsx`) prompts inline for both before submitting
+- [x] Duplicate-send guard: notifications for shipped/delivered only fire the first time `shipped_at`/`delivered_at` moves from null to set, however many times the status is later toggled
+- [x] Removed the old hardcoded duplicate order-confirmation email in `app/api/orders/create` — `fireNotifications()` is now the sole sender
+- [x] Fixed a real bug found during testing: `resend.emails.send()` doesn't throw on API-level failures, so a rejected send was being logged as `status: 'sent'` with no error — now checked and surfaced
+- [x] `notification-workflow-user-stories.md` and product-manager framing written before the build
+
+### Catalog management (books table + admin UI)
+- [x] New Supabase `books` table (public SELECT, service-role-only writes) seeded with all 36 books migrated from the static `lib/books.ts` array
+- [x] `lib/books-data.ts` — async, server-safe reads (`getAllBooks`, `getBookBySlug`, `getBookById`, `getBooksByIds`, `getBooksByCategory`, `getFeaturedBooks`)
+- [x] `app/api/admin/books` (POST/PATCH/DELETE) — service-role, admin-cookie gated, validates category/level/language and catches duplicate-slug conflicts
+- [x] Every storefront consumer switched from the static array to the live table: homepage, `/books` (split into a server component + `components/BooksListClient.tsx` since a `'use client'` page can't be async), book detail pages + related books, sitemap, profile wishlist tab
+- [x] `/admin/books` — list with search/category/bundle-only filters, create/edit form (all fields including authors/tags as line/comma-separated text), delete with inline confirm. Bundles use the same form via the "Bundle Set" checkbox — no separate bundle UI needed.
+- [x] `lib/books.ts` deliberately left in place (types + `categoryMeta` still imported everywhere) with its static array and helpers now dead code — not deleted, per the chosen migration approach
+- [x] Default catalog ordering fixed — bundles first, then individual books grouped by series with parts in numeric order, instead of a flat alphabetical sort that scattered series and bundles randomly
+- [x] Real cover-image upload — public Supabase Storage `covers` bucket, `POST /api/admin/books/upload-cover` (service-role, 5MB limit, JPG/PNG/WebP/AVIF), live thumbnail preview + upload button in the admin form, with the path/URL still directly editable for the legacy `/covers/*.jpg` books. `next.config.mjs` allow-lists `*.supabase.co` for `next/image`.
+- [x] Fixed the admin book-form modal clipping at the top on shorter viewports (flexbox + `overflow-y-auto` scroll bug) — switched to a plain block layout with `mx-auto` centering that scrolls correctly
+
+### Admin invoice printing (Bill of Supply)
+Scoped to a single admin-panel-only story — see `order-invoice-user-stories.md`. Modeled on
+the business's real existing invoice (Invoice #469), not the earlier Amazon.in example that
+was ruled out — no GSTIN/HSN/tax fields, just a plain Bill of Supply.
+- [x] `lib/seller-details.ts` — letterhead (name/address/phone), reusing `CONTACT` from `lib/utils.ts`
+- [x] `orders.invoice_number` column + `orders_invoice_number_seq` sequence + `next_invoice_number()` RPC (`invoice-number-column.sql`, isolated per the transactional-rollback lesson from the books-table migration)
+- [x] `GET /api/admin/orders/[id]/invoice` — service-role, admin-cookie gated; lazily assigns `invoice_number` on first print rather than at order-creation time
+- [x] `/admin/orders/[id]/invoice` — print-ready page: logo + business details left, "BILL OF SUPPLY" centered, Bill To, line items, Grand Total/Delivery Fee (always ₹0 — no shipping-charge feature exists)/Total Paid, Authorised Signatory footer
+- [x] "Print Invoice" link added to each order row on `/admin/orders`
+- [x] Invoice markup extracted to `components/admin/InvoiceSheet.tsx` for reuse
+- [x] Bulk printing: per-order checkboxes + header "select all" (scoped to the current filter) on `/admin/orders`, a "Print Selected (N)" button, `GET /api/admin/orders/invoice-batch` (sequential invoice-number assignment, preserves selection order), and `/admin/orders/print-batch` — renders every selected invoice with a page break between them and auto-opens the print dialog once loaded
+- [ ] **Before this goes live:** `invoice-number-column.sql` has been run in Supabase and works. The owner decided the website's invoices start at **1** (a separate series from the business's earlier manual invoices), and the SQL files now say so. Because test invoices consume numbers (assigned on first print), once the test orders are cleared run `alter sequence orders_invoice_number_seq restart with 1; update orders set invoice_number = null;`. Still to confirm with the accountant: one running series, or a fresh series each financial year.
+- [x] Customer-facing "Download Invoice" — `/profile` Orders tab only (logged-in customers). `GET /api/orders/[id]/invoice` (bearer-token auth, ownership-checked, 404s rather than 403s on mismatch) + `/orders/[id]/invoice` page, both reusing `InvoiceSheet`.
+- [ ] Checkout-success-screen "Download Invoice" and guest-checkout access — deliberately not built yet (only order-history access was in scope for this round), see Open Questions in `order-invoice-user-stories.md`
 
 ---
 
 ## Phase 1 — Customer-facing (make it real for buyers)
 
 > Goal: a customer can browse, pay, and receive confirmation. Orders land in a real database.
-> Supabase ✓ · Resend ✓ · Razorpay — remaining blocker.
+> Supabase ✓ · Customer accounts ✓ · Order-lifecycle notifications ✓ (code-complete, blocked on Resend domain) · Razorpay ✓ code-complete, blocked on real keys.
 
-### Payments (main remaining work)
-- [ ] Razorpay API keys — migrating from old website, need keys from Bharani (Key ID + Key Secret)
-- [ ] API route `POST /api/checkout/create-order` — creates Razorpay order, returns ID to frontend
-- [ ] Razorpay payment modal wired into checkout page
-- [ ] API route `POST /api/checkout/verify` — verifies signature, writes order to Supabase
-- [ ] Handle payment failures gracefully on frontend
+### Payments — code-complete, blocked on real API keys
+All three stories in `razorpay-integration-user-stories.md` are built:
+- [x] `orders.razorpay_order_id` / `orders.razorpay_payment_id` columns (`razorpay-columns.sql`) — **run against the live database, confirmed**; also now includes a unique index on `razorpay_payment_id` (see replay-block item below)
+- [x] `lib/razorpay.ts` — order creation (raw fetch + Basic Auth, no new npm dependency) + signature verification (Node `crypto` HMAC) + `getRazorpayOrder()` (fetches the real order state, used by the amount-tie check below)
+- [x] `lib/books-data.ts`'s `computeVerifiedSubtotal()` — recomputes the cart total from real book prices, used by both routes below so the client's price/subtotal is never trusted
+- [x] `POST /api/checkout/create-order` (Story 1) — creates the Razorpay order, writes nothing to Supabase
+- [x] `POST /api/checkout/verify` (Story 2) — verifies the signature server-side, only then saves the order + fires `order_placed`; rejects and logs an invalid/forged signature (Story 3, AC5)
+- [x] `app/checkout/page.tsx` rewritten — real Razorpay checkout.js widget replaces the old mock UI entirely; handles success, `payment.failed` (Story 3, AC2), and widget dismissal/cancel (Story 3, AC1) without leaving the customer confused or creating orphaned orders
+- [x] Retry behavior resolved: each retry creates a **fresh** Razorpay order (no reuse/idempotency) — since nothing is saved to Supabase until `verify` succeeds, this can't create duplicates (Story 3, AC4)
+- [x] **Cart tied to the actual payment** (PR #11 review) — `verify` used to recompute the subtotal from whatever cart was submitted in the request, without checking it against what was actually charged for that Razorpay order. A genuinely-valid signature from paying for a cheap cart could've been replayed against `verify` with a different, pricier cart and saved as confirmed with nothing paid for the gap. Now fetches the real order via `getRazorpayOrder()` and rejects unless `status === 'paid'` and `amount_paid` matches the recomputed subtotal exactly.
+- [x] **Payment replay blocked** (PR #11 review) — `verify` rejects if `razorpay_payment_id` is already attached to an existing order, backed by a unique DB index as a second line of defense against two near-simultaneous requests for the same payment.
+- [x] **`POST /api/orders/create` deleted** (PR #11 review) — confirmed nothing called it anymore; it created a confirmed order unconditionally with no payment involved at all, a full bypass around the payment flow.
+- [x] **Shipping-details validation** (found in QA 2026-10-12: a 5-digit phone and a 2-digit PIN went straight through) — new `lib/checkout-validation.ts` (name, email, 10-digit Indian mobile starting 6–9 with optional +91/0 prefix normalised to `+91XXXXXXXXXX`, address, city, state, 6-digit PIN not starting 0). The checkout form shows the specific message under each bad field, outlines it in red, focuses the first one and stays on the details step. `POST /api/checkout/create-order` re-checks the same rules and answers 400 + `fieldErrors` **before** a Razorpay order exists (rejecting later, in `verify`, would leave a customer charged with no order); the page then returns them to the details step. 20 checker cases pass, plus bad/missing/valid requests against the route and the form in a browser. Note: `verify` still trusts the details the page sends it (it can't reject after payment), so this stops honest mistakes rather than a deliberately forged request.
+- [x] Cart-badge hydration mismatch and checkout step-transition/padding bugs found while testing this branch end-to-end — fixed (not originally part of the review, surfaced during manual testing).
+- [ ] **Before this can actually run:** `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` need to be real values in `.env.local`/Vercel — test-mode keys (available immediately from the Razorpay dashboard, no approval needed) are enough to test the whole flow now; live keys need Bharani's GST/PAN account verification to go live for real. Same Razorpay account as the existing sangitshreeprakashan.com site — generating test keys doesn't touch anything live there.
+- [ ] End-to-end test once test-mode keys exist: pay with Razorpay's documented test card/UPI, confirm the order actually saves, then deliberately fail/cancel a payment and confirm no order is created — **and specifically try to replay a payment or tamper with the cart to confirm the new amount-tie/replay-block protections actually hold**
+- [ ] Blocked on PRs #9 and #10 merging first (this branch is stacked on top of both)
 
 ### Book content
-- [x] Add missing books to catalog (Swar Vadan Part 1, Raag Shastra Parichay Part 3, Concepts of Vocal Music Class 9–12, Concepts of Instrumental Music Class 9–12, Sangit Saar Class 11, Bal Sangit Parts 1–3, Treasure of Raags & Taals)
-- [x] Fixed duplicate catalog entries (sv-1, rsp-3 were listed twice) — 36 unique books, down from 38 array entries
-- [x] Real book cover images for all 36 books (30 from the print catalogue PDF, 6 bundle/individual covers supplied directly)
-- [x] Verified all book/bundle prices against the print catalogue
 - [ ] Final copy for descriptions, table of contents, author bios
 - [ ] Book detail pages — richer layout with TOC, edition/ISBN, sample pages (currently description-only)
+- [ ] Prerender book detail pages — add `generateStaticParams()` to `app/books/[slug]`; currently server-rendered per request (the catalog is now a live Supabase table, not a static array, so this would need a fetch inside `generateStaticParams()` too)
 
-### SEO
-- [x] Meta tags and OG images on all pages — PR #2 `feature/seo-metadata`, merged; SEO metadata on all public pages and per-book detail pages
-- [x] Sitemap.xml for Google indexing — auto-generates for all pages and 36 book URLs
-- [x] Fix `/books` 404 — PR #2 overwrote the catalog listing page with book-detail code; restored in PR #3 `fix/books-listing-page`
-- [x] Restore brand suffix on book detail titles — `app/books/layout.tsx` used a plain-string `title`, which nulled the root layout's title template for all 36 book pages
-- [x] Founder timeline — mobile scroll fix done (PR #4); real photos and refined content still blocked on Bharani
-- [ ] Prerender book detail pages — add `generateStaticParams()` to `app/books/[slug]`; currently server-rendered per request despite the catalog being a static array
+### Founder timeline
+- [ ] Real photos and refined content (mobile scroll fix already done, PR #4)
 
-### Customer accounts
-- [x] Sign up / sign in with email + password — Supabase Auth, `/login` and `/signup` pages
-- [x] Sign in with Google — code is in place (`signInWithOAuth`), but **needs manual setup before it works**:
-      1. Create an OAuth 2.0 Client ID in Google Cloud Console (Web application), with
-         authorized redirect URI `https://<your-project-ref>.supabase.co/auth/v1/callback`
-      2. In the Supabase dashboard → Authentication → Providers → Google, paste the Client ID
-         and Client Secret, and enable the provider
-      Email/password works right now without this step.
-- [x] `/profile` page — account overview, Wishlist tab, Orders tab (tab-based, one route)
-- [x] Wishlist — heart icon on book cards and detail pages, backed by a new `wishlist` Supabase
-      table, properly scoped to the signed-in user via RLS
-- [x] Order history — `orders` table gained a nullable `user_id` column, set at checkout when the
-      customer is signed in; guest checkout (no account) still works exactly as before
-- [x] **Run the SQL migration** — `supabase/schema.sql` was updated with the `orders.user_id`
-      column and the new `wishlist` table + RLS policies. Applied to the live Supabase project on
-      2026-08-27.
-- [ ] Confirm-email UX — Supabase's default email templates are used for the sign-up confirmation
-      link (not the branded Resend templates used for order confirmations). Fine for now; revisit
-      if it needs to match the brand.
+### Notifications — remaining before this is fully live end-to-end
+> **On hold** (as of this session) — pausing further work here to study the domain situation before touching DNS, since `sangitshreeprakashan.com` already has an existing website live on it. The code is complete; a PR for `feature/order-notifications` is being opened against `master` now — no PR existed for it until this session, despite this doc previously claiming otherwise. Real email delivery is still parked until the domain question is resolved, but that's separate from merging the code.
+- [ ] **Re-verify `sangitshreeprakashan.com` on Resend** — currently shows unverified, so no customer email actually sends despite the code path being correct. Needs whoever owns the domain's DNS (Bharani). Email-sending DNS records (TXT/CNAME for SPF+DKIM) don't conflict with whatever's already routing the existing website — but confirm what's already in the domain's DNS before adding anything, in case there's an existing SPF record that needs merging rather than overwriting.
+- [ ] WhatsApp sends are still skipped — needs `WHATSAPP_PHONE_NUMBER_ID` + `WHATSAPP_TOKEN` (Meta Cloud API business verification, 2–4 weeks)
+- [x] ~~Fix: checkout never checked whether order-creation actually succeeded before showing the confirmation screen~~ — resolved as part of the Razorpay rewrite: `app/checkout/page.tsx` now only shows the success screen after `POST /api/checkout/verify` returns `res.ok`, not optimistically
+- [ ] Open question flagged in the story doc but intentionally not built: an OTP step on delivery confirmation ("need to confirm" per the original spec) — needs a product decision first
 
 ---
 
 ## Security & maintenance
 
-> Not tied to a phase. The dependency patch is the only item here with a live impact today.
+> Not tied to a phase.
 
-- [ ] **Patch the critical Next.js CVE** — `npm audit` flags information exposure in the Next.js
-      dev server due to missing origin verification (currently on 14.2.21). Also high-severity
-      issues in `ws` (uninitialized memory disclosure, DoS) and `glob` (command injection via
-      `-c/--cmd`). Prefer a patch bump within the 14.2.x line — do **not** jump to Next.js 15,
-      which changes the `params` API this codebase relies on.
-- [ ] **Rotate or remove the hardcoded admin password** — `ssp@admin` is committed in `CLAUDE.md`
-      and `HANDOVER.md`, and the GitHub repo is public, so it is publicly readable. It only guards
-      a localStorage gate today, so nothing is genuinely protected either way — but it should not
-      survive into the NextAuth.js work below.
-- [ ] **Tighten Supabase RLS** — policies are still permissive on `orders`, `order_items`,
-      `notification_rules` and `notification_logs`: anon can insert, select and update freely.
-      Real auth has now landed for customers (Supabase Auth, see "Customer accounts" above), but
-      `orders` SELECT was deliberately left open rather than scoped to `auth.uid() = user_id`,
-      because the admin panel reads all orders through this same anon-key client with no Supabase
-      Auth session of its own (it's still just the localStorage password gate). Restricting
-      `orders` SELECT today would silently break admin. Revisit once admin gets real accounts
-      (NextAuth.js, below) — at that point `orders`/`order_items` can get the same properly-scoped
-      RLS the new `wishlist` table already has.
+- [ ] **Patch the Next.js CVE** — `npm audit` flags information exposure in the dev server due to missing origin verification (currently on 14.2.21), plus high-severity issues in `ws` and `glob`. Patch within the 14.2.x line — do **not** jump to Next.js 15, which changes the `params` API this codebase relies on.
+- [x] ~~Rotate or remove the hardcoded admin password~~ — done. `ADMIN_PASSWORD` is now a server-only env var, never committed; the old `ssp@admin` value documented in `CLAUDE.md`/`HANDOVER.md` is stale and no longer the real password.
+- [x] ~~Lock down `orders`/`order_items` RLS~~ — done (see Security hardening above).
+- [ ] **Tighten `notification_rules`/`notification_logs` RLS** — both still fully permissive to the anon key (`for all to anon using (true) with check (true)`). Lower urgency than `orders` was (no customer PII beyond what's already in the templates), but still worth scoping once admin has real per-person auth.
 
 ---
 
@@ -109,29 +138,27 @@
 
 ### Accounts to create first
 - [ ] Meta Business account + WhatsApp Cloud API — start immediately, verification takes 2–4 weeks
-- [ ] MSG91 or Twilio Verify — for real OTP
+- [ ] MSG91 or Twilio Verify — for real OTP (replaces both the customer phone-login mock and the admin users-page mock)
 
 ### Auth
-- [ ] NextAuth.js with Google OAuth — replace localStorage password gate
+- [x] Admin login is no longer a client-side-only localStorage flag — it's a real password check server-side plus a signed httpOnly session cookie. Still a single shared password though, not per-person accounts.
+- [ ] NextAuth.js with Google OAuth — replace the shared-password admin login with real per-person accounts
 - [ ] Role-based access — staff sees orders only, admin sees everything
 
 ### Catalog management
-- [ ] Edit existing book — title, price, description, cover image, stock status
-- [ ] Create new book from admin panel
-- [ ] Upload book cover to Supabase Storage
-- [ ] Create and edit bundles — select books, set bundle price and cover
-- [ ] Migrate books from `lib/books.ts` static array to Supabase `books` table
+- [x] ~~Edit existing book / create new book from admin panel / create and edit bundles / migrate to Supabase `books` table~~ — done, see Catalog management above and `/admin/books`.
+- [ ] Upload book cover to Supabase Storage — today cover images are a manual path field (e.g. `/covers/foo.jpg` into `public/`), not a real upload
 
 ### Orders
-- [ ] Order status change triggers notification email to customer
+- [x] ~~Order status change triggers notification email to customer~~ — done, see Order-lifecycle notifications above.
 - [ ] Manually create an order from admin (for phone/walk-in orders)
 
 ### Notifications
-- [ ] Real email via Resend — wire existing templates to actual sends
-- [ ] Real OTP via MSG91 or Twilio — replace mock in users page
-- [ ] Real WhatsApp via Meta Cloud API — wire existing templates to actual sends
-- [ ] Notification logs — history of what was sent, to whom, and status
-- [ ] Notification rules stored in Supabase (not localStorage)
+- [x] ~~Real email via Resend — wire existing templates to actual sends~~ — wired; blocked on the Resend domain re-verification, not on code.
+- [ ] Real OTP via MSG91 or Twilio — replace mock in both the customer phone-login flow and the admin users page
+- [ ] Real WhatsApp via Meta Cloud API — code already calls it, just needs credentials
+- [x] ~~Notification logs — history of what was sent, to whom, and status~~ — done, `notification_logs` table + admin UI.
+- [x] ~~Notification rules stored in Supabase (not localStorage)~~ — done; the old `notifications-store.ts` Zustand store is no longer actually read from for rules.
 
 ### Users
 - [ ] Real Google OAuth replaces the simulated sign-in flow

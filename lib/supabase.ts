@@ -45,6 +45,14 @@ export interface DbOrder {
   subtotal: number;
   payment_method: string;
   user_id: string | null;
+  tracking_id: string | null;
+  courier_service: string | null;
+  shipped_at: string | null;
+  delivered_at: string | null;
+  expected_delivery_date: string | null;
+  invoice_number: number | null;
+  razorpay_order_id: string | null;
+  razorpay_payment_id: string | null;
   order_items: DbOrderItem[];
 }
 
@@ -72,6 +80,7 @@ export interface DbNotificationRule {
   whatsapp_message: string;
   active: boolean;
   created_at: string;
+  audience: 'admin' | 'customer';
 }
 
 export interface DbNotificationLog {

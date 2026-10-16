@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getBookBySlug } from '@/lib/books';
+import { getBookBySlug, getBooksByCategory } from '@/lib/books-data';
 import BookDetailClient from '@/components/BookDetailClient';
 
 interface Props {
@@ -8,7 +8,7 @@ interface Props {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const book = getBookBySlug(params.slug);
+  const book = await getBookBySlug(params.slug);
   if (!book) return {};
   return {
     title: book.titleEnglish,
@@ -21,8 +21,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default function BookDetailPage({ params }: Props) {
-  const book = getBookBySlug(params.slug);
+export default async function BookDetailPage({ params }: Props) {
+  const book = await getBookBySlug(params.slug);
   if (!book) notFound();
-  return <BookDetailClient book={book} />;
+
+  // Computed here (server-side) instead of inside BookDetailClient, which is
+  // a 'use client' component and would otherwise need its own Supabase call.
+  const related = (await getBooksByCategory(book.category))
+    .filter((b) => b.id !== book.id)
+    .slice(0, 4);
+
+  return <BookDetailClient book={book} related={related} />;
 }

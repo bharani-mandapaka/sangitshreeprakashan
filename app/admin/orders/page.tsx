@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronUp, Download, MapPin, Phone, Mail, Package, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, MapPin, Phone, Mail, Package, RefreshCw, Truck, Printer } from 'lucide-react';
 import { type DbOrder } from '@/lib/supabase';
 import { type OrderStatus } from '@/lib/orders-store';
 import { formatPrice } from '@/lib/utils';
@@ -25,23 +25,93 @@ function fmtTime(iso: string) {
 }
 
 // ── Order row ──────────────────────────────────────────────────────────────────
-function OrderRow({ order, onStatusChange }: { order: DbOrder; onStatusChange: (id: string, status: OrderStatus) => void }) {
+function OrderRow({
+  order,
+  onStatusChange,
+  selected,
+  onToggleSelect,
+}: {
+  order: DbOrder;
+  onStatusChange: (id: string, status: OrderStatus, extra?: Partial<DbOrder>) => void;
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [updating, setUpdating] = useState(false);
 
-  const handleStatus = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    e.stopPropagation();
-    const newStatus = e.target.value as OrderStatus;
+  // The backend (app/api/admin/orders/route.ts) requires a tracking ID +
+  // courier name the first time an order moves to "shipped" — it uses them
+  // in the customer's shipped notification. Rather than let that come back
+  // as a 400, we ask for them inline before submitting.
+  const [shipModalOpen, setShipModalOpen] = useState(false);
+  const [trackingIdInput, setTrackingIdInput] = useState('');
+  const [courierInput, setCourierInput] = useState('');
+  const [shipError, setShipError] = useState('');
+
+  const submitStatus = async (newStatus: OrderStatus, extra?: { trackingId?: string; courierService?: string }) => {
     setUpdating(true);
+    setShipError('');
     // Goes through the admin API route (service-role, cookie-gated) instead
     // of the anon client — see app/api/admin/orders/route.ts.
     const res = await fetch('/api/admin/orders', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: order.id, status: newStatus }),
+      body: JSON.stringify({
+        id: order.id,
+        status: newStatus,
+        ...(extra?.trackingId ? { trackingId: extra.trackingId } : {}),
+        ...(extra?.courierService ? { courierService: extra.courierService } : {}),
+      }),
     });
-    if (res.ok) onStatusChange(order.id, newStatus);
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      const patch: Partial<DbOrder> | undefined =
+        newStatus === 'shipped'
+          ? {
+              shipped_at:      order.shipped_at ?? new Date().toISOString(),
+              tracking_id:     extra?.trackingId ?? order.tracking_id,
+              courier_service: extra?.courierService ?? order.courier_service,
+            }
+          : newStatus === 'delivered'
+          ? { delivered_at: order.delivered_at ?? new Date().toISOString() }
+          : undefined;
+      onStatusChange(order.id, newStatus, patch);
+      setShipModalOpen(false);
+      setTrackingIdInput('');
+      setCourierInput('');
+    } else {
+      setShipError(data.error ?? 'Failed to update status.');
+    }
     setUpdating(false);
+  };
+
+  const handleStatus = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    e.stopPropagation();
+    const newStatus = e.target.value as OrderStatus;
+    if (newStatus === 'shipped' && !order.shipped_at) {
+      // First-time shipment — collect tracking info before calling the API.
+      // The <select> stays controlled to the unchanged `status` prop below,
+      // so it visually reverts until this is confirmed.
+      setShipError('');
+      setShipModalOpen(true);
+      return;
+    }
+    submitStatus(newStatus);
+  };
+
+  const confirmShip = () => {
+    if (!trackingIdInput.trim() || !courierInput.trim()) {
+      setShipError('Tracking ID and courier service are both required.');
+      return;
+    }
+    submitStatus('shipped', { trackingId: trackingIdInput.trim(), courierService: courierInput.trim() });
+  };
+
+  const cancelShip = () => {
+    setShipModalOpen(false);
+    setTrackingIdInput('');
+    setCourierInput('');
+    setShipError('');
   };
 
   const items  = order.order_items ?? [];
@@ -53,6 +123,14 @@ function OrderRow({ order, onStatusChange }: { order: DbOrder; onStatusChange: (
         className="border-b border-gold/5 hover:bg-white/2 transition-colors cursor-pointer"
         onClick={() => setExpanded((p) => !p)}
       >
+        <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggleSelect(order.id)}
+            className="accent-[#C9A84C] w-3.5 h-3.5 cursor-pointer"
+          />
+        </td>
         <td className="px-4 py-3">
           <p className="font-cinzel text-gold text-xs font-bold">{order.id}</p>
           <p className="text-cream/35 text-[10px] mt-0.5">{fmtDate(order.created_at)}</p>
@@ -85,7 +163,7 @@ function OrderRow({ order, onStatusChange }: { order: DbOrder; onStatusChange: (
 
       {expanded && (
         <tr className="bg-[#060000]">
-          <td colSpan={7} className="px-4 py-5">
+          <td colSpan={8} className="px-4 py-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 text-sm">
 
               {/* Customer */}
@@ -161,6 +239,75 @@ function OrderRow({ order, onStatusChange }: { order: DbOrder; onStatusChange: (
                     <RefreshCw size={11} className="absolute right-8 top-1/2 -translate-y-1/2 text-gold animate-spin" />
                   )}
                 </div>
+
+                {/* Print Invoice — opens the admin-only Bill of Supply page
+                    (app/admin/orders/[id]/invoice) in a new tab. Available
+                    regardless of order status, since admins may want to
+                    print ahead of marking an order "Shipped". */}
+                <a
+                  href={`/admin/orders/${order.id}/invoice`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-3 inline-flex items-center gap-1.5 border border-gold/20 hover:border-gold/40 text-gold/70 hover:text-gold font-cinzel text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <Printer size={11} /> Print Invoice
+                </a>
+
+                {/* Inline tracking-info prompt — required the first time an
+                    order is marked shipped, since that's what goes into the
+                    customer's "Order Shipped" notification. */}
+                {shipModalOpen && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-3 border border-gold/20 rounded-lg p-3 bg-black/30 space-y-2"
+                  >
+                    <p className="text-gold/70 text-[10px] font-cinzel uppercase tracking-widest flex items-center gap-1.5">
+                      <Truck size={10} /> Shipping Details
+                    </p>
+                    <input
+                      className="input-gold text-xs py-1.5 w-full"
+                      placeholder="Tracking ID"
+                      value={trackingIdInput}
+                      onChange={(e) => setTrackingIdInput(e.target.value)}
+                      autoComplete="off"
+                    />
+                    <input
+                      className="input-gold text-xs py-1.5 w-full"
+                      placeholder="Courier service (e.g. India Post)"
+                      value={courierInput}
+                      onChange={(e) => setCourierInput(e.target.value)}
+                      autoComplete="off"
+                    />
+                    {shipError && <p className="text-red-400 text-[10px]">{shipError}</p>}
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={confirmShip}
+                        disabled={updating}
+                        className="flex-1 bg-gold/20 hover:bg-gold/30 text-gold font-cinzel text-[10px] uppercase tracking-widest py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {updating ? 'Saving…' : 'Confirm'}
+                      </button>
+                      <button
+                        onClick={cancelShip}
+                        disabled={updating}
+                        className="flex-1 border border-cream/15 hover:border-cream/30 text-cream/50 hover:text-cream font-cinzel text-[10px] uppercase tracking-widest py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Once set, show the shipping info that's already on file. */}
+                {!shipModalOpen && order.tracking_id && (
+                  <div className="mt-3 text-[10px] text-cream/40 leading-relaxed flex items-start gap-1.5">
+                    <Truck size={10} className="mt-0.5 flex-shrink-0" />
+                    <span>
+                      {order.courier_service} · {order.tracking_id}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </td>
@@ -178,6 +325,7 @@ export default function OrdersPage() {
   const [query,   setQuery]   = useState('');
   const [status,  setStatus]  = useState<OrderStatus | 'all'>('all');
   const [sort,    setSort]    = useState<'newest' | 'oldest' | 'highest'>('newest');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -203,10 +351,13 @@ export default function OrdersPage() {
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
-  // Optimistic status update (no re-fetch needed)
-  const handleStatusChange = (id: string, newStatus: OrderStatus) => {
+  // Optimistic status update (no re-fetch needed). `extra` carries the
+  // shipped_at/delivered_at/tracking fields the PATCH route just set, so the
+  // duplicate-notification guard (order.shipped_at / order.delivered_at)
+  // works immediately without a re-fetch.
+  const handleStatusChange = (id: string, newStatus: OrderStatus, extra?: Partial<DbOrder>) => {
     setOrders((prev) =>
-      prev.map((o) => (o.id === id ? { ...o, status: newStatus } : o))
+      prev.map((o) => (o.id === id ? { ...o, status: newStatus, ...extra } : o))
     );
   };
 
@@ -228,6 +379,38 @@ export default function OrdersPage() {
     if (sort === 'highest') list = [...list].sort((a, b) => b.subtotal - a.subtotal);
     return list;
   }, [orders, query, status, sort]);
+
+  // Bulk "Print Selected" — see app/admin/orders/print-batch/page.tsx.
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every((o) => selected.has(o.id));
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      if (allFilteredSelected) {
+        // Deselect just what's currently visible, leave any other selections
+        // (from a different filter view) intact.
+        const next = new Set(prev);
+        filtered.forEach((o) => next.delete(o.id));
+        return next;
+      }
+      const next = new Set(prev);
+      filtered.forEach((o) => next.add(o.id));
+      return next;
+    });
+  };
+
+  const handlePrintSelected = () => {
+    if (selected.size === 0) return;
+    const ids = Array.from(selected).join(',');
+    window.open(`/admin/orders/print-batch?ids=${encodeURIComponent(ids)}`, '_blank', 'noopener,noreferrer');
+  };
 
   const totalRevenue = useMemo(
     () => filtered.filter((o) => o.status !== 'cancelled').reduce((s, o) => s + o.subtotal, 0),
@@ -325,6 +508,14 @@ export default function OrdersPage() {
           >
             <Download size={13} /> Export CSV
           </button>
+          <button
+            onClick={handlePrintSelected}
+            disabled={selected.size === 0}
+            className="flex items-center gap-2 border border-gold/25 hover:border-gold/50 text-gold/70 hover:text-gold font-cinzel text-xs px-4 py-2 rounded-xl transition-all disabled:opacity-40"
+            title={selected.size === 0 ? 'Select orders below to print their invoices' : undefined}
+          >
+            <Printer size={13} /> Print Selected{selected.size > 0 ? ` (${selected.size})` : ''}
+          </button>
         </div>
       </div>
 
@@ -379,6 +570,16 @@ export default function OrdersPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gold/10">
+                  <th className="px-3 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      onChange={toggleSelectAll}
+                      disabled={filtered.length === 0}
+                      className="accent-[#C9A84C] w-3.5 h-3.5 cursor-pointer disabled:opacity-30"
+                      title="Select all"
+                    />
+                  </th>
                   {['Order ID / Date', 'Customer', 'Items', 'Total', 'Status', 'Payment', ''].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-[10px] font-cinzel uppercase tracking-widest text-cream/35">
                       {h}
@@ -389,7 +590,7 @@ export default function OrdersPage() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-16 text-center">
+                    <td colSpan={8} className="px-4 py-16 text-center">
                       <Package size={28} className="text-cream/10 mx-auto mb-3" />
                       <p className="font-cinzel text-cream/30 text-sm">
                         {orders.length === 0 ? 'No orders yet — place an order from the storefront to see it here.' : 'No orders match your filters.'}
@@ -398,7 +599,13 @@ export default function OrdersPage() {
                   </tr>
                 ) : (
                   filtered.map((order) => (
-                    <OrderRow key={order.id} order={order} onStatusChange={handleStatusChange} />
+                    <OrderRow
+                      key={order.id}
+                      order={order}
+                      onStatusChange={handleStatusChange}
+                      selected={selected.has(order.id)}
+                      onToggleSelect={toggleSelect}
+                    />
                   ))
                 )}
               </tbody>
