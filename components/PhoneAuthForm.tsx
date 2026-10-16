@@ -158,7 +158,7 @@ export default function PhoneAuthForm({ mode, next }: { mode: Mode; next: string
 
               {mockOtp && (
                 <p className="text-gold/80 text-xs font-cinzel bg-gold/5 border border-gold/20 rounded-lg px-3 py-2">
-                  Demo mode — no SMS provider is connected yet, so here&apos;s your code: <span className="font-bold">{mockOtp}</span>
+                  Demo mode — WhatsApp delivery isn&apos;t connected yet, so here&apos;s your code: <span className="font-bold">{mockOtp}</span>
                 </p>
               )}
 

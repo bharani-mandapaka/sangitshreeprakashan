@@ -22,7 +22,7 @@ const categoryIcons: Record<BookCategory, string> = {
   bundle:        '⊞',
 };
 
-const categoryColors: Record<BookCategory, { bg: string; accent: string }> = {
+export const categoryColors: Record<BookCategory, { bg: string; accent: string }> = {
   instrumental:  { bg: '#3D0800', accent: '#FF6B35' },
   vocal:         { bg: '#08003D', accent: '#4EA8FF' },
   'raag-theory': { bg: '#003D1A', accent: '#4EFF91' },

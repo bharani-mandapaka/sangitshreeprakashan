@@ -39,7 +39,12 @@ create index if not exists order_items_order_id_idx on order_items(order_id);
 -- ── Orders: link to authenticated customer account ──────────────────────────────
 -- Nullable — guest checkout (no account) is still fully supported. Set from the
 -- client's Supabase Auth session at checkout time when the customer is signed in.
-alter table orders add column if not exists user_id uuid references auth.users(id);
+alter table orders add column if not exists user_id uuid references auth.users(id) on delete set null;
+-- Already-deployed databases keep the original FK (no ON DELETE), which blocks deleting an
+-- auth user who has orders ("Database error deleting user"). Run once:
+--   alter table orders drop constraint orders_user_id_fkey;
+--   alter table orders add constraint orders_user_id_fkey
+--     foreign key (user_id) references auth.users(id) on delete set null;
 create index if not exists orders_user_id_idx on orders(user_id);
 
 -- ── Orders: lifecycle notification fields ────────────────────────────────────────
@@ -280,10 +285,14 @@ create index if not exists notif_logs_sent_at_idx on notification_logs(sent_at d
 alter table notification_rules enable row level security;
 alter table notification_logs  enable row level security;
 
+-- RLS on with NO anon/authenticated policy = those roles can't touch these tables
+-- at all. The public anon key ships in the browser bundle, so the old
+-- "for all to anon using (true)" policies let anyone rewrite notification rules
+-- (recipients, templates) or read the logs. Only the server-side service-role
+-- key (which bypasses RLS) reads/writes them: lib/notifications-sender.ts,
+-- app/api/admin/notifications and app/api/notifications/test (admin-cookie gated).
 drop policy if exists "anon_all_notification_rules" on notification_rules;
 drop policy if exists "anon_all_notification_logs"  on notification_logs;
-create policy "anon_all_notification_rules" on notification_rules for all to anon using (true) with check (true);
-create policy "anon_all_notification_logs"  on notification_logs  for all to anon using (true) with check (true);
 
 -- ── Books ─────────────────────────────────────────────────────────────────────
 -- Migrated from the static lib/books.ts array (36 books) so the admin panel can

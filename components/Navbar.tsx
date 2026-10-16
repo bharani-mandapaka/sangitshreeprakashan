@@ -27,7 +27,11 @@ export default function Navbar() {
   // runs, which only happens post-hydration) keeps the first client render
   // identical to the server's, then lets the real count show a tick later.
   const [mounted, setMounted] = useState(false);
-  const itemCount  = useCartStore((s) => s.itemCount);
+  // Selecting the itemCount getter itself (a stable function reference) means
+  // Zustand never sees a changed value and never re-renders this component
+  // when the cart is mutated elsewhere (e.g. a book card's "Add" button) —
+  // selecting the derived number instead makes that state change visible.
+  const itemCount  = useCartStore((s) => s.items.reduce((sum, i) => sum + i.quantity, 0));
   const toggleCart = useCartStore((s) => s.toggleCart);
   const user       = useAuthStore((s) => s.user);
 
@@ -112,14 +116,14 @@ export default function Navbar() {
                 title="Cart"
               >
                 <ShoppingCart size={20} />
-                {mounted && itemCount() > 0 && (
+                {mounted && itemCount > 0 && (
                   <motion.span
-                    key={itemCount()}
+                    key={itemCount}
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     className="absolute -top-0.5 -right-0.5 bg-gold text-dark text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center"
                   >
-                    {itemCount() > 9 ? '9+' : itemCount()}
+                    {itemCount > 9 ? '9+' : itemCount}
                   </motion.span>
                 )}
               </button>
