@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { User, Heart, Package, LogOut, Loader2, Check } from 'lucide-react';
+import { User, Heart, Package, LogOut, Loader2, Check, Download } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '@/lib/auth-store';
 import { useWishlistStore } from '@/lib/wishlist-store';
@@ -295,10 +295,18 @@ export default function ProfilePage() {
                         </div>
                       ))}
                     </div>
-                    <div className="border-t border-gold/10 pt-2 flex justify-between">
+                    <div className="border-t border-gold/10 pt-2 flex items-center justify-between">
                       <span className="text-cream/40 text-xs font-cinzel uppercase">Total</span>
                       <span className="font-cinzel text-gold font-bold text-sm">{formatPrice(order.subtotal)}</span>
                     </div>
+                    <Link
+                      href={`/orders/${order.id}/invoice`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-flex items-center gap-1.5 bg-gold hover:bg-gold-300 text-dark font-cinzel font-bold text-[11px] uppercase tracking-widest px-4 py-2 rounded-lg transition-colors"
+                    >
+                      <Download size={12} /> Download Invoice
+                    </Link>
                   </div>
                 ))}
               </div>

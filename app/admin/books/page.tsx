@@ -526,8 +526,30 @@ export default function AdminBooksPage() {
     });
   }, [books, query, categoryFilter, bundleOnly]);
 
+  const [editLoading, setEditLoading] = useState(false);
+
   const openCreate = () => { setForm(EMPTY_FORM); setFormOpen(true); };
-  const openEdit = (row: DbBookRow) => { setForm(rowToForm(row)); setFormOpen(true); };
+
+  // Refetches the single book fresh rather than trusting the cached `books`
+  // list, which is only loaded once on mount and after this page's own
+  // writes — never on an external change (another admin, another tab, a
+  // direct DB fix). The form always sends every field back on save (a full
+  // replace, not a partial diff), so editing from a stale cached row would
+  // silently revert any change made outside this page since the list was
+  // last loaded. Falls back to the cached row if the refetch fails, so a
+  // transient error degrades to the old (stale-but-working) behavior instead
+  // of blocking the edit entirely.
+  const openEdit = async (row: DbBookRow) => {
+    setEditLoading(true);
+    const { data, error: fetchError } = await getSupabase()
+      .from('books')
+      .select('*')
+      .eq('id', row.id)
+      .maybeSingle();
+    setEditLoading(false);
+    setForm(rowToForm(!fetchError && data ? (data as DbBookRow) : row));
+    setFormOpen(true);
+  };
 
   const handleSaved = (row: DbBookRow) => {
     setBooks((prev) => {
@@ -701,7 +723,8 @@ export default function AdminBooksPage() {
                         <td className="px-4 py-3 text-right whitespace-nowrap">
                           <button
                             onClick={() => openEdit(b)}
-                            className="text-cream/40 hover:text-gold transition-colors p-1.5"
+                            disabled={editLoading}
+                            className="text-cream/40 hover:text-gold transition-colors p-1.5 disabled:opacity-40"
                             title="Edit"
                           >
                             <Pencil size={14} />
