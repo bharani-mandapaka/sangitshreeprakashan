@@ -13,6 +13,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import { getSupabase } from '@/lib/supabase';
 import { formatPrice, generateOrderId } from '@/lib/utils';
 import { validateCheckoutDetails, type CheckoutErrors } from '@/lib/checkout-validation';
+import { statesMatch, PINCODE_FORMAT } from '@/lib/pincode';
 import BookCoverImage from '@/components/BookCoverImage';
 
 type CheckoutStep = 'details' | 'payment' | 'success';
@@ -49,6 +50,33 @@ declare global {
   }
 }
 
+// What we know about the PIN code typed so far (see /api/pincode, lib/pincode.ts).
+// "unknown" means the lookup service didn't answer — that never blocks checkout.
+interface PinInfo {
+  code: string;
+  status: 'checking' | 'valid' | 'invalid' | 'unknown';
+  state?: string;
+  districts?: string[];
+}
+const pinCache = new Map<string, PinInfo>();
+
+async function lookupPin(code: string): Promise<PinInfo> {
+  const cached = pinCache.get(code);
+  if (cached) return cached;
+  try {
+    const res  = await fetch(`/api/pincode?code=${code}`);
+    const data = await res.json();
+    const info: PinInfo =
+      data.status === 'valid'   ? { code, status: 'valid', state: data.state, districts: data.districts } :
+      data.status === 'invalid' ? { code, status: 'invalid' } :
+                                  { code, status: 'unknown' };
+    if (info.status !== 'unknown') pinCache.set(code, info);
+    return info;
+  } catch {
+    return { code, status: 'unknown' };
+  }
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, clearCart } = useCartStore();
@@ -67,6 +95,24 @@ export default function CheckoutPage() {
     name: '', email: '', phone: '', address: '', city: '', state: '', pincode: '',
   });
   const [fieldErrors, setFieldErrors] = useState<CheckoutErrors>({});
+  const [pinInfo, setPinInfo]           = useState<PinInfo | null>(null);
+  const [pinConfirmed, setPinConfirmed] = useState(false);
+
+  // Look the PIN code up as soon as all 6 digits are in; fill in an empty State field.
+  useEffect(() => {
+    const code = form.pincode;
+    if (!PINCODE_FORMAT.test(code)) { setPinInfo(null); return; }
+    let cancelled = false;
+    setPinInfo({ code, status: 'checking' });
+    lookupPin(code).then((info) => {
+      if (cancelled) return;
+      setPinInfo(info);
+      if (info.status === 'valid' && info.state) {
+        setForm((f) => (f.pincode === code && !f.state.trim() ? { ...f, state: info.state as string } : f));
+      }
+    });
+    return () => { cancelled = true; };
+  }, [form.pincode]);
 
   // Updating a field also clears that field's error message.
   const setField = (key: keyof typeof form, value: string) => {
@@ -99,7 +145,7 @@ export default function CheckoutPage() {
   const shipping = 0;   // Free shipping for now
   const total    = subtotal() + shipping;
 
-  const handleDetailsSubmit = (e: React.FormEvent) => {
+  const handleDetailsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Catch bad details (e.g. a 5-digit phone, a 2-digit PIN) before anyone
@@ -109,6 +155,20 @@ export default function CheckoutPage() {
       setFieldErrors(errors);
       const first = (['name', 'email', 'phone', 'address', 'city', 'state', 'pincode'] as const).find((k) => errors[k]);
       if (first) document.getElementById(`checkout-${first}`)?.focus();
+      return;
+    }
+
+    // The PIN has the right shape — does it really exist, and is it in the state typed?
+    const pin = await lookupPin(clean.pincode);
+    setPinInfo(pin);
+    if (pin.status === 'invalid' && !pinConfirmed) {
+      setFieldErrors({ pincode: 'We couldn’t find this PIN code. Please check it, or tick “My PIN code is correct” below if you’re sure.' });
+      document.getElementById('checkout-pincode')?.focus();
+      return;
+    }
+    if (pin.status === 'valid' && pin.state && !statesMatch(clean.state, pin.state)) {
+      setFieldErrors({ state: `PIN code ${clean.pincode} belongs to ${pin.state}. Change the state, or check the PIN code.` });
+      document.getElementById('checkout-state')?.focus();
       return;
     }
     setFieldErrors({});
@@ -163,6 +223,7 @@ export default function CheckoutPage() {
           items: itemsPayload,
           customer: { name: form.name, email: form.email, phone: form.phone },
           billingAddress: { line1: form.address, city: form.city, state: form.state, pincode: form.pincode },
+          pincodeConfirmed: pinConfirmed,
         }),
       });
     } catch {
@@ -413,11 +474,36 @@ export default function CheckoutPage() {
                       <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">State *</label>
                       <input id="checkout-state" className={fieldClass('state')} required autoComplete="address-level1" value={form.state} onChange={(e) => setField('state', e.target.value)} placeholder="State" />
                       {fieldError('state')}
+                      {pinInfo?.status === 'valid' && pinInfo.state && form.state.trim() && !statesMatch(form.state, pinInfo.state) && (
+                        <p className="text-amber-400 text-xs mt-1.5">
+                          PIN {pinInfo.code} is in {pinInfo.state}.{' '}
+                          <button type="button" onClick={() => setField('state', pinInfo.state as string)} className="underline text-gold hover:text-gold-300">
+                            Use {pinInfo.state}
+                          </button>
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">PIN Code *</label>
-                      <input id="checkout-pincode" className={fieldClass('pincode')} required inputMode="numeric" autoComplete="postal-code" value={form.pincode} onChange={(e) => setField('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="110001" maxLength={6} />
+                      <input id="checkout-pincode" className={fieldClass('pincode')} required inputMode="numeric" autoComplete="postal-code" value={form.pincode} onChange={(e) => { setField('pincode', e.target.value.replace(/\D/g, '').slice(0, 6)); setPinConfirmed(false); }} placeholder="110001" maxLength={6} />
                       {fieldError('pincode')}
+                      {pinInfo?.status === 'checking' && !fieldErrors.pincode && (
+                        <p className="text-cream/40 text-xs mt-1.5">Checking PIN code…</p>
+                      )}
+                      {pinInfo?.status === 'valid' && !fieldErrors.pincode && (
+                        <p className="text-emerald-400/90 text-xs mt-1.5">✓ {(pinInfo.districts ?? []).join(', ')}, {pinInfo.state}</p>
+                      )}
+                      {pinInfo?.status === 'invalid' && (
+                        <div className="mt-1.5">
+                          {!fieldErrors.pincode && (
+                            <p className="text-amber-400 text-xs">We couldn’t find this PIN code. Please double-check it.</p>
+                          )}
+                          <label className="flex items-center gap-2 text-cream/60 text-xs mt-1.5 cursor-pointer">
+                            <input type="checkbox" checked={pinConfirmed} onChange={(e) => setPinConfirmed(e.target.checked)} />
+                            My PIN code is correct
+                          </label>
+                        </div>
+                      )}
                     </div>
                   </div>
 
