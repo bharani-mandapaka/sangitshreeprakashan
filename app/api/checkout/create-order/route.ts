@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRazorpayOrder } from '@/lib/razorpay';
 import { computeVerifiedSubtotal } from '@/lib/books-data';
 import { validateCheckoutDetails } from '@/lib/checkout-validation';
-import { lookupPincode } from '@/lib/pincode';
+import { lookupPincode } from '@/lib/pincode-lookup';
 
 // Story 1 (razorpay-integration-user-stories.md): starts a real payment.
 // Deliberately does NOT touch Supabase's orders table at all — no order
@@ -32,12 +32,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // The PIN has the right shape — now check it actually exists. A definite "no such
-  // PIN" is refused unless the customer ticked "My PIN code is correct" (India Post's
-  // list can lag behind brand-new PINs). If the lookup itself fails ("unknown"), the
-  // order goes ahead: a flaky third-party service must never block a sale.
+  // The PIN has the right shape — now check it exists in the bundled official
+  // directory. A PIN that isn't listed is refused unless the customer ticked "My PIN
+  // code is correct" (the directory is refreshed about yearly, so it can lag behind
+  // brand-new PINs).
   const pincode = String(body?.billingAddress?.pincode ?? '').trim();
-  const pin = await lookupPincode(pincode);
+  const pin = lookupPincode(pincode);
   if (pin.status === 'invalid' && body?.pincodeConfirmed !== true) {
     return NextResponse.json(
       {

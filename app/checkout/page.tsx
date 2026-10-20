@@ -62,8 +62,9 @@ interface PinInfo {
 const pinCache = new Map<string, PinInfo>();
 
 // A PIN straddling a state border lists several states — any of them is fine.
+// A PIN with no state in the official list (~100 of them) is never held against the customer.
 const pinStateMatches = (entered: string, pin: PinInfo) =>
-  (pin.states?.length ? pin.states : [pin.state ?? '']).some((s) => statesMatch(entered, s));
+  !pin.states?.length || pin.states.some((s) => statesMatch(entered, s));
 
 async function lookupPin(code: string): Promise<PinInfo> {
   const cached = pinCache.get(code);
@@ -72,7 +73,7 @@ async function lookupPin(code: string): Promise<PinInfo> {
     const res  = await fetch(`/api/pincode?code=${code}`);
     const data = await res.json();
     const info: PinInfo =
-      data.status === 'valid'   ? { code, status: 'valid', state: data.state, states: data.states ?? [data.state], districts: data.districts } :
+      data.status === 'valid'   ? { code, status: 'valid', state: data.state, states: data.states ?? [], districts: data.districts } :
       data.status === 'invalid' ? { code, status: 'invalid' } :
                                   { code, status: 'unknown' };
     if (info.status !== 'unknown') pinCache.set(code, info);
@@ -112,8 +113,9 @@ export default function CheckoutPage() {
     lookupPin(code).then((info) => {
       if (cancelled) return;
       setPinInfo(info);
-      if (info.status === 'valid' && info.state) {
-        setForm((f) => (f.pincode === code && !f.state.trim() ? { ...f, state: info.state as string } : f));
+      // Fill an empty State only when the PIN is in exactly one state (border PINs: customer picks).
+      if (info.status === 'valid' && info.states?.length === 1) {
+        setForm((f) => (f.pincode === code && !f.state.trim() ? { ...f, state: (info.states as string[])[0] } : f));
       }
     });
     return () => { cancelled = true; };
@@ -171,8 +173,8 @@ export default function CheckoutPage() {
       document.getElementById('checkout-pincode')?.focus();
       return;
     }
-    if (pin.status === 'valid' && pin.state && !pinStateMatches(clean.state, pin)) {
-      setFieldErrors({ state: `PIN code ${clean.pincode} belongs to ${(pin.states ?? [pin.state]).join(' / ')}. Change the state, or check the PIN code.` });
+    if (pin.status === 'valid' && !pinStateMatches(clean.state, pin)) {
+      setFieldErrors({ state: `PIN code ${clean.pincode} belongs to ${(pin.states ?? []).join(' / ')}. Change the state, or check the PIN code.` });
       document.getElementById('checkout-state')?.focus();
       return;
     }
@@ -479,12 +481,14 @@ export default function CheckoutPage() {
                       <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">State *</label>
                       <input id="checkout-state" className={fieldClass('state')} required autoComplete="address-level1" value={form.state} onChange={(e) => setField('state', e.target.value)} placeholder="State" />
                       {fieldError('state')}
-                      {pinInfo?.status === 'valid' && pinInfo.state && form.state.trim() && !pinStateMatches(form.state, pinInfo) && (
+                      {pinInfo?.status === 'valid' && form.state.trim() && !pinStateMatches(form.state, pinInfo) && (
                         <p className="text-amber-400 text-xs mt-1.5">
-                          PIN {pinInfo.code} is in {pinInfo.state}.{' '}
-                          <button type="button" onClick={() => setField('state', pinInfo.state as string)} className="underline text-gold hover:text-gold-300">
-                            Use {pinInfo.state}
-                          </button>
+                          PIN {pinInfo.code} is in {(pinInfo.states ?? []).join(' / ')}.{' '}
+                          {(pinInfo.states ?? []).map((s) => (
+                            <button key={s} type="button" onClick={() => setField('state', s)} className="underline text-gold hover:text-gold-300 mr-2">
+                              Use {s}
+                            </button>
+                          ))}
                         </p>
                       )}
                     </div>
@@ -496,7 +500,7 @@ export default function CheckoutPage() {
                         <p className="text-cream/40 text-xs mt-1.5">Checking PIN code…</p>
                       )}
                       {pinInfo?.status === 'valid' && !fieldErrors.pincode && (
-                        <p className="text-emerald-400/90 text-xs mt-1.5">✓ {(pinInfo.districts ?? []).join(', ')}, {pinInfo.state}</p>
+                        <p className="text-emerald-400/90 text-xs mt-1.5">✓ {[...(pinInfo.districts ?? []), ...(pinInfo.states ?? [])].join(', ') || 'PIN code found'}</p>
                       )}
                       {pinInfo?.status === 'invalid' && (
                         <div className="mt-1.5">
