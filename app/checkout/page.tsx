@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Script from 'next/script';
@@ -14,6 +14,8 @@ import { getSupabase } from '@/lib/supabase';
 import { formatPrice, generateOrderId } from '@/lib/utils';
 import { validateCheckoutDetails, type CheckoutErrors } from '@/lib/checkout-validation';
 import { statesMatch, PINCODE_FORMAT } from '@/lib/pincode';
+import { useAddressesStore } from '@/lib/addresses-store';
+import { sameAddress, MAX_SAVED_ADDRESSES, type SavedAddress } from '@/lib/addresses';
 import BookCoverImage from '@/components/BookCoverImage';
 
 type CheckoutStep = 'details' | 'payment' | 'success';
@@ -104,6 +106,19 @@ export default function CheckoutPage() {
   const [pinInfo, setPinInfo]           = useState<PinInfo | null>(null);
   const [pinConfirmed, setPinConfirmed] = useState(false);
 
+  // Saved addresses (signed-in customers only — see lib/addresses-store.ts).
+  const savedAddresses  = useAddressesStore((s) => s.addresses);
+  const addressesLoaded = useAddressesStore((s) => s.loaded);
+  const addAddress      = useAddressesStore((s) => s.add);
+  const [saveAddress, setSaveAddress]   = useState(true);
+  const [addressLabel, setAddressLabel] = useState('');
+  // Set when a saved address is applied, so the PIN lookup that follows doesn't
+  // overwrite the city/state the customer saved (the lookup uses district names).
+  const skipAutofillFor = useRef<string | null>(null);
+  const prefilledDefault = useRef(false);
+  const formRef = useRef(form);
+  formRef.current = form;
+
   // Look the PIN code up as soon as all 6 digits are in; fill in an empty State field.
   useEffect(() => {
     const code = form.pincode;
@@ -113,6 +128,7 @@ export default function CheckoutPage() {
     lookupPin(code).then((info) => {
       if (cancelled) return;
       setPinInfo(info);
+      if (skipAutofillFor.current === code) { skipAutofillFor.current = null; return; }
       // A new PIN moves State and City with it. A border PIN (several states) keeps the
       // customer's state if it is one of them; a PIN with no state on record leaves State alone.
       if (info.status === 'valid') {
@@ -157,6 +173,35 @@ export default function CheckoutPage() {
     }));
   }, [user]);
 
+  // Fill the whole delivery block from a saved address (name and phone come with it;
+  // the email stays as is).
+  const applyAddress = (a: SavedAddress) => {
+    if (a.address_pincode !== formRef.current.pincode) skipAutofillFor.current = a.address_pincode;
+    setForm((f) => ({
+      ...f,
+      name: a.full_name, phone: a.phone,
+      address: a.address_line1, city: a.address_city, state: a.address_state, pincode: a.address_pincode,
+    }));
+    setFieldErrors({});
+    setPinConfirmed(true); // it was accepted when the customer saved it
+  };
+
+  const startNewAddress = () => {
+    setForm((f) => ({ ...f, address: '', city: '', state: '', pincode: '' }));
+    setFieldErrors({});
+    setPinConfirmed(false);
+  };
+
+  // A returning customer lands on checkout with their default address already in place.
+  useEffect(() => {
+    if (!addressesLoaded || prefilledDefault.current) return;
+    prefilledDefault.current = true;
+    const preferred = savedAddresses.find((a) => a.is_default) ?? savedAddresses[0];
+    const f = formRef.current;
+    if (preferred && !f.address.trim() && !f.pincode) applyAddress(preferred);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, when the addresses first arrive
+  }, [addressesLoaded, savedAddresses]);
+
   const shipping = 0;   // Free shipping for now
   const total    = subtotal() + shipping;
 
@@ -188,6 +233,18 @@ export default function CheckoutPage() {
     }
     setFieldErrors({});
     setForm(clean);
+
+    // Keep the address for next time if the customer asked (fire and forget — a save
+    // problem must never get in the way of paying; duplicates and the 5-address cap
+    // are handled by the store).
+    if (user && saveAddress) {
+      void addAddress(user.id, {
+        label: addressLabel.trim() || null,
+        full_name: clean.name, phone: clean.phone,
+        address_line1: clean.address, address_city: clean.city,
+        address_state: clean.state, address_pincode: clean.pincode,
+      });
+    }
     setStep('payment');
     // Without this, the page keeps whatever scroll position the (often
     // long) shipping form left it at — after filling the form, that's
@@ -454,6 +511,40 @@ export default function CheckoutPage() {
                 >
                   <h2 className="font-cinzel text-cream text-xl font-bold mb-6">Shipping Details</h2>
 
+                  {/* Returning customers: pick a saved address instead of retyping it. */}
+                  {user && savedAddresses.length > 0 && (
+                    <div>
+                      <p className="text-cream/50 text-xs uppercase tracking-widest mb-2 font-cinzel">Your saved addresses</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {savedAddresses.map((a) => {
+                          const selected = sameAddress({ address_line1: form.address, address_pincode: form.pincode }, a);
+                          return (
+                            <button
+                              key={a.id}
+                              type="button"
+                              onClick={() => applyAddress(a)}
+                              className={`text-left rounded-xl border p-3 transition-colors ${selected ? 'border-gold bg-gold/10' : 'border-gold/15 hover:border-gold/40'}`}
+                            >
+                              <span className="flex items-center justify-between gap-2">
+                                <span className="font-cinzel text-gold text-xs font-bold">{a.label || 'Address'}</span>
+                                {a.is_default && <span className="text-[10px] uppercase tracking-widest text-cream/50 border border-gold/20 rounded-full px-2 py-0.5">Default</span>}
+                              </span>
+                              <span className="block text-cream/85 text-sm mt-1">{a.full_name}</span>
+                              <span className="block text-cream/55 text-xs mt-0.5">{a.address_line1}, {a.address_city}, {a.address_state} – {a.address_pincode}</span>
+                            </button>
+                          );
+                        })}
+                        <button
+                          type="button"
+                          onClick={startNewAddress}
+                          className="rounded-xl border border-dashed border-gold/25 hover:border-gold/60 p-3 text-gold/80 hover:text-gold text-sm font-cinzel transition-colors"
+                        >
+                          + Use a new address
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">Full Name *</label>
@@ -539,6 +630,39 @@ export default function CheckoutPage() {
                     <textarea id="checkout-address" className={`${fieldClass('address')} h-20 resize-none`} required autoComplete="street-address" value={form.address} onChange={(e) => setField('address', e.target.value)} placeholder="House/Flat No., Street, Area" />
                     {fieldError('address')}
                   </div>
+
+                  {/* "Save address" (signed-in customers); guests get a nudge to sign in. */}
+                  {user ? (() => {
+                    const alreadySaved = savedAddresses.some((a) => sameAddress({ address_line1: form.address, address_pincode: form.pincode }, a));
+                    if (alreadySaved) {
+                      return <p className="text-emerald-400/90 text-xs">✓ This address is saved to your account.</p>;
+                    }
+                    if (savedAddresses.length >= MAX_SAVED_ADDRESSES) {
+                      return <p className="text-cream/45 text-xs">You have {MAX_SAVED_ADDRESSES} saved addresses. Delete one in your <Link href="/profile" className="underline text-gold/80 hover:text-gold">profile</Link> to save this one.</p>;
+                    }
+                    return (
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-cream/70 text-sm cursor-pointer">
+                          <input type="checkbox" checked={saveAddress} onChange={(e) => setSaveAddress(e.target.checked)} />
+                          Save address
+                        </label>
+                        {saveAddress && (
+                          <input
+                            className="input-gold"
+                            value={addressLabel}
+                            onChange={(e) => setAddressLabel(e.target.value.slice(0, 30))}
+                            placeholder="Name this address (optional) — e.g. Home, Office"
+                            maxLength={30}
+                          />
+                        )}
+                      </div>
+                    );
+                  })() : (
+                    <p className="text-cream/40 text-xs">
+                      Want to save your address?{' '}
+                      <Link href="/login?next=/checkout" className="underline text-gold/80 hover:text-gold">Sign in</Link>
+                    </p>
+                  )}
 
                   <button
                     type="submit"
