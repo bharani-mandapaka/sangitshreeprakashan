@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRazorpayOrder } from '@/lib/razorpay';
 import { computeVerifiedSubtotal } from '@/lib/books-data';
 import { validateCheckoutDetails } from '@/lib/checkout-validation';
+import { lookupPincode } from '@/lib/pincode-lookup';
 
 // Story 1 (razorpay-integration-user-stories.md): starts a real payment.
 // Deliberately does NOT touch Supabase's orders table at all — no order
@@ -27,6 +28,22 @@ export async function POST(req: NextRequest) {
   if (Object.keys(errors).length > 0) {
     return NextResponse.json(
       { error: 'Please correct your shipping details and try again.', fieldErrors: errors },
+      { status: 400 },
+    );
+  }
+
+  // The PIN has the right shape — now check it exists in the bundled official
+  // directory. A PIN that isn't listed is refused unless the customer ticked "My PIN
+  // code is correct" (the directory is refreshed about yearly, so it can lag behind
+  // brand-new PINs).
+  const pincode = String(body?.billingAddress?.pincode ?? '').trim();
+  const pin = lookupPincode(pincode);
+  if (pin.status === 'invalid' && body?.pincodeConfirmed !== true) {
+    return NextResponse.json(
+      {
+        error: 'Please correct your shipping details and try again.',
+        fieldErrors: { pincode: 'We couldn’t find this PIN code. Please check it, or tick “My PIN code is correct” if you’re sure.' },
+      },
       { status: 400 },
     );
   }
