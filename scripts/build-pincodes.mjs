@@ -61,22 +61,25 @@ const states = [], districts = [];
 const stateIdx = new Map(), districtIdx = new Map();
 const idx = (list, map, v) => { if (!map.has(v)) { map.set(v, list.length); list.push(v); } return map.get(v); };
 
-const byPin = new Map(); // pin -> { states: Set<idx>, districts: Set<idx> }
+const byPin = new Map(); // pin -> { s: Map<stateIdx, postOffices>, d: Map<districtIdx, postOffices> }
 let rowCount = 0;
 for (const r of rows.slice(1)) {
   const pin = (r[iPin] ?? '').trim();
   if (!/^[1-9]\d{5}$/.test(pin)) continue;
   rowCount++;
-  if (!byPin.has(pin)) byPin.set(pin, { s: new Set(), d: new Set() });
+  if (!byPin.has(pin)) byPin.set(pin, { s: new Map(), d: new Map() });
   const entry = byPin.get(pin);
-  if (!isBlank(r[iState])) entry.s.add(idx(states, stateIdx, cleanState(r[iState])));
-  if (!isBlank(r[iDistrict])) entry.d.add(idx(districts, districtIdx, titleCase(r[iDistrict].trim())));
+  const bump = (m, k) => m.set(k, (m.get(k) ?? 0) + 1);
+  if (!isBlank(r[iState])) bump(entry.s, idx(states, stateIdx, cleanState(r[iState])));
+  if (!isBlank(r[iDistrict])) bump(entry.d, idx(districts, districtIdx, titleCase(r[iDistrict].trim())));
 }
 
 const pins = {};
 for (const pin of [...byPin.keys()].sort()) {
   const { s, d } = byPin.get(pin);
-  pins[pin] = [[...s], [...d].slice(0, 3)];
+  // Most common first: the checkout fills City/State from the first entry of each list.
+  const byCount = (m) => [...m.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0]).map(([k]) => k);
+  pins[pin] = [byCount(s), byCount(d).slice(0, 3)];
 }
 
 const out = {

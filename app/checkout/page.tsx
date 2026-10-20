@@ -113,9 +113,17 @@ export default function CheckoutPage() {
     lookupPin(code).then((info) => {
       if (cancelled) return;
       setPinInfo(info);
-      // Fill an empty State only when the PIN is in exactly one state (border PINs: customer picks).
-      if (info.status === 'valid' && info.states?.length === 1) {
-        setForm((f) => (f.pincode === code && !f.state.trim() ? { ...f, state: (info.states as string[])[0] } : f));
+      // A new PIN moves State and City with it. A border PIN (several states) keeps the
+      // customer's state if it is one of them; a PIN with no state on record leaves State alone.
+      if (info.status === 'valid') {
+        setForm((f) => {
+          if (f.pincode !== code) return f;
+          const states = info.states ?? [];
+          const keepState = states.length > 1 && f.state.trim() !== '' && states.some((s) => statesMatch(f.state, s));
+          const state = states.length === 0 || keepState ? f.state : states[0];
+          const city  = info.districts?.[0] ?? f.city;
+          return { ...f, state, city };
+        });
       }
     });
     return () => { cancelled = true; };
@@ -466,16 +474,48 @@ export default function CheckoutPage() {
                   </div>
 
                   <div>
-                    <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">Address *</label>
-                    <textarea id="checkout-address" className={`${fieldClass('address')} h-20 resize-none`} required autoComplete="street-address" value={form.address} onChange={(e) => setField('address', e.target.value)} placeholder="House/Flat No., Street, Area" />
-                    {fieldError('address')}
+                    <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">PIN Code *</label>
+                    <input id="checkout-pincode" className={fieldClass('pincode')} required inputMode="numeric" autoComplete="postal-code" value={form.pincode} onChange={(e) => { setField('pincode', e.target.value.replace(/\D/g, '').slice(0, 6)); setPinConfirmed(false); }} placeholder="e.g. 208001" maxLength={6} />
+                    {fieldError('pincode')}
+                    {!pinInfo && !fieldErrors.pincode && (
+                      <p className="text-cream/35 text-xs mt-1.5">Enter your PIN code first — we’ll fill in your city and state.</p>
+                    )}
+                    {pinInfo?.status === 'checking' && !fieldErrors.pincode && (
+                      <p className="text-cream/40 text-xs mt-1.5">Checking PIN code…</p>
+                    )}
+                    {pinInfo?.status === 'valid' && !fieldErrors.pincode && (
+                      <p className="text-emerald-400/90 text-xs mt-1.5">✓ {[...(pinInfo.districts ?? []), ...(pinInfo.states ?? [])].join(', ') || 'PIN code found'}</p>
+                    )}
+                    {pinInfo?.status === 'invalid' && (
+                      <div className="mt-1.5">
+                        {!fieldErrors.pincode && (
+                          <p className="text-amber-400 text-xs">We couldn’t find this PIN code. Please double-check it.</p>
+                        )}
+                        <label className="flex items-center gap-2 text-cream/60 text-xs mt-1.5 cursor-pointer">
+                          <input type="checkbox" checked={pinConfirmed} onChange={(e) => setPinConfirmed(e.target.checked)} />
+                          My PIN code is correct
+                        </label>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">City *</label>
                       <input id="checkout-city" className={fieldClass('city')} required autoComplete="address-level2" value={form.city} onChange={(e) => setField('city', e.target.value)} placeholder="City" />
                       {fieldError('city')}
+                      {pinInfo?.status === 'valid' && (pinInfo.districts?.length ?? 0) > 1 && (
+                        <p className="text-cream/40 text-xs mt-1.5">
+                          Also in:{' '}
+                          {(pinInfo.districts ?? [])
+                            .filter((d) => d.toLowerCase() !== form.city.trim().toLowerCase())
+                            .map((d) => (
+                              <button key={d} type="button" onClick={() => setField('city', d)} className="underline text-gold hover:text-gold-300 mr-2">
+                                {d}
+                              </button>
+                            ))}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">State *</label>
@@ -492,28 +532,12 @@ export default function CheckoutPage() {
                         </p>
                       )}
                     </div>
-                    <div>
-                      <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">PIN Code *</label>
-                      <input id="checkout-pincode" className={fieldClass('pincode')} required inputMode="numeric" autoComplete="postal-code" value={form.pincode} onChange={(e) => { setField('pincode', e.target.value.replace(/\D/g, '').slice(0, 6)); setPinConfirmed(false); }} placeholder="110001" maxLength={6} />
-                      {fieldError('pincode')}
-                      {pinInfo?.status === 'checking' && !fieldErrors.pincode && (
-                        <p className="text-cream/40 text-xs mt-1.5">Checking PIN code…</p>
-                      )}
-                      {pinInfo?.status === 'valid' && !fieldErrors.pincode && (
-                        <p className="text-emerald-400/90 text-xs mt-1.5">✓ {[...(pinInfo.districts ?? []), ...(pinInfo.states ?? [])].join(', ') || 'PIN code found'}</p>
-                      )}
-                      {pinInfo?.status === 'invalid' && (
-                        <div className="mt-1.5">
-                          {!fieldErrors.pincode && (
-                            <p className="text-amber-400 text-xs">We couldn’t find this PIN code. Please double-check it.</p>
-                          )}
-                          <label className="flex items-center gap-2 text-cream/60 text-xs mt-1.5 cursor-pointer">
-                            <input type="checkbox" checked={pinConfirmed} onChange={(e) => setPinConfirmed(e.target.checked)} />
-                            My PIN code is correct
-                          </label>
-                        </div>
-                      )}
-                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">Address *</label>
+                    <textarea id="checkout-address" className={`${fieldClass('address')} h-20 resize-none`} required autoComplete="street-address" value={form.address} onChange={(e) => setField('address', e.target.value)} placeholder="House/Flat No., Street, Area" />
+                    {fieldError('address')}
                   </div>
 
                   <button

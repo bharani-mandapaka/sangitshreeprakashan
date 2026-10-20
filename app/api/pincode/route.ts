@@ -12,7 +12,9 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json(lookupPincode(code), {
-    // The directory only changes when the app is redeployed, so answers are safe to cache.
-    headers: { 'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=604800' },
+    // The directory only changes when the app is redeployed, so the CDN may cache answers
+    // (Vercel clears it on every deploy). Browsers must NOT reuse a stored copy: with
+    // "stale-while-revalidate" a browser can show an old answer after the data has changed.
+    headers: { 'Cache-Control': 'public, max-age=0, s-maxage=86400' },
   });
 }
