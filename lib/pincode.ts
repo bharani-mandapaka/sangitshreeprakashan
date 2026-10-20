@@ -7,7 +7,9 @@
 // found" counts as invalid — and even then the form lets the customer confirm.
 
 export type PincodeLookup =
-  | { status: 'valid'; state: string; districts: string[] }
+  // `state` is the main one; `states` lists every state the PIN's post offices are in
+  // (a few PINs straddle a border, e.g. 396230 in Gujarat and Dadra & Nagar Haveli).
+  | { status: 'valid'; state: string; states: string[]; districts: string[] }
   | { status: 'invalid' }
   | { status: 'unknown' };
 
@@ -47,9 +49,11 @@ export async function lookupPincode(code: string): Promise<PincodeLookup> {
 
     if (entry?.Status === 'Success' && Array.isArray(entry.PostOffice) && entry.PostOffice.length > 0) {
       const offices = entry.PostOffice as { State?: string; District?: string }[];
-      const state = mostCommon(offices.map((o) => o.State ?? '').filter(Boolean));
+      const stateNames = offices.map((o) => o.State ?? '').filter(Boolean);
+      const state = mostCommon(stateNames);
+      const states = Array.from(new Set(stateNames));
       const districts = Array.from(new Set(offices.map((o) => o.District ?? '').filter(Boolean))).slice(0, 3);
-      if (state) value = { status: 'valid', state, districts };
+      if (state) value = { status: 'valid', state, states, districts };
     } else if (entry?.Status === 'Error' && /no records/i.test(String(entry.Message ?? ''))) {
       value = { status: 'invalid' };
     }
