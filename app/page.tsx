@@ -40,6 +40,9 @@ export const metadata = {
   },
 };
 
+// Built once and re-checked hourly (the admin API revalidates it on every book edit).
+export const revalidate = 3600;
+
 export default async function HomePage() {
   const featured = (await getFeaturedBooks()).slice(0, 8);
 

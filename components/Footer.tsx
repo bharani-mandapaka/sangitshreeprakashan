@@ -36,7 +36,7 @@ export default function Footer() {
           <div className="lg:col-span-1">
             <Link href="/" className="flex items-center gap-3 mb-4">
               <div className="relative w-12 h-12">
-                <Image src="/logo.png" alt="SSP Logo" fill className="object-contain" />
+                <Image src="/logo.png" alt="SSP Logo" fill sizes="48px" className="object-contain" />
               </div>
               <div>
                 <p className="font-cinzel text-gold font-bold text-sm">Sangit Shree Prakashan</p>
