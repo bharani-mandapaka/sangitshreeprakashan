@@ -3,17 +3,19 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { User, Heart, Package, LogOut, Loader2, Check, Download } from 'lucide-react';
+import { User, Heart, Package, LogOut, Loader2, Check, Download, MapPin, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '@/lib/auth-store';
 import { useWishlistStore } from '@/lib/wishlist-store';
+import { useAddressesStore } from '@/lib/addresses-store';
+import { MAX_SAVED_ADDRESSES } from '@/lib/addresses';
 import { getSupabase, type DbOrder } from '@/lib/supabase';
 import { mapDbBookToBook, type DbBookRow } from '@/lib/books-data';
 import type { Book } from '@/lib/books';
 import { formatPrice, whatsappLink } from '@/lib/utils';
 import BookCard from '@/components/BookCard';
 
-type Tab = 'overview' | 'wishlist' | 'orders';
+type Tab = 'overview' | 'wishlist' | 'orders' | 'addresses';
 
 // Matches the policy on /shipping-returns: report a damaged/wrong book within 7 days of delivery.
 const RETURN_WINDOW_DAYS = 7;
@@ -33,6 +35,10 @@ export default function ProfilePage() {
   const authLoading = useAuthStore((s) => s.loading);
   const signOut     = useAuthStore((s) => s.signOut);
   const wishlistIds = useWishlistStore(useShallow((s) => Array.from(s.bookIds)));
+  const addresses     = useAddressesStore((s) => s.addresses);
+  const removeAddress = useAddressesStore((s) => s.remove);
+  const makeDefault   = useAddressesStore((s) => s.makeDefault);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const [tab, setTab] = useState<Tab>('overview');
   const [orders,        setOrders]        = useState<DbOrder[]>([]);
@@ -144,6 +150,7 @@ export default function ProfilePage() {
     { id: 'overview', label: 'Overview',                       icon: <User size={14} /> },
     { id: 'wishlist', label: `Wishlist (${wishlistBooks.length})`, icon: <Heart size={14} /> },
     { id: 'orders',   label: `Orders (${orders.length})`,        icon: <Package size={14} /> },
+    { id: 'addresses', label: `Addresses (${addresses.length})`, icon: <MapPin size={14} /> },
   ];
 
   return (
@@ -259,6 +266,57 @@ export default function ProfilePage() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {wishlistBooks.map((b) => <BookCard key={b.id} book={b} />)}
+            </div>
+          )
+        )}
+
+        {/* Saved addresses — added at checkout (the "Save address" tick) */}
+        {tab === 'addresses' && (
+          addresses.length === 0 ? (
+            <div className="text-center py-16">
+              <MapPin size={32} className="text-cream/20 mx-auto mb-4" />
+              <p className="text-cream/50 mb-2">No saved addresses yet.</p>
+              <p className="text-cream/35 text-sm mb-4">Tick “Save address” at checkout and it will appear here.</p>
+              <Link href="/books" className="text-gold hover:text-gold-300 font-cinzel text-sm transition-colors">
+                Browse Books →
+              </Link>
+            </div>
+          ) : (
+            <div>
+              <p className="text-cream/40 text-xs mb-4">You can save up to {MAX_SAVED_ADDRESSES} addresses. The default one fills in automatically at checkout.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {addresses.map((a) => (
+                  <div key={a.id} className="gold-border rounded-2xl p-5 bg-[#0A0000]">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <p className="font-cinzel text-gold text-sm font-bold">{a.label || 'Address'}</p>
+                      {a.is_default && <span className="text-[10px] uppercase tracking-widest text-gold/80 border border-gold/30 rounded-full px-2 py-0.5">Default</span>}
+                    </div>
+                    <p className="text-cream/85 text-sm">{a.full_name}</p>
+                    <p className="text-cream/55 text-xs mt-0.5">{a.phone}</p>
+                    <p className="text-cream/60 text-sm mt-2 leading-relaxed">
+                      {a.address_line1}<br />{a.address_city}, {a.address_state} – {a.address_pincode}
+                    </p>
+                    <div className="flex items-center gap-4 mt-4 text-xs">
+                      {!a.is_default && (
+                        <button type="button" onClick={() => user && makeDefault(user.id, a.id)} className="text-gold/80 hover:text-gold underline">
+                          Make default
+                        </button>
+                      )}
+                      {confirmDeleteId === a.id ? (
+                        <span className="flex items-center gap-3">
+                          <span className="text-cream/60">Delete this address?</span>
+                          <button type="button" onClick={() => { if (user) removeAddress(user.id, a.id); setConfirmDeleteId(null); }} className="text-red-400 hover:text-red-300 underline">Yes, delete</button>
+                          <button type="button" onClick={() => setConfirmDeleteId(null)} className="text-cream/50 hover:text-cream underline">Cancel</button>
+                        </span>
+                      ) : (
+                        <button type="button" onClick={() => setConfirmDeleteId(a.id)} className="flex items-center gap-1 text-cream/45 hover:text-red-400">
+                          <Trash2 size={12} /> Delete
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )
         )}
