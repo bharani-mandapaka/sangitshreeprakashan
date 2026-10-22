@@ -35,7 +35,10 @@ export default function BookDetailClient({ book, related }: { book: Book; relate
   const isWishlisted   = useWishlistStore((s) => s.has(book.id));
   const toggleWishlist = useWishlistStore((s) => s.toggle);
 
+  const soldOut = book.inStock === false;
+
   const handleAddToCart = () => {
+    if (soldOut) return;
     addItem(book);
     openCart();
   };
@@ -165,14 +168,21 @@ export default function BookDetailClient({ book, related }: { book: Book; relate
               <span className="text-cream/30 text-sm">Incl. of all taxes</span>
             </div>
 
+            {soldOut && (
+              <p className="text-amber-400/90 text-sm">
+                This book is out of stock right now. Message us on WhatsApp to ask when it will be back.
+              </p>
+            )}
+
             {/* CTA */}
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={handleAddToCart}
-                className="flex-1 flex items-center justify-center gap-2.5 bg-gold hover:bg-gold-300 text-dark font-cinzel font-bold py-4 rounded-xl transition-colors text-base"
+                disabled={soldOut}
+                className="flex-1 flex items-center justify-center gap-2.5 bg-gold hover:bg-gold-300 text-dark font-cinzel font-bold py-4 rounded-xl transition-colors text-base disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gold"
               >
                 <ShoppingCart size={20} />
-                Add to Cart
+                {soldOut ? 'Out of Stock' : 'Add to Cart'}
               </button>
               <a
                 href={whatsappUrl}

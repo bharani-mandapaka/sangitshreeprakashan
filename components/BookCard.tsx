@@ -25,8 +25,11 @@ export default function BookCard({ book }: BookCardProps) {
   const isWishlisted   = useWishlistStore((s) => s.has(book.id));
   const toggleWishlist = useWishlistStore((s) => s.toggle);
 
+  const soldOut = book.inStock === false;
+
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (soldOut) return;
     addItem(book);
     openCart();
   };
@@ -61,6 +64,11 @@ export default function BookCard({ book }: BookCardProps) {
           {book.isBundle && (
             <span className="absolute top-2 left-2 bg-gold text-dark text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider z-10">
               Set
+            </span>
+          )}
+          {soldOut && (
+            <span className="absolute bottom-2 left-2 bg-black/80 border border-cream/30 text-cream/80 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider z-10">
+              Out of stock
             </span>
           )}
           {book.language === 'english' && (
@@ -106,10 +114,11 @@ export default function BookCard({ book }: BookCardProps) {
             </Link>
             <button
               onClick={handleAddToCart}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-gold/10 hover:bg-gold text-gold hover:text-dark font-cinzel text-[11px] py-2 rounded-lg transition-all duration-200 border border-gold/25 hover:border-gold font-semibold"
+              disabled={soldOut}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-gold/10 hover:bg-gold text-gold hover:text-dark font-cinzel text-[11px] py-2 rounded-lg transition-all duration-200 border border-gold/25 hover:border-gold font-semibold disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gold/10 disabled:hover:text-gold disabled:hover:border-gold/25"
             >
               <ShoppingCart size={12} />
-              Add
+              {soldOut ? 'Sold out' : 'Add'}
             </button>
           </div>
         </div>
