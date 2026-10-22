@@ -94,6 +94,44 @@ was ruled out — no GSTIN/HSN/tax fields, just a plain Bill of Supply.
 
 ---
 
+## Remaining work (as of 2026-10-21)
+
+> Consolidated list, grouped by who can move each item. Details live in the sections below.
+
+### Waiting on Bharani or an outside party (blocks launch)
+- [~] **Vercel Production environment variables** — **partly done:** on 2026-10-21 the live admin login answered "Admin login is not configured on the server"; by 2026-10-22 it answers "Incorrect password", so `ADMIN_PASSWORD` has been added. Not checked, so assume still missing until someone confirms each one: orders, email, WhatsApp and phone login can't work live without the rest. The full list to have in Production: `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `PHONE_AUTH_SECRET`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_TOKEN`, `CRON_SECRET`, then redeploy (Vercel only applies new variables to new deployments). `.env.local` never reaches Vercel because it is git-ignored.
+- [~] **Merge the open PRs** — saved addresses is **merged (#19, 2026-10-21)** (it was originally #18, merged into the already-merged PIN branch, so it never reached master). Still open: `perf/faster-customer-site` (#20, makes book pages fast on Vercel). Pushed but no PR opened yet: `feature/out-of-stock`. This `tasks.md` update (`chore/update-tasks`) also needs a PR.
+- [ ] **Supabase Site URL** — still localhost, so Google sign-in on the live site redirects to localhost. Set it to the live address (Authentication → URL Configuration) and add preview addresses to the Redirect URLs if previews need Google sign-in.
+- [ ] **Razorpay keys on Vercel** — payments fail without them. Test keys work immediately; live keys need Bharani's GST/PAN verification.
+- [ ] **Email domain** — the three DNS records for `mail.sangitshreeprakashan.com` (see Notifications below), and a decision on which Resend account owns production email.
+- [ ] **Meta Business Verification** (2–4 weeks) — gates WhatsApp to real customers, WhatsApp login codes and the admin users-page code.
+- [ ] **Domain cutover plan** — the old site still serves `sangitshreeprakashan.com`.
+- [ ] **Vercel preview protection** — preview deployments sit behind a Vercel login (team `meetbharani91-5980s-projects`), so nobody outside the team can open a PR preview. Settings → Deployment Protection → "Only Production Deployments" opens them.
+
+### Before launch, mostly quick
+- [ ] End-to-end payment test once test keys exist (including replay and cart-tamper attempts).
+- [ ] Run the notification-policy drop SQL now that the new code is deployed (see Security below).
+- [ ] **Revert the temporary admin alert number** to +917408452828 (currently +918874592121 for testing) — only when the owner says so.
+- [ ] Reset the invoice counter to 1 and clear the test orders and test accounts.
+- [ ] Google sign-in branding (needs Supabase Custom Domain, plus the Google consent-screen name).
+- [ ] Confirm the legal wording; decide the real delivery time (7 days is a placeholder); decide whether returned orders count toward revenue.
+- [ ] Manual logged-in pass on the live site (Google/phone sign-in, profile, Orders, Wishlist, sign-out) once login works there.
+
+### Next work, no outside dependency
+- [~] **Stock / availability** — first step built on `feature/out-of-stock` (pushed 2026-10-22, PR not opened yet): the admin's existing In Stock / Out of Stock switch now takes effect on the storefront. Cards and the book page show "Out of stock" with the buy button disabled, and `POST /api/checkout/create-order` refuses to start a payment for a sold-out book (409 naming the books). `verify` deliberately does not check, so a customer who already paid still gets their order. **Not built:** quantity counts (stock going down as orders arrive), and warning about a sold-out book already sitting in a customer's saved cart — they only find out at payment.
+- [ ] **Abuse limits** — OTP requests (30 s per-number cooldown only), signup, admin login attempts.
+- [ ] **Error monitoring and backups** — nothing alerts when checkout or an API route fails.
+- [ ] **More speed** — check the Supabase project region (Settings → General; Mumbai `ap-south-1` is best for the Mumbai Vercel region); trim the ~209 KB first-load JavaScript.
+- [ ] Real analytics (admin numbers come from browser localStorage).
+- [ ] Book content: descriptions, tables of contents, author bios, sample pages; real founder-timeline photos.
+- [ ] Repo hygiene: delete or ignore the scratch folders in the project root.
+- [ ] Next.js security patches that need Next 15/16.
+
+### Later (Phase 2)
+- [ ] Per-person admin accounts and roles; create orders by hand from admin; admin users in Supabase; real admin OTP (needs Meta); a code on delivery confirmation (needs a product decision).
+
+---
+
 ## Phase 1 — Customer-facing (make it real for buyers)
 
 > Goal: a customer can browse, pay, and receive confirmation. Orders land in a real database.
@@ -117,12 +155,12 @@ All three stories in `razorpay-integration-user-stories.md` are built:
 - [x] Cart-badge hydration mismatch and checkout step-transition/padding bugs found while testing this branch end-to-end — fixed (not originally part of the review, surfaced during manual testing).
 - [ ] **Before this can actually run:** `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` need to be real values in `.env.local`/Vercel — test-mode keys (available immediately from the Razorpay dashboard, no approval needed) are enough to test the whole flow now; live keys need Bharani's GST/PAN account verification to go live for real. Same Razorpay account as the existing sangitshreeprakashan.com site — generating test keys doesn't touch anything live there.
 - [ ] End-to-end test once test-mode keys exist: pay with Razorpay's documented test card/UPI, confirm the order actually saves, then deliberately fail/cancel a payment and confirm no order is created — **and specifically try to replay a payment or tamper with the cart to confirm the new amount-tie/replay-block protections actually hold**
-- [ ] Blocked on PRs #9 and #10 merging first (this branch is stacked on top of both)
+- [x] ~~Blocked on PRs #9 and #10 merging first~~ — done, all PRs #8–#17 are merged to master
 
 ### Book content
 - [ ] Final copy for descriptions, table of contents, author bios
 - [ ] Book detail pages — richer layout with TOC, edition/ISBN, sample pages (currently description-only)
-- [ ] Prerender book detail pages — add `generateStaticParams()` to `app/books/[slug]`; currently server-rendered per request (the catalog is now a live Supabase table, not a static array, so this would need a fetch inside `generateStaticParams()` too)
+- [x] ~~Prerender book detail pages~~ — done on `perf/faster-customer-site` (see Catalog management above)
 
 ### Founder timeline
 - [ ] Real photos and refined content (mobile scroll fix already done, PR #4)
@@ -162,8 +200,8 @@ All three stories in `razorpay-integration-user-stories.md` are built:
   - **Still to do, only after this branch is deployed everywhere that shares the Supabase project:** run `drop policy if exists "anon_all_notification_rules" on notification_rules; drop policy if exists "anon_all_notification_logs" on notification_logs;` in the Supabase SQL editor. Running it earlier breaks any deployment still on the old code (admin Notifications page and every order notification use the anon key there).
   - Also fixed: the daily/weekly digest cron routes read `orders` with the anon key, which `orders` RLS blocks, so every digest would have reported 0 orders. They now use `getSupabaseAdmin()` and return a 500 (instead of sending a false "0 orders" digest) if the query fails. No digest rules exist in the live DB yet, so nothing was being sent; tested both routes locally (200, sent 0).
   - **Heads-up:** `CRON_SECRET` is optional and unset locally — when unset, `/api/cron/*` is callable by anyone. Set it in Vercel (Production) so only Vercel Cron can trigger digests.
-- [ ] **Repo hygiene: line-ending noise and scratch folders** (noted 2026-10-15). Two things keep cluttering `git status` and risk polluting PRs:
-  - **~25 files show as modified though their content is unchanged** (e.g. `.eslintrc.json`, `README.md`, `.gitignore`, `tailwind.config.ts`, `tsconfig.json`, `vercel.json`, `components/Footer.tsx`'s untouched siblings, `components/AuthListener.tsx`…) — Windows saved them with CRLF line endings while the repo stores LF, so git flags every line. Fix once, in its own small commit: add a `.gitattributes` with `* text=auto eol=lf` (and/or `git config core.autocrlf input`), run `git add --renormalize .`, and review that the commit only touches line endings. Until then, **always stage files by name — never `git add -A` / `git add .`**.
+- [ ] **Repo hygiene: scratch folders** (noted 2026-10-15; the line-ending half is done — `.gitattributes` landed in PR #16). Still keeps cluttering `git status`:
+  - ~~**~25 files show as modified though their content is unchanged**~~ **Done (PR #16, `.gitattributes` with LF).** Original note: ~25 files showed as modified (e.g. `.eslintrc.json`, `README.md`, `.gitignore`, `tailwind.config.ts`, `tsconfig.json`, `vercel.json`, `components/Footer.tsx`'s untouched siblings, `components/AuthListener.tsx`…) — Windows saved them with CRLF line endings while the repo stores LF, so git flags every line. Fix once, in its own small commit: add a `.gitattributes` with `* text=auto eol=lf` (and/or `git config core.autocrlf input`), run `git add --renormalize .`, and review that the commit only touches line endings. Until then, **always stage files by name — never `git add -A` / `git add .`**.
   - **Untracked scratch folders/files sit in the project root:** `.claude/`, `.cleanup-scratch/`, `.old-docs-removed/`, `.next.stale.*`, `audit-report.txt`, `outputs/`. Decide for each whether to delete it or add it to `.gitignore` (`.next.stale.*` and `.cleanup-scratch/` are safe to ignore/delete; check `.claude/` before deleting — it holds this tool's `launch.json`).
 - [~] **QA walkthrough (public side, run in the browser pane; logged-in parts still need a manual pass)**
   - Passed: homepage, `/books` (36 books, search narrows correctly), book detail, add to cart + navbar badge, checkout page + empty-form blocking, `/contact`, `/about`, `/sitemap.xml`, 404 page; no horizontal scroll at 375px on home/books/detail/checkout/contact.
@@ -224,11 +262,11 @@ All three stories in `razorpay-integration-user-stories.md` are built:
 
 ### Worth doing soon
 - [~] **Cancellations, returns & refunds** — first step done 2026-10-15 on `feature/legal-pages`: `/profile` → Orders now shows "Return or report a problem" on delivered orders (only within 7 days of delivery, then a "window has ended" note) and "Cancel this order" on pending/confirmed orders; both open WhatsApp to the shop number with the order ID pre-typed, plus a link to `/shipping-returns`. Second step (branch `feature/order-returns`, stacked on `feature/legal-pages`): admins can mark a **delivered** order **Returned** in `/admin/orders` (the option is disabled for any other status, and the API rejects it too); that sets `returned_at` and, once, sends the customer "We've received your returned book" by **email and WhatsApp** through a new `order_returned` notification trigger + seeded rule `order-returned-customer` (also an admin-style template for hand-built rules). **Live database needs `order-returned-migration.sql` run once in the Supabase SQL editor *before* anyone uses it** (widens the order-status and notification-trigger checks, adds `orders.returned_at`, inserts the rule). Returned orders are still counted in the admin revenue totals (only `cancelled` is excluded) — decide whether a returned order should come out of revenue once refunds are handled. Like every WhatsApp message here, the free-text message only reaches a customer inside the 24-hour window until real approved templates exist. Still open: an actual in-site request form, an admin "cancel/refund" action, tracking of return requests before the book arrives, and Razorpay refunds.
-- [ ] **Stock / availability** — no inventory tracking, so out-of-stock books can still be bought.
+- [~] **Stock / availability** — see "Remaining work" at the top: the In Stock switch now works on the storefront, but there is still no quantity tracking.
 - [ ] **Real analytics** — admin visit/click numbers come from browser localStorage, not a real measure of traffic.
 - [ ] **Error monitoring & backups** — nothing alerts anyone when checkout or an API route fails; no scheduled Supabase backup/restore plan.
 - [ ] **Abuse limits** — rate-limit OTP requests (there's only a 30 s per-number cooldown), signup, and the admin login attempts.
 - [x] **GST — resolved:** Bharani/owner confirmed there is no GST on books, so the existing "Bill of Supply" format on `feature/admin-invoice-printing` (PR #10) is the right one; nothing to add.
 - [ ] **Invoice numbering must start at 1 for the real site** (decided 2026-10-12). `feature/admin-invoice-printing` currently does `create sequence orders_invoice_number_seq start with 470` (to continue the old business's #469) in both `supabase/schema.sql` and `invoice-number-column.sql`. To do on that branch (PR #10): change both to `start with 1` and drop the "continue from #469" notes. Numbers are assigned lazily on the first admin print, so every test invoice printed so far has consumed a number — **before launch**, once the test orders are cleared, run `alter sequence orders_invoice_number_seq restart with 1; update orders set invoice_number = null;` (or start from a clean production database). Invoice numbers should stay gap-free and in order once real invoices begin — confirm with the accountant whether they want one running series or a fresh series each financial year.
-- [ ] **Checkout validation** — phone (10-digit Indian mobile) and PIN (6 digits), client and server side — do in the Razorpay PR (#11).
+- [x] ~~Checkout validation~~ — done, see Payments above (phone and PIN format, then the official PIN directory check).
 - [ ] **Set `CRON_SECRET`** in Vercel so only Vercel Cron can call `/api/cron/*`.
