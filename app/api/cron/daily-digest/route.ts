@@ -13,14 +13,18 @@ export async function GET(req: NextRequest) {
   // own rows, so the anon key would always return zero orders here.
   const supabase = getSupabaseAdmin();
 
-  // Today's orders (midnight UTC → now)
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
+  // Yesterday's orders: the whole previous day in India time (00:00 → 00:00 IST).
+  // This cron runs at 02:00 UTC (7:30 AM IST), so counting "today" from midnight UTC, as it
+  // used to, only covered the first two hours of the day and reported almost nothing.
+  const todayIst = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD
+  const windowEnd   = new Date(`${todayIst}T00:00:00+05:30`);
+  const windowStart = new Date(windowEnd.getTime() - 24 * 60 * 60 * 1000);
 
   const { data: orders, error } = await supabase
     .from('orders')
     .select('subtotal, status')
-    .gte('created_at', today.toISOString())
+    .gte('created_at', windowStart.toISOString())
+    .lt('created_at', windowEnd.toISOString())
     .neq('status', 'cancelled');
 
   // Don't send a digest claiming "0 orders" when the query actually failed.
@@ -33,7 +37,7 @@ export async function GET(req: NextRequest) {
   const revenue     = (orders ?? []).reduce((s, o) => s + Number(o.subtotal), 0);
 
   const vars: Record<string, string> = {
-    date:         today.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+    date:         windowStart.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' }),
     orders_count: String(ordersCount),
     revenue:      `₹${revenue.toLocaleString('en-IN')}`,
     // analytics (visits, clicks) are client-side only — not available server-side
