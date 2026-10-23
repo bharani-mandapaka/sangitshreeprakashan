@@ -455,6 +455,17 @@ $$;
 revoke all on function take_stock(text, integer) from public, anon, authenticated;
 grant execute on function take_stock(text, integer) to service_role;
 
+-- ── Book details ───────────────────────────────────────────────────────────
+-- (see book-details.sql) optional ISBN, edition, pages, year, table of contents and author note.
+
+alter table books
+  add column if not exists isbn             text,
+  add column if not exists edition          text,
+  add column if not exists pages            integer check (pages is null or pages > 0),
+  add column if not exists publication_year integer check (publication_year is null or publication_year between 1900 and 2100),
+  add column if not exists table_of_contents text[],      -- one entry per line
+  add column if not exists about_authors    text;
+
 -- ── Error log ──────────────────────────────────────────────────────────────
 -- (see error-logs.sql) server and browser errors, reviewed in Admin -> System.
 

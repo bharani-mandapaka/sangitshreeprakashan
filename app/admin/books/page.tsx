@@ -37,6 +37,13 @@ interface BookFormState {
   inStock: boolean;
   /** Copies left as text; empty = copies are not counted (only the In Stock switch applies). */
   stockQuantity: string;
+  // Optional details (book-details.sql), kept as text in the form.
+  isbn: string;
+  edition: string;
+  pages: string;
+  publicationYear: string;
+  tocText: string;        // one table-of-contents entry per line
+  aboutAuthors: string;
   tagsText: string;
 }
 
@@ -59,6 +66,12 @@ const EMPTY_FORM: BookFormState = {
   isFeatured: false,
   inStock: true,
   stockQuantity: '',
+  isbn: '',
+  edition: '',
+  pages: '',
+  publicationYear: '',
+  tocText: '',
+  aboutAuthors: '',
   tagsText: '',
 };
 
@@ -82,6 +95,12 @@ function rowToForm(row: DbBookRow): BookFormState {
     isFeatured: row.is_featured,
     inStock: row.in_stock,
     stockQuantity: typeof row.stock_quantity === 'number' ? String(row.stock_quantity) : '',
+    isbn: row.isbn ?? '',
+    edition: row.edition ?? '',
+    pages: row.pages != null ? String(row.pages) : '',
+    publicationYear: row.publication_year != null ? String(row.publication_year) : '',
+    tocText: (row.table_of_contents ?? []).join('\n'),
+    aboutAuthors: row.about_authors ?? '',
     tagsText: (row.tags ?? []).join(', '),
   };
 }
@@ -106,6 +125,12 @@ function formToPayload(form: BookFormState) {
     isFeatured: form.isFeatured,
     inStock: form.inStock,
     stockQuantity: form.stockQuantity.trim() === '' ? null : Number(form.stockQuantity),
+    isbn: form.isbn.trim() || null,
+    edition: form.edition.trim() || null,
+    pages: form.pages.trim() ? Number(form.pages) : null,
+    publicationYear: form.publicationYear.trim() ? Number(form.publicationYear) : null,
+    tableOfContents: form.tocText.split('\n').map((l) => l.trim()).filter(Boolean),
+    aboutAuthors: form.aboutAuthors.trim() || null,
     tags: form.tagsText.split(',').map((t) => t.trim()).filter(Boolean),
   };
 }
@@ -203,6 +228,7 @@ function BookFormModal({
   onClose,
   onSaved,
   stockSupported,
+  detailsSupported,
 }: {
   form: BookFormState;
   onChange: (f: BookFormState) => void;
@@ -210,6 +236,8 @@ function BookFormModal({
   onSaved: (row: DbBookRow) => void;
   /** False until stock-quantity.sql has been run: the quantity field is then hidden and never sent. */
   stockSupported: boolean;
+  /** False until book-details.sql has been run: the details fields are then hidden and never sent. */
+  detailsSupported: boolean;
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -220,13 +248,19 @@ function BookFormModal({
     setSaving(true);
     setError('');
     // Without the stock_quantity column, sending it would make every save fail.
-    const { stockQuantity, ...rest } = formToPayload(form);
+    // The same goes for the optional details columns (book-details.sql).
+    const { stockQuantity, isbn, edition, pages, publicationYear, tableOfContents, aboutAuthors, ...rest } = formToPayload(form);
     const payload = rest;
+    const details = { isbn, edition, pages, publicationYear, tableOfContents, aboutAuthors };
     const counted = stockSupported && stockQuantity !== null;
     const res = await fetch('/api/admin/books', {
       method: isEdit ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(stockSupported ? { ...payload, stockQuantity } : payload),
+      body: JSON.stringify({
+        ...payload,
+        ...(stockSupported ? { stockQuantity } : {}),
+        ...(detailsSupported ? details : {}),
+      }),
     });
     const data = await res.json().catch(() => ({}));
     setSaving(false);
@@ -258,6 +292,12 @@ function BookFormModal({
       // A counted book is in stock exactly when copies are left (the API does the same).
       in_stock: counted ? (stockQuantity as number) > 0 : payload.inStock,
       ...(stockSupported ? { stock_quantity: stockQuantity } : {}),
+      ...(detailsSupported ? {
+        isbn, edition, pages,
+        publication_year: publicationYear,
+        table_of_contents: tableOfContents,
+        about_authors: aboutAuthors,
+      } : {}),
       tags: payload.tags,
     };
     onSaved(row);
@@ -481,6 +521,42 @@ function BookFormModal({
               Leave empty to not count copies. When a number is set it goes down as orders arrive: the book shows as sold out at
               0 and as in stock above 0, whatever the In Stock box says. To hide a counted book, set it to 0.
             </p>
+          </div>
+        )}
+
+        {detailsSupported && (
+          <div className="space-y-4 border-t border-gold/10 pt-5">
+            <div>
+              <p className="font-cinzel text-gold text-sm font-semibold">Book details <span className="text-cream/35 text-xs font-normal">(optional — shown on the book’s page when filled in)</span></p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="col-span-2">
+                <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">ISBN</label>
+                <input className="input-gold" value={form.isbn} maxLength={25} onChange={(e) => onChange({ ...form, isbn: e.target.value })} placeholder="978-81-…" />
+              </div>
+              <div>
+                <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">Edition</label>
+                <input className="input-gold" value={form.edition} maxLength={60} onChange={(e) => onChange({ ...form, edition: e.target.value })} placeholder="e.g. 3rd" />
+              </div>
+              <div>
+                <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">Pages</label>
+                <input type="number" min={1} step={1} className="input-gold" value={form.pages} onChange={(e) => onChange({ ...form, pages: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">Year</label>
+                <input type="number" min={1900} max={2100} step={1} className="input-gold" value={form.publicationYear} onChange={(e) => onChange({ ...form, publicationYear: e.target.value })} placeholder="e.g. 2019" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">
+                Table of contents <span className="normal-case tracking-normal text-cream/30">(one chapter per line)</span>
+              </label>
+              <textarea className="input-gold min-h-[110px]" value={form.tocText} onChange={(e) => onChange({ ...form, tocText: e.target.value })} placeholder={'1. Introduction\n2. Swar Parichay\n3. …'} />
+            </div>
+            <div>
+              <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">About the author(s)</label>
+              <textarea className="input-gold min-h-[90px]" value={form.aboutAuthors} maxLength={2000} onChange={(e) => onChange({ ...form, aboutAuthors: e.target.value })} placeholder="A few lines about who wrote this book." />
+            </div>
           </div>
         )}
 
@@ -793,6 +869,7 @@ export default function AdminBooksPage() {
           onClose={() => setFormOpen(false)}
           onSaved={handleSaved}
           stockSupported={books.some((b) => 'stock_quantity' in b)}
+          detailsSupported={books.some((b) => 'isbn' in b)}
         />
       )}
 

@@ -35,6 +35,13 @@ export interface DbBookRow {
   in_stock: boolean;
   /** Copies left; null/missing = not tracked (only the In Stock switch applies). See stock-quantity.sql. */
   stock_quantity?: number | null;
+  // Optional extra details; the columns exist once book-details.sql has been run.
+  isbn?: string | null;
+  edition?: string | null;
+  pages?: number | null;
+  publication_year?: number | null;
+  table_of_contents?: string[] | null;
+  about_authors?: string | null;
   tags: string[];
   created_at?: string;
   updated_at?: string;
@@ -62,6 +69,12 @@ export function mapDbBookToBook(row: DbBookRow): Book {
     // Available only if the admin hasn't switched it off AND, when copies are counted, some are left.
     inStock: row.in_stock !== false && !(typeof row.stock_quantity === 'number' && row.stock_quantity <= 0),
     stockQuantity: typeof row.stock_quantity === 'number' ? row.stock_quantity : null,
+    isbn: row.isbn || undefined,
+    edition: row.edition || undefined,
+    pages: row.pages ?? undefined,
+    publicationYear: row.publication_year ?? undefined,
+    tableOfContents: row.table_of_contents?.length ? row.table_of_contents : undefined,
+    aboutAuthors: row.about_authors || undefined,
     tags: row.tags ?? [],
   };
 }

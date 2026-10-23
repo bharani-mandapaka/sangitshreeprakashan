@@ -218,6 +218,53 @@ export default function BookDetailClient({ book, related }: { book: Book; relate
               <p className="text-cream/65 text-sm leading-relaxed">{book.description}</p>
             </div>
 
+            {/* Optional extra details: each part only appears once the admin has filled it in
+                (Admin -> Catalog -> "Book details"), so books without them look as before. */}
+            {(book.edition || book.pages || book.publicationYear || book.isbn) && (
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                {book.edition && (
+                  <div>
+                    <dt className="text-cream/40 text-xs uppercase tracking-widest font-cinzel">Edition</dt>
+                    <dd className="text-cream/80 mt-0.5">{book.edition}</dd>
+                  </div>
+                )}
+                {book.publicationYear && (
+                  <div>
+                    <dt className="text-cream/40 text-xs uppercase tracking-widest font-cinzel">Published</dt>
+                    <dd className="text-cream/80 mt-0.5">{book.publicationYear}</dd>
+                  </div>
+                )}
+                {book.pages && (
+                  <div>
+                    <dt className="text-cream/40 text-xs uppercase tracking-widest font-cinzel">Pages</dt>
+                    <dd className="text-cream/80 mt-0.5">{book.pages}</dd>
+                  </div>
+                )}
+                {book.isbn && (
+                  <div>
+                    <dt className="text-cream/40 text-xs uppercase tracking-widest font-cinzel">ISBN</dt>
+                    <dd className="text-cream/80 mt-0.5 break-all">{book.isbn}</dd>
+                  </div>
+                )}
+              </dl>
+            )}
+
+            {book.tableOfContents && book.tableOfContents.length > 0 && (
+              <details className="rounded-xl border border-gold/15 bg-black/20 px-4 py-3">
+                <summary className="cursor-pointer font-cinzel text-cream font-semibold text-base">Table of contents</summary>
+                <ol className="mt-3 space-y-1.5 text-cream/70 text-sm leading-relaxed list-none">
+                  {book.tableOfContents.map((line, i) => <li key={`${i}-${line}`}>{line}</li>)}
+                </ol>
+              </details>
+            )}
+
+            {book.aboutAuthors && (
+              <div>
+                <h2 className="font-cinzel text-cream font-semibold text-base mb-3">About the author{book.authors.length > 1 ? 's' : ''}</h2>
+                <p className="text-cream/65 text-sm leading-relaxed whitespace-pre-line">{book.aboutAuthors}</p>
+              </div>
+            )}
+
             {/* Tags */}
             {book.tags.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-2">
