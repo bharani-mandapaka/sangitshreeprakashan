@@ -13,13 +13,13 @@ import { isAdminRequest } from '@/lib/admin-auth';
 // (orders_invoice_number_seq, see supabase/schema.sql) only advances for
 // orders someone actually needed a document for. Once set, it's never
 // reassigned.
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAdminRequest(req)) {
     return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
   }
 
   const admin = getSupabaseAdmin();
-  const { id } = params;
+  const { id } = await params;
 
   const { data: order, error: fetchError } = await admin
     .from('orders')
