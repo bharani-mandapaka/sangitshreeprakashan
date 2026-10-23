@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { logError } from '@/lib/error-log';
 import { normalizePhone, generateOtp } from '@/lib/phone-auth';
 import { isWhatsAppOtpConfigured, sendWhatsAppOtp } from '@/lib/whatsapp-otp';
 
@@ -60,7 +61,8 @@ export async function POST(req: NextRequest) {
       await sendWhatsAppOtp(phone, otp);
       return NextResponse.json({ phone, mock: false });
     } catch (err) {
-      console.error('[send-otp] WhatsApp send failed, falling back to on-screen code:', err);
+      // Customers can't log in by phone while this keeps failing, so it is worth seeing in Admin -> System.
+      await logError('auth/send-otp', `WhatsApp code delivery failed, falling back to on-screen code: ${err instanceof Error ? err.message : err}`);
     }
   }
 

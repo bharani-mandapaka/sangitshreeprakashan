@@ -4,6 +4,7 @@ import { fireNotifications } from '@/lib/notifications-sender';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { verifyRazorpaySignature, getRazorpayOrder } from '@/lib/razorpay';
 import { computeVerifiedSubtotal } from '@/lib/books-data';
+import { logError } from '@/lib/error-log';
 
 // Story 2 (razorpay-integration-user-stories.md): the ONLY place an order
 // actually gets written to Supabase and a customer notified. The old
@@ -34,6 +35,18 @@ export async function POST(req: NextRequest) {
     razorpayOrderId, razorpayPaymentId, razorpaySignature,
   } = body ?? {};
 
+  // What an admin needs to look a customer up and fix things by hand if this goes wrong
+  // (shown in Admin -> System via lib/error-log.ts).
+  const context = () => ({
+    orderId: id,
+    razorpayOrderId,
+    razorpayPaymentId,
+    customer: { name: customer?.name, phone: customer?.phone, email: customer?.email },
+    items: Array.isArray(items)
+      ? items.map((i: { bookId?: string; qty?: number }) => ({ bookId: i.bookId, qty: i.qty }))
+      : undefined,
+  });
+
   if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
     return NextResponse.json({ error: 'Missing payment verification details.' }, { status: 400 });
   }
@@ -43,12 +56,12 @@ export async function POST(req: NextRequest) {
   try {
     signatureValid = verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
   } catch (err) {
-    console.error('[checkout/verify] signature check error:', err);
+    await logError('checkout/verify', `Signature check failed to run: ${err instanceof Error ? err.message : err}`, { details: context() });
   }
   if (!signatureValid) {
-    // Story 3, AC5 — visible in server logs for support to trace a "I paid
-    // but got no confirmation" report, even without a dedicated admin view.
-    console.error('[checkout/verify] REJECTED invalid signature', { razorpayOrderId, razorpayPaymentId });
+    // Story 3, AC5 — kept in Admin -> System (and the server logs) so support can trace an
+    // "I paid but got no confirmation" report.
+    await logError('checkout/verify', 'Rejected: payment signature is invalid', { details: context() });
     return NextResponse.json({ error: 'Payment could not be verified. If you were charged, please contact support.' }, { status: 400 });
   }
 
@@ -75,7 +88,10 @@ export async function POST(req: NextRequest) {
     .eq('razorpay_payment_id', razorpayPaymentId)
     .maybeSingle();
   if (existingOrder) {
-    console.error('[checkout/verify] REJECTED replayed payment', { razorpayPaymentId, existingOrderId: existingOrder.id });
+    await logError('checkout/verify', 'Rejected: this payment id was already used for an order', {
+      severity: 'warning',
+      details: { ...context(), existingOrderId: existingOrder.id },
+    });
     return NextResponse.json({ error: 'This payment has already been used for an order.' }, { status: 409 });
   }
 
@@ -97,7 +113,9 @@ export async function POST(req: NextRequest) {
     subtotal = result.subtotal;
     priceByBookId = result.priceByBookId;
   } catch (err) {
-    console.error('[checkout/verify] subtotal recompute error:', err);
+    await logError('checkout/verify', `Could not recompute the order total: ${err instanceof Error ? err.message : err}`, {
+      details: context(),
+    });
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Could not confirm the order total.' },
       { status: 400 },
@@ -113,14 +131,22 @@ export async function POST(req: NextRequest) {
   try {
     razorpayOrder = await getRazorpayOrder(razorpayOrderId);
   } catch (err) {
-    console.error('[checkout/verify] could not fetch Razorpay order:', err);
+    await logError('checkout/verify', `PAYMENT NOT CONFIRMED: could not fetch the order from Razorpay (${err instanceof Error ? err.message : err})`, {
+      severity: 'critical',
+      details: context(),
+    });
     return NextResponse.json({ error: 'Could not confirm the payment. If you were charged, please contact support.' }, { status: 502 });
   }
   const expectedAmountPaise = Math.round(subtotal * 100);
   if (razorpayOrder.status !== 'paid' || razorpayOrder.amount_paid !== expectedAmountPaise) {
-    console.error('[checkout/verify] REJECTED amount mismatch', {
-      razorpayOrderId, status: razorpayOrder.status,
-      amountPaid: razorpayOrder.amount_paid, expectedAmountPaise,
+    await logError('checkout/verify', 'PAYMENT NOT ACCEPTED: amount paid does not match the order total', {
+      severity: 'critical',
+      details: {
+        ...context(),
+        razorpayStatus: razorpayOrder.status,
+        amountPaidPaise: razorpayOrder.amount_paid,
+        expectedAmountPaise,
+      },
     });
     return NextResponse.json({ error: 'The amount paid does not match this order. If you were charged, please contact support.' }, { status: 400 });
   }
@@ -149,7 +175,10 @@ export async function POST(req: NextRequest) {
   });
 
   if (orderError) {
-    console.error('[checkout/verify] order insert error:', orderError);
+    await logError('checkout/verify', `PAID BUT ORDER NOT SAVED: ${orderError.message}`, {
+      severity: 'critical',
+      details: { ...context(), subtotal },
+    });
     return NextResponse.json({ error: orderError.message }, { status: 500 });
   }
 
@@ -167,7 +196,12 @@ export async function POST(req: NextRequest) {
   }));
 
   const { error: itemsError } = await admin.from('order_items').insert(orderItems);
-  if (itemsError) console.error('[checkout/verify] items insert error:', itemsError);
+  if (itemsError) {
+    await logError('checkout/verify', `ORDER SAVED WITHOUT ITS ITEMS: ${itemsError.message}`, {
+      severity: 'critical',
+      details: { ...context(), subtotal },
+    });
+  }
 
   // ── 7. Fire the order-placed notification ───────────────────────────────────
   const dateStr = new Date(createdAt).toLocaleDateString('en-IN', {
@@ -196,7 +230,10 @@ export async function POST(req: NextRequest) {
   };
 
   await fireNotifications('order_placed', notifVars)
-    .catch((err) => console.error('[checkout/verify] notification error:', err));
+    .catch((err) => logError('checkout/verify', `Order saved but its notification failed: ${err instanceof Error ? err.message : err}`, {
+      severity: 'warning',
+      details: { orderId: id },
+    }));
 
   return NextResponse.json({ success: true, orderId: id });
 }
