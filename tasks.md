@@ -133,9 +133,9 @@ was ruled out — no GSTIN/HSN/tax fields, just a plain Bill of Supply.
 #### Branch stacking and merge order
 Several branches contain others' commits so that their PRs build on the same code. A stacked PR (base `master`) shows the commits underneath it until those are merged. Suggested order: `feature/out-of-stock` → `feature/error-monitoring` → `feature/stock-quantity` → `feature/real-analytics` → `perf/lighter-javascript` → `feature/book-details`. Independent, any time: `perf/faster-customer-site` (#20), `feature/abuse-limits`, `chore/ignore-scratch-folders`, `chore/upgrade-nextjs-15`, `chore/update-tasks`. If a stacked PR is merged first it also brings in the ones under it. Pairwise dry-run merges of all branches into each other showed no conflicts.
 
-#### Found while doing this, not fixed
-- **The daily digest reports almost nothing.** `app/api/cron/daily-digest` counts orders from midnight UTC, but the cron runs at 02:00 UTC (7:30 AM IST), so "today's orders" covers about two hours. It probably should report yesterday. (The new visitor numbers in the digest are for the full previous day.)
-- Daily digest and weekly digest crash with a 500 if `RESEND_API_KEY` is missing (it is created before any rule is read).
+#### Found while doing this, now fixed on `fix/daily-digest-window` (PR to open)
+- [x] **The daily digest reported almost nothing.** It counted orders from midnight UTC, but the cron runs at 02:00 UTC (7:30 AM IST), so "today's orders" covered about two hours. It now reports the whole previous day in India time (00:00 → 00:00 IST), and the date in the message is that day. The same fix is also on `feature/real-analytics`, so the visitor numbers and the order numbers describe the same day.
+- [x] **A missing `RESEND_API_KEY` crashed every notification, not just the digests.** The email client was created before any rule was read, so WhatsApp-only rules (e.g. the admin order alerts) never sent either. It is now created only when an email is actually sent: with no key that one email fails with a clear message in the notification log, and WhatsApp and the other rules carry on. Checked with no key set: WhatsApp-only rule sent, email-only rule failed cleanly, a both-channels rule was recorded as partial.
 
 ### Later (Phase 2)
 - [ ] Per-person admin accounts and roles; create orders by hand from admin; admin users in Supabase; real admin OTP (needs Meta); a code on delivery confirmation (needs a product decision).
