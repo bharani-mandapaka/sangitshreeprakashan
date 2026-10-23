@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { verifyRazorpaySignature, getRazorpayOrder } from '@/lib/razorpay';
 import { computeVerifiedSubtotal } from '@/lib/books-data';
 import { logError } from '@/lib/error-log';
+import { takeStockForOrder } from '@/lib/stock';
 
 // Story 2 (razorpay-integration-user-stories.md): the ONLY place an order
 // actually gets written to Supabase and a customer notified. The old
@@ -200,6 +201,25 @@ export async function POST(req: NextRequest) {
     await logError('checkout/verify', `ORDER SAVED WITHOUT ITS ITEMS: ${itemsError.message}`, {
       severity: 'critical',
       details: { ...context(), subtotal },
+    });
+  }
+
+  // ── 6b. Take the copies off the shelf (books whose copies are counted) ──────
+  // The customer has already paid, so this never fails the order. If two people paid for the
+  // last copy at once, the shortfall is recorded as critical so the shop can sort it out.
+  const stock = await takeStockForOrder(
+    items.map((i: { bookId: string; qty: number }) => ({ bookId: i.bookId, qty: i.qty })),
+  );
+  if (stock.shortfalls.length > 0) {
+    await logError('checkout/verify', 'OVERSOLD: the customer paid for more copies than were in stock', {
+      severity: 'critical',
+      details: { ...context(), shortfalls: stock.shortfalls },
+    });
+  }
+  if (stock.failed) {
+    await logError('checkout/verify', 'Order saved, but its stock count could not be updated', {
+      severity: 'warning',
+      details: { orderId: id },
     });
   }
 

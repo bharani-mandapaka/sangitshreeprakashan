@@ -33,6 +33,8 @@ export interface DbBookRow {
   is_bundle: boolean;
   is_featured: boolean;
   in_stock: boolean;
+  /** Copies left; null/missing = not tracked (only the In Stock switch applies). See stock-quantity.sql. */
+  stock_quantity?: number | null;
   tags: string[];
   created_at?: string;
   updated_at?: string;
@@ -57,20 +59,45 @@ export function mapDbBookToBook(row: DbBookRow): Book {
     part: row.part ?? undefined,
     isBundle: row.is_bundle,
     isFeatured: row.is_featured,
-    inStock: row.in_stock !== false,
+    // Available only if the admin hasn't switched it off AND, when copies are counted, some are left.
+    inStock: row.in_stock !== false && !(typeof row.stock_quantity === 'number' && row.stock_quantity <= 0),
+    stockQuantity: typeof row.stock_quantity === 'number' ? row.stock_quantity : null,
     tags: row.tags ?? [],
   };
 }
 
-/** Thrown by computeVerifiedSubtotal({ requireInStock: true }) so callers can answer 409 instead of 500. */
-export class OutOfStockError extends Error {
-  constructor(public titles: string[]) {
+/**
+ * Thrown by computeVerifiedSubtotal({ requireInStock: true }) so callers can answer 409
+ * instead of 500. `titles` are the books the customer needs to fix in their cart.
+ */
+export class StockError extends Error {
+  constructor(message: string, public titles: string[]) {
+    super(message);
+    this.name = 'StockError';
+  }
+}
+
+/** One or more books are out of stock. */
+export class OutOfStockError extends StockError {
+  constructor(titles: string[]) {
     super(
       titles.length === 1
         ? `“${titles[0]}” is out of stock right now. Please remove it from your cart to continue.`
         : `These books are out of stock right now: ${titles.map((t) => `“${t}”`).join(', ')}. Please remove them from your cart to continue.`,
+      titles,
     );
     this.name = 'OutOfStockError';
+  }
+}
+
+/** The cart asks for more copies than are left of a book whose copies are counted. */
+export class NotEnoughStockError extends StockError {
+  constructor(shortages: { title: string; left: number }[]) {
+    super(
+      shortages.map((s) => `Only ${s.left} cop${s.left === 1 ? 'y' : 'ies'} of “${s.title}” left. Please lower the quantity in your cart.`).join(' '),
+      shortages.map((s) => s.title),
+    );
+    this.name = 'NotEnoughStockError';
   }
 }
 
@@ -146,6 +173,15 @@ export async function computeVerifiedSubtotal(
   if (requireInStock) {
     const soldOut = books.filter((b) => b.inStock === false).map((b) => b.titleEnglish);
     if (soldOut.length > 0) throw new OutOfStockError(soldOut);
+
+    // Books whose copies are counted: the cart's total for each book (the same book can
+    // appear on two lines) must not exceed what is left.
+    const wanted: Record<string, number> = {};
+    for (const item of items) wanted[item.bookId] = (wanted[item.bookId] ?? 0) + (Number.isInteger(item.qty) ? item.qty : 0);
+    const short = books
+      .filter((b) => typeof b.stockQuantity === 'number' && wanted[b.id] > b.stockQuantity)
+      .map((b) => ({ title: b.titleEnglish, left: b.stockQuantity as number }));
+    if (short.length > 0) throw new NotEnoughStockError(short);
   }
 
   let subtotal = 0;

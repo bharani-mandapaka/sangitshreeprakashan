@@ -71,6 +71,11 @@ export default function BookCard({ book }: BookCardProps) {
               Out of stock
             </span>
           )}
+          {!soldOut && typeof book.stockQuantity === 'number' && book.stockQuantity <= 5 && (
+            <span className="absolute bottom-2 left-2 bg-black/80 border border-amber-400/50 text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider z-10">
+              Only {book.stockQuantity} left
+            </span>
+          )}
           {book.language === 'english' && (
             <span className="absolute top-2 right-2 bg-blue-900/80 text-blue-200 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider z-10">
               EN

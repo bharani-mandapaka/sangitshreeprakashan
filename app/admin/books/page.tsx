@@ -35,6 +35,8 @@ interface BookFormState {
   isBundle: boolean;
   isFeatured: boolean;
   inStock: boolean;
+  /** Copies left as text; empty = copies are not counted (only the In Stock switch applies). */
+  stockQuantity: string;
   tagsText: string;
 }
 
@@ -56,6 +58,7 @@ const EMPTY_FORM: BookFormState = {
   isBundle: false,
   isFeatured: false,
   inStock: true,
+  stockQuantity: '',
   tagsText: '',
 };
 
@@ -78,6 +81,7 @@ function rowToForm(row: DbBookRow): BookFormState {
     isBundle: row.is_bundle,
     isFeatured: row.is_featured,
     inStock: row.in_stock,
+    stockQuantity: typeof row.stock_quantity === 'number' ? String(row.stock_quantity) : '',
     tagsText: (row.tags ?? []).join(', '),
   };
 }
@@ -101,6 +105,7 @@ function formToPayload(form: BookFormState) {
     isBundle: form.isBundle,
     isFeatured: form.isFeatured,
     inStock: form.inStock,
+    stockQuantity: form.stockQuantity.trim() === '' ? null : Number(form.stockQuantity),
     tags: form.tagsText.split(',').map((t) => t.trim()).filter(Boolean),
   };
 }
@@ -197,11 +202,14 @@ function BookFormModal({
   onChange,
   onClose,
   onSaved,
+  stockSupported,
 }: {
   form: BookFormState;
   onChange: (f: BookFormState) => void;
   onClose: () => void;
   onSaved: (row: DbBookRow) => void;
+  /** False until stock-quantity.sql has been run: the quantity field is then hidden and never sent. */
+  stockSupported: boolean;
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -211,11 +219,14 @@ function BookFormModal({
     e.preventDefault();
     setSaving(true);
     setError('');
-    const payload = formToPayload(form);
+    // Without the stock_quantity column, sending it would make every save fail.
+    const { stockQuantity, ...rest } = formToPayload(form);
+    const payload = rest;
+    const counted = stockSupported && stockQuantity !== null;
     const res = await fetch('/api/admin/books', {
       method: isEdit ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(stockSupported ? { ...payload, stockQuantity } : payload),
     });
     const data = await res.json().catch(() => ({}));
     setSaving(false);
@@ -244,7 +255,9 @@ function BookFormModal({
       part: payload.part,
       is_bundle: payload.isBundle,
       is_featured: payload.isFeatured,
-      in_stock: payload.inStock,
+      // A counted book is in stock exactly when copies are left (the API does the same).
+      in_stock: counted ? (stockQuantity as number) > 0 : payload.inStock,
+      ...(stockSupported ? { stock_quantity: stockQuantity } : {}),
       tags: payload.tags,
     };
     onSaved(row);
@@ -450,6 +463,26 @@ function BookFormModal({
             In Stock
           </label>
         </div>
+
+        {stockSupported && (
+          <div>
+            <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">Copies left</label>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              inputMode="numeric"
+              className="input-gold w-40"
+              value={form.stockQuantity}
+              onChange={(e) => onChange({ ...form, stockQuantity: e.target.value })}
+              placeholder="Not counted"
+            />
+            <p className="text-cream/40 text-xs mt-1.5">
+              Leave empty to not count copies. When a number is set it goes down as orders arrive: the book shows as sold out at
+              0 and as in stock above 0, whatever the In Stock box says. To hide a counted book, set it to 0.
+            </p>
+          </div>
+        )}
 
         {error && (
           <p className="text-red-400 text-xs font-cinzel bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
@@ -712,13 +745,19 @@ export default function AdminBooksPage() {
                           <p className="font-cinzel text-gold font-bold text-sm">{formatPrice(b.price)}</p>
                         </td>
                         <td className="px-4 py-3 hidden lg:table-cell">
-                          <span className={`text-[10px] font-cinzel font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${
-                            b.in_stock
-                              ? 'bg-green-500/15 text-green-300 border-green-500/30'
-                              : 'bg-red-500/15 text-red-300 border-red-500/30'
-                          }`}>
-                            {b.in_stock ? 'In Stock' : 'Out of Stock'}
-                          </span>
+                          {(() => {
+                            const counted = typeof b.stock_quantity === 'number';
+                            const available = b.in_stock && !(counted && (b.stock_quantity as number) <= 0);
+                            return (
+                              <span className={`text-[10px] font-cinzel font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${
+                                available
+                                  ? 'bg-green-500/15 text-green-300 border-green-500/30'
+                                  : 'bg-red-500/15 text-red-300 border-red-500/30'
+                              }`}>
+                                {available ? (counted ? `In Stock · ${b.stock_quantity} left` : 'In Stock') : 'Out of Stock'}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap">
                           <button
@@ -753,6 +792,7 @@ export default function AdminBooksPage() {
           onChange={setForm}
           onClose={() => setFormOpen(false)}
           onSaved={handleSaved}
+          stockSupported={books.some((b) => 'stock_quantity' in b)}
         />
       )}
 

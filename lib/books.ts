@@ -33,8 +33,10 @@ export interface Book {
   part?: number;
   isBundle?: boolean;
   isFeatured?: boolean;
-  /** False when the admin has marked the book "Out of Stock". Missing means available. */
+  /** False when the admin has marked the book "Out of Stock", or its counted copies ran out. Missing means available. */
   inStock?: boolean;
+  /** Copies left when the admin counts them; null/missing means not counted. */
+  stockQuantity?: number | null;
   tags: string[];
 }
 

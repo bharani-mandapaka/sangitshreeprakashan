@@ -6,9 +6,12 @@ import { X, ShoppingBag, Plus, Minus, Trash2 } from 'lucide-react';
 import { useCartStore } from '@/lib/cart-store';
 import { formatPrice } from '@/lib/utils';
 import BookCoverImage from './BookCoverImage';
+import CartStockNotice from './CartStockNotice';
+import { useCartStock } from '@/lib/use-cart-stock';
 
 export default function CartDrawer() {
   const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal } = useCartStore();
+  const { issues: stockIssues } = useCartStock();
 
   return (
     <AnimatePresence>
@@ -124,6 +127,7 @@ export default function CartDrawer() {
             {/* Footer */}
             {items.length > 0 && (
               <div className="border-t border-gold/10 px-6 py-5 space-y-4">
+                <CartStockNotice issues={stockIssues} />
                 <div className="flex items-center justify-between">
                   <span className="text-cream/60 text-sm">Subtotal</span>
                   <span className="font-cinzel text-gold font-bold text-xl">
