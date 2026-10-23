@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Book } from './books';
+import { trackEvent } from './track';
 
 export interface CartItem {
   book: Book;
@@ -30,6 +31,7 @@ export const useCartStore = create<CartStore>()(
       isOpen: false,
 
       addItem: (book) => {
+        trackEvent('add_to_cart', { bookSlug: book.slug });   // anonymous, fire-and-forget
         const existing = get().items.find((i) => i.book.id === book.id);
         if (existing) {
           set({

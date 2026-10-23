@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { fireNotifications } from '@/lib/notifications-sender';
 import { logError, countOpenErrors } from '@/lib/error-log';
+import { getAnalyticsSummary, prettySlug } from '@/lib/analytics-server';
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization');
@@ -33,13 +34,16 @@ export async function GET(req: NextRequest) {
   const ordersCount = orders?.length ?? 0;
   const revenue     = (orders ?? []).reduce((s, o) => s + Number(o.subtotal), 0);
 
+  const analytics = await getAnalyticsSummary(7);
+
   const vars: Record<string, string> = {
-    week_start:     weekStart.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+    week_start:    weekStart.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
     week_end:       new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
     orders_count:   String(ordersCount),
     revenue:        `₹${revenue.toLocaleString('en-IN')}`,
-    visitors:       'N/A',
-    top_book:       'N/A',
+    // Visitors are unique per day, added up over the 7 days. N/A until analytics.sql has been run.
+    visitors:       analytics.tableMissing ? 'N/A' : String(analytics.totals.visitors),
+    top_book:       analytics.tableMissing ? 'N/A' : prettySlug(analytics.topBooks[0]?.slug),
     returning_rate: 'N/A',
     // Unresolved errors in Admin -> System; only shows up if the digest template includes {{open_errors}}.
     open_errors:    String((await countOpenErrors()).open),

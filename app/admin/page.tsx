@@ -3,7 +3,7 @@
 import { useMemo, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Eye, ShoppingCart, Package, TrendingUp, ArrowRight, Circle, RefreshCw, AlertCircle } from 'lucide-react';
-import { useAnalyticsStore, getTotals } from '@/lib/analytics-store';
+import type { AnalyticsSummary } from '@/lib/analytics-server';   // type only: nothing server-side is bundled
 import { type DbOrder } from '@/lib/supabase';
 import { formatPrice } from '@/lib/utils';
 
@@ -17,12 +17,23 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function AdminDashboard() {
-  const analytics = useAnalyticsStore();
-  const totals    = getTotals(analytics);
-
   const [orders,  setOrders]  = useState<DbOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState('');
+
+  // Real visitor numbers from the server (anonymous, see lib/analytics-server.ts).
+  const [days, setDays] = useState<7 | 30>(7);
+  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSummary(null);
+    fetch(`/api/admin/analytics?days=${days}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => { if (!cancelled && s) setSummary(s); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [days]);
 
   useEffect(() => {
     const load = async () => {
@@ -59,41 +70,37 @@ export default function AdminDashboard() {
     return counts;
   }, [orders]);
 
-  // Top books by clicks (still from client-side analytics store)
-  const topBooks = useMemo(() => {
-    return Object.entries(analytics.bookClicks)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-      .map(([slug, clicks]) => ({ slug, clicks }));
-  }, [analytics.bookClicks]);
-
-  const maxClicks = topBooks[0]?.clicks ?? 1;
-  const maxDay    = Math.max(...analytics.dailyData.map((d) => d.visits));
+  const topBooks  = summary?.topBooks ?? [];
+  const maxViews  = topBooks[0]?.views ?? 1;
+  const daily     = summary?.daily ?? [];
+  const maxDay    = Math.max(...daily.map((d) => d.pageViews), 1);
+  const num       = (n: number | undefined) => (summary ? (n ?? 0).toLocaleString('en-IN') : '—');
+  const period    = `Last ${days} days`;
 
   const statCards = [
     {
-      label: 'Page Visits',
-      value: totals.visits.toLocaleString('en-IN'),
+      label: 'Page Views',
+      value: num(summary?.totals.pageViews),
       icon:  Eye,
       color: 'text-blue-400',
       bg:    'bg-blue-400/10',
-      sub:   'All time',
+      sub:   period,
     },
     {
-      label: 'Unique Visitors',
-      value: totals.unique.toLocaleString('en-IN'),
+      label: 'Visitors',
+      value: num(summary?.totals.visitors),
       icon:  TrendingUp,
       color: 'text-purple-400',
       bg:    'bg-purple-400/10',
-      sub:   `${Math.round((totals.unique / Math.max(totals.visits, 1)) * 100)}% of visits`,
+      sub:   'Daily unique',
     },
     {
       label: 'Add to Cart',
-      value: totals.cartAdds.toLocaleString('en-IN'),
+      value: num(summary?.totals.cartAdds),
       icon:  ShoppingCart,
       color: 'text-gold',
       bg:    'bg-gold/10',
-      sub:   `${Math.round((totals.cartAdds / Math.max(totals.visits, 1)) * 100)}% conversion`,
+      sub:   summary ? `${num(summary.totals.checkoutStarts)} at checkout` : period,
     },
     {
       label: 'Total Orders',
@@ -122,6 +129,30 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {summary?.tableMissing && (
+        <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs px-4 py-3 rounded-xl">
+          <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+          <span>
+            Visitor tracking isn’t switched on yet, so visits and clicks show as 0. Run <code>analytics.sql</code> once in the
+            Supabase SQL editor. Orders and revenue below are real and don’t need it.
+          </span>
+        </div>
+      )}
+
+      {/* Period for the visitor numbers */}
+      <div className="flex items-center gap-2 text-xs font-cinzel">
+        <span className="text-cream/40">Visitor numbers:</span>
+        {([7, 30] as const).map((d) => (
+          <button
+            key={d}
+            onClick={() => setDays(d)}
+            className={`px-3 py-1 rounded-full border transition-colors ${days === d ? 'border-gold/50 text-gold bg-gold/10' : 'border-gold/10 text-cream/50 hover:text-cream'}`}
+          >
+            Last {d} days
+          </button>
+        ))}
+      </div>
+
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((s) => (
@@ -142,22 +173,36 @@ export default function AdminDashboard() {
 
         {/* Visits chart */}
         <div className="lg:col-span-2 bg-[#0A0000] border border-gold/10 rounded-2xl p-5">
-          <h2 className="font-cinzel text-cream font-semibold text-sm mb-6">Daily Visits (Last 7 Days)</h2>
-          <div className="flex items-end gap-2 h-36">
-            {analytics.dailyData.map((d) => {
-              const heightPct = Math.round((d.visits / Math.max(maxDay, 1)) * 100);
-              const label = new Date(d.date).toLocaleDateString('en-IN', { weekday: 'short' });
-              return (
-                <div key={d.date} className="flex-1 flex flex-col items-center gap-1.5">
-                  <span className="text-cream/40 text-[9px] font-cinzel">{d.visits}</span>
-                  <div className="w-full rounded-t-md bg-gold/15 hover:bg-gold/30 transition-colors relative" style={{ height: `${Math.max(heightPct, 4)}%` }}>
-                    <div className="absolute inset-x-0 bottom-0 rounded-t-md bg-gradient-to-t from-gold/60 to-gold/20" style={{ height: '100%' }} />
+          <h2 className="font-cinzel text-cream font-semibold text-sm mb-6">Daily Page Views (Last {days} Days)</h2>
+          {!summary ? (
+            <div className="h-36 rounded-lg bg-white/5 animate-pulse" />
+          ) : (
+            <div className="flex items-end gap-1 sm:gap-2 h-36">
+              {daily.map((d, i) => {
+                const heightPct = Math.round((d.pageViews / maxDay) * 100);
+                const date = new Date(`${d.date}T00:00:00`);
+                // 7 days: weekday under every bar. 30 days: a date under every 5th bar, so labels don't collide.
+                const label = days === 7
+                  ? date.toLocaleDateString('en-IN', { weekday: 'short' })
+                  : (i % 5 === 0 ? date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '');
+                return (
+                  <div key={d.date} className="flex-1 h-full flex flex-col items-center gap-1.5 min-w-0" title={`${d.date}: ${d.pageViews} views, ${d.visitors} visitors`}>
+                    {days === 7 && <span className="text-cream/40 text-[9px] font-cinzel">{d.pageViews}</span>}
+                    {/* The bar sits in a box that fills the space between the number and the label, so its % height has something to be a % of. */}
+                    <div className="flex-1 w-full flex items-end min-h-0">
+                      <div className="w-full rounded-t-md bg-gold/15 hover:bg-gold/30 transition-colors relative" style={{ height: `${Math.max(heightPct, 4)}%` }}>
+                        <div className="absolute inset-x-0 bottom-0 rounded-t-md bg-gradient-to-t from-gold/60 to-gold/20" style={{ height: '100%' }} />
+                      </div>
+                    </div>
+                    <span className="text-cream/40 text-[9px] font-cinzel whitespace-nowrap">{label || ' '}</span>
                   </div>
-                  <span className="text-cream/40 text-[9px] font-cinzel">{label}</span>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
+          {summary?.truncated && (
+            <p className="text-cream/30 text-[10px] mt-3">This period has more activity than can be counted here, so these numbers are a minimum.</p>
+          )}
         </div>
 
         {/* Order status breakdown */}
@@ -204,12 +249,12 @@ export default function AdminDashboard() {
 
         {/* Top books by clicks */}
         <div className="bg-[#0A0000] border border-gold/10 rounded-2xl p-5">
-          <h2 className="font-cinzel text-cream font-semibold text-sm mb-5">Top Books by Clicks</h2>
+          <h2 className="font-cinzel text-cream font-semibold text-sm mb-5">Most Viewed Books ({period})</h2>
           {topBooks.length === 0 ? (
-            <p className="text-cream/25 text-sm font-cinzel text-center py-6">No clicks tracked yet</p>
+            <p className="text-cream/25 text-sm font-cinzel text-center py-6">{summary ? 'No book views recorded yet' : 'Loading…'}</p>
           ) : (
             <div className="space-y-3">
-              {topBooks.map(({ slug, clicks }, i) => (
+              {topBooks.map(({ slug, views }, i) => (
                 <div key={slug} className="flex items-center gap-3">
                   <span className="font-cinzel text-gold/40 text-xs w-4">{i + 1}</span>
                   <div className="flex-1">
@@ -219,11 +264,11 @@ export default function AdminDashboard() {
                     <div className="mt-1 h-1 rounded-full bg-white/5 overflow-hidden">
                       <div
                         className="h-full rounded-full bg-gradient-to-r from-gold/60 to-gold/30"
-                        style={{ width: `${Math.round((clicks / maxClicks) * 100)}%` }}
+                        style={{ width: `${Math.round((views / maxViews) * 100)}%` }}
                       />
                     </div>
                   </div>
-                  <span className="font-cinzel text-cream/60 text-xs w-8 text-right">{clicks}</span>
+                  <span className="font-cinzel text-cream/60 text-xs w-8 text-right">{views}</span>
                 </div>
               ))}
             </div>
