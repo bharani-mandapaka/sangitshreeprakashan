@@ -3,7 +3,7 @@
 import { useState, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { SlidersHorizontal, X, ArrowUpDown, ChevronDown } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import BookCard from '@/components/BookCard';
 import {
   categoryMeta,

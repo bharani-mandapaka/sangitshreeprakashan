@@ -1,4 +1,4 @@
-import { getSupabase } from './supabase';
+import { loadSupabase } from './supabase-lazy';
 
 // Saved delivery addresses for a signed-in customer (table: saved_addresses, see
 // saved-addresses.sql). Row-level security scopes every query to the owner, the
@@ -31,7 +31,7 @@ export function sameAddress(
 }
 
 export async function getSavedAddresses(userId: string): Promise<SavedAddress[]> {
-  const { data, error } = await getSupabase()
+  const { data, error } = await (await loadSupabase())
     .from('saved_addresses')
     .select('*')
     .eq('user_id', userId)
@@ -47,7 +47,7 @@ export async function getSavedAddresses(userId: string): Promise<SavedAddress[]>
 }
 
 export async function insertAddress(userId: string, address: NewAddress, makeDefault: boolean) {
-  const { data, error } = await getSupabase()
+  const { data, error } = await (await loadSupabase())
     .from('saved_addresses')
     .insert({ ...address, user_id: userId, is_default: makeDefault })
     .select('*')
@@ -57,14 +57,14 @@ export async function insertAddress(userId: string, address: NewAddress, makeDef
 }
 
 export async function deleteAddress(userId: string, id: string) {
-  const { error } = await getSupabase().from('saved_addresses').delete().eq('user_id', userId).eq('id', id);
+  const { error } = await (await loadSupabase()).from('saved_addresses').delete().eq('user_id', userId).eq('id', id);
   if (error) console.error('[addresses] delete error:', error.message);
   return { error: error?.message ?? null };
 }
 
 /** Makes one address the default (the others are cleared first: only one default is allowed). */
 export async function setDefaultAddress(userId: string, id: string) {
-  const db = getSupabase();
+  const db = await loadSupabase();
   const cleared = await db.from('saved_addresses').update({ is_default: false }).eq('user_id', userId).eq('is_default', true);
   if (cleared.error) { console.error('[addresses] default error:', cleared.error.message); return { error: cleared.error.message }; }
   const { error } = await db.from('saved_addresses').update({ is_default: true }).eq('user_id', userId).eq('id', id);

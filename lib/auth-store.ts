@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import type { User } from '@supabase/supabase-js';
-import { getSupabase } from './supabase';
+import { loadSupabase } from './supabase-lazy';
 
 interface AuthStore {
   user: User | null;
@@ -59,7 +59,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
       // Hand the session from the server to the browser's Supabase client so
       // the rest of the app (AuthListener, etc.) picks it up normally.
-      const { error } = await getSupabase().auth.setSession({
+      const { error } = await (await loadSupabase()).auth.setSession({
         access_token: body.access_token,
         refresh_token: body.refresh_token,
       });
@@ -70,7 +70,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   signInWithGoogle: async () => {
-    const { error } = await getSupabase().auth.signInWithOAuth({
+    const { error } = await (await loadSupabase()).auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/profile` },
     });
@@ -78,7 +78,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   signOut: async () => {
-    await getSupabase().auth.signOut();
+    await (await loadSupabase()).auth.signOut();
     set({ user: null });
   },
 }));

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Script from 'next/script';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, CheckCircle, Lock, ChevronRight, ShieldCheck, RefreshCw } from 'lucide-react';
 import { useCartStore } from '@/lib/cart-store';
 import { useOrdersStore } from '@/lib/orders-store';
