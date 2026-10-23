@@ -5,7 +5,15 @@ node_modules/
 
 # Next.js build output
 .next/
+.next.stale*/
 out/
+
+# Local tool state and scratch files that should never end up in a PR
+.claude/
+.cleanup-scratch/
+.old-docs-removed/
+outputs/
+audit-report.txt
 
 # TypeScript incremental build cache
 *.tsbuildinfo
