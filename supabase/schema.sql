@@ -467,3 +467,21 @@ drop trigger if exists saved_addresses_limit on saved_addresses;
 create trigger saved_addresses_limit
   before insert on saved_addresses
   for each row execute function enforce_saved_addresses_limit();
+
+-- ============================================================
+-- Rate limiting (see rate-limits.sql): counts recent attempts so one visitor cannot
+-- guess the admin password or trigger unlimited paid WhatsApp messages.
+-- ============================================================
+
+create table if not exists rate_limit_hits (
+  id         bigint generated always as identity primary key,
+  key        text not null,                    -- e.g. 'admin-login:203.0.113.7'
+  created_at timestamptz not null default now()
+);
+
+create index if not exists rate_limit_hits_key_created_at_idx
+  on rate_limit_hits (key, created_at);
+
+-- Only the server (service-role key, which bypasses RLS) may read or write this table.
+-- RLS on with NO policies means the public anon key can do nothing with it.
+alter table rate_limit_hits enable row level security;
