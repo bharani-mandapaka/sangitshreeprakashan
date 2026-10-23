@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { fireNotifications } from '@/lib/notifications-sender';
+import { logError, countOpenErrors } from '@/lib/error-log';
 
 export async function GET(req: NextRequest) {
   // Verify cron secret (Vercel sets Authorization: Bearer <CRON_SECRET>)
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
 
   // Don't send a digest claiming "0 orders" when the query actually failed.
   if (error) {
-    console.error('[cron/daily-digest] orders query failed:', error.message);
+    await logError('cron/daily-digest', `Orders query failed: ${error.message}`);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -40,6 +41,8 @@ export async function GET(req: NextRequest) {
     visitors:     'N/A',
     cart_adds:    'N/A',
     top_book:     'N/A',
+    // Unresolved errors in Admin -> System; only shows up if the digest template includes {{open_errors}}.
+    open_errors:  String((await countOpenErrors()).open),
   };
 
   const result = await fireNotifications('daily_digest', vars);

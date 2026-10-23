@@ -415,6 +415,28 @@ insert into storage.buckets (id, name, public)
 values ('covers', 'covers', true)
 on conflict (id) do nothing;
 
+-- ── Error log ──────────────────────────────────────────────────────────────
+-- (see error-logs.sql) server and browser errors, reviewed in Admin -> System.
+
+create table if not exists error_logs (
+  id          bigint generated always as identity primary key,
+  source      text not null,                       -- e.g. 'checkout/verify', 'browser'
+  severity    text not null default 'error'
+              check (severity in ('critical', 'error', 'warning')),
+  message     text not null,
+  details     jsonb,                                -- ids and context needed to fix it by hand
+  occurrences integer not null default 1,           -- identical errors are grouped, not repeated
+  first_seen  timestamptz not null default now(),
+  last_seen   timestamptz not null default now(),
+  resolved    boolean not null default false
+);
+
+create index if not exists error_logs_open_idx on error_logs (resolved, last_seen desc);
+
+-- Only the server (service-role key, which bypasses RLS) may read or write this table.
+-- RLS on with NO policies means the public anon key can do nothing with it.
+alter table error_logs enable row level security;
+
 -- ── Saved addresses ─────────────────────────────────────────────────────────
 -- A signed-in customer can keep up to 5 delivery addresses and reuse them at checkout.
 -- Standalone copy for the live database: saved-addresses.sql
