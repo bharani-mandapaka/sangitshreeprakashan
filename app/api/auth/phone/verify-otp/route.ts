@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getSupabaseServer } from '@/lib/supabase';
 import { normalizePhone, phoneToSyntheticEmail, derivePasswordForPhone } from '@/lib/phone-auth';
+import { limitAndRecord, getClientIp, tooManyRequests } from '@/lib/rate-limit';
 
 const MAX_ATTEMPTS = 5;
+
+// The 5-guess cap above is per code; this one is per visitor, so guessing across many
+// numbers or many freshly requested codes is capped too.
+const VERIFIES_PER_IP = 20;
+const VERIFY_WINDOW_MS = 15 * 60 * 1000;
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -25,6 +31,9 @@ export async function POST(req: NextRequest) {
   if (!phone) {
     return NextResponse.json({ error: 'Enter a valid 10-digit Indian mobile number.' }, { status: 400 });
   }
+
+  const verifyLimit = await limitAndRecord(`otp-verify-ip:${getClientIp(req)}`, VERIFIES_PER_IP, VERIFY_WINDOW_MS);
+  if (verifyLimit.limited) return tooManyRequests('attempts', verifyLimit.retryAfterSec);
 
   const admin = getSupabaseAdmin();
 

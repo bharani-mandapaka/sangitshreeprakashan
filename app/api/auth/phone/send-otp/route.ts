@@ -3,9 +3,16 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { logError } from '@/lib/error-log';
 import { normalizePhone, generateOtp } from '@/lib/phone-auth';
 import { isWhatsAppOtpConfigured, sendWhatsAppOtp } from '@/lib/whatsapp-otp';
+import { limitAndRecord, getClientIp, tooManyRequests } from '@/lib/rate-limit';
 
 const OTP_TTL_MS = 15 * 60 * 1000;     // codes are valid for 15 minutes
 const RESEND_COOLDOWN_MS = 30 * 1000;  // don't let the same phone spam requests
+
+// Every code is a paid WhatsApp message, so cap how many one visitor can trigger
+// (otherwise anyone could message strangers at our expense) and how many one number can get.
+const SENDS_PER_IP_PER_HOUR = 10;
+const SENDS_PER_PHONE_PER_HOUR = 5;
+const HOUR_MS = 60 * 60 * 1000;
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -36,6 +43,12 @@ export async function POST(req: NextRequest) {
       { status: 429 },
     );
   }
+
+  // Hourly caps — checked after the cooldown so only codes we actually send are counted.
+  const ipLimit = await limitAndRecord(`otp-send-ip:${getClientIp(req)}`, SENDS_PER_IP_PER_HOUR, HOUR_MS);
+  if (ipLimit.limited) return tooManyRequests('code requests', ipLimit.retryAfterSec);
+  const phoneLimit = await limitAndRecord(`otp-send-phone:${phone}`, SENDS_PER_PHONE_PER_HOUR, HOUR_MS);
+  if (phoneLimit.limited) return tooManyRequests('code requests for this number', phoneLimit.retryAfterSec);
 
   // Clear any older codes for this number, then issue a fresh one.
   await admin.from('phone_otps').delete().eq('phone', phone);
