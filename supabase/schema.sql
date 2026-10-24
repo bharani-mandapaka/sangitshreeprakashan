@@ -437,6 +437,25 @@ create index if not exists error_logs_open_idx on error_logs (resolved, last_see
 -- RLS on with NO policies means the public anon key can do nothing with it.
 alter table error_logs enable row level security;
 
+-- ── Analytics ──────────────────────────────────────────────────────────────
+-- (see analytics.sql) anonymous page views, add-to-cart and checkout starts for the admin dashboard.
+
+create table if not exists analytics_events (
+  id         bigint generated always as identity primary key,
+  created_at timestamptz not null default now(),
+  type       text not null check (type in ('page_view', 'add_to_cart', 'checkout_start')),
+  path       text,                       -- e.g. '/books/swar-vadan-part-1' (no query string)
+  book_slug  text,                       -- set for book pages and add-to-cart
+  visitor    text not null               -- daily-rotating anonymous hash, see lib/analytics-server.ts
+);
+
+create index if not exists analytics_events_created_at_idx on analytics_events (created_at);
+create index if not exists analytics_events_type_created_at_idx on analytics_events (type, created_at);
+
+-- Only the server (service-role key, which bypasses RLS) may read or write this table.
+-- RLS on with NO policies means the public anon key can do nothing with it.
+alter table analytics_events enable row level security;
+
 -- ── Saved addresses ─────────────────────────────────────────────────────────
 -- A signed-in customer can keep up to 5 delivery addresses and reuse them at checkout.
 -- Standalone copy for the live database: saved-addresses.sql
