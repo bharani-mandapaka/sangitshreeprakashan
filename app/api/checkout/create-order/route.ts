@@ -3,6 +3,7 @@ import { createRazorpayOrder } from '@/lib/razorpay';
 import { computeVerifiedSubtotal, OutOfStockError } from '@/lib/books-data';
 import { validateCheckoutDetails } from '@/lib/checkout-validation';
 import { lookupPincode } from '@/lib/pincode-lookup';
+import { logError } from '@/lib/error-log';
 
 // Story 1 (razorpay-integration-user-stories.md): starts a real payment.
 // Deliberately does NOT touch Supabase's orders table at all — no order
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
     }
     // Story 1, AC4 — a clear failure the customer sees, never a silent
     // proceed-as-if-it-worked.
-    console.error('[checkout/create-order] error:', err);
+    await logError('checkout/create-order', err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Could not start payment. Please try again.' },
       { status: 500 },

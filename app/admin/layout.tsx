@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import {
-  LayoutDashboard, ShoppingBag, Bell, Users, LogOut, Menu, X, BookOpen,
+  LayoutDashboard, ShoppingBag, Bell, Users, LogOut, Menu, X, BookOpen, Activity,
 } from 'lucide-react';
 
 const NAV = [
@@ -14,6 +14,7 @@ const NAV = [
   { href: '/admin/books',         icon: BookOpen,        label: 'Catalog'       },
   { href: '/admin/notifications', icon: Bell,            label: 'Notifications' },
   { href: '/admin/users',         icon: Users,           label: 'Users'         },
+  { href: '/admin/system',        icon: Activity,        label: 'System'        },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +24,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [error, setError]   = useState('');
   const [loading, setLoading] = useState(false);
   const [sideOpen, setSideOpen] = useState(false);
+  const [openErrors, setOpenErrors] = useState<{ open: number; critical: number }>({ open: 0, critical: 0 });
 
   // This flag is just UI state — whether to show the sidebar or the login
   // form. It carries no real authority: every admin API route checks its own
@@ -50,6 +52,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     };
     return () => { window.fetch = originalFetch; };
   }, []);
+
+  // Red count next to "System" when errors need attention. Refreshed when the admin moves
+  // between pages (so resolving an error on the System page clears it straight away).
+  useEffect(() => {
+    if (!authed) return;
+    fetch('/api/admin/errors?summary=1')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => { if (s) setOpenErrors(s); })
+      .catch(() => {});
+  }, [authed, pathname]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,6 +181,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               >
                 <Icon size={16} />
                 {label}
+                {href === '/admin/system' && openErrors.open > 0 && (
+                  <span
+                    title={openErrors.critical > 0 ? `${openErrors.critical} critical` : 'Open errors'}
+                    className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white ${openErrors.critical > 0 ? 'bg-red-600' : 'bg-amber-600'}`}
+                  >
+                    {openErrors.open}
+                  </span>
+                )}
               </Link>
             );
           })}

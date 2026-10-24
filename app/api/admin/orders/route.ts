@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { isAdminRequest } from '@/lib/admin-auth';
 import { fireNotifications } from '@/lib/notifications-sender';
 import { CONTACT } from '@/lib/utils';
+import { logError } from '@/lib/error-log';
 
 const ALL_STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'returned', 'cancelled'];
 
@@ -130,7 +131,10 @@ export async function PATCH(req: NextRequest) {
   }
 
   // ── Fire the relevant customer notification, only on first transition ──────
-  const notifyError = (err: unknown) => console.error('[admin/orders PATCH] notification error:', err);
+  const notifyError = (err: unknown) => logError('admin/orders PATCH', err, {
+    severity: 'warning',
+    details: { orderId: id, note: 'Order status changed but the customer notification failed.' },
+  });
 
   if (firstShip) {
     fireNotifications('order_shipped', {
