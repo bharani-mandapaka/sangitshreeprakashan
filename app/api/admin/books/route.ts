@@ -48,7 +48,39 @@ interface BookInput {
   inStock?: boolean;
   /** Copies left; null = not counted; omitted = leave as is (and don't touch the column). */
   stockQuantity?: number | null;
+  /** Optional details, sent together; omitted = leave as is (the columns only exist after book-details.sql). */
+  isbn?: string | null;
+  edition?: string | null;
+  pages?: number | null;
+  publicationYear?: number | null;
+  tableOfContents?: string[] | null;
+  aboutAuthors?: string | null;
   tags: string[];
+}
+
+const sendsDetails = (b: Partial<BookInput>) =>
+  b.isbn !== undefined || b.edition !== undefined || b.pages !== undefined ||
+  b.publicationYear !== undefined || b.tableOfContents !== undefined || b.aboutAuthors !== undefined;
+
+function validateDetails(b: Partial<BookInput>): string | null {
+  if (b.isbn != null && (typeof b.isbn !== 'string' || !/^[0-9Xx][0-9Xx -]{5,24}$/.test(b.isbn.trim()))) {
+    return 'ISBN should be digits (and hyphens), for example 978-81-234-5678-9.';
+  }
+  if (b.edition != null && (typeof b.edition !== 'string' || b.edition.length > 60)) return 'Edition is too long (60 characters at most).';
+  if (b.pages != null && (!Number.isInteger(b.pages) || b.pages <= 0 || b.pages > 5000)) return 'Pages must be a whole number above 0.';
+  if (b.publicationYear != null && (!Number.isInteger(b.publicationYear) || b.publicationYear < 1900 || b.publicationYear > 2100)) {
+    return 'Year must be between 1900 and 2100.';
+  }
+  if (b.tableOfContents != null) {
+    if (!Array.isArray(b.tableOfContents) || b.tableOfContents.length > 80
+        || b.tableOfContents.some((l) => typeof l !== 'string' || l.length > 200)) {
+      return 'Table of contents can have up to 80 lines of up to 200 characters each.';
+    }
+  }
+  if (b.aboutAuthors != null && (typeof b.aboutAuthors !== 'string' || b.aboutAuthors.length > 2000)) {
+    return 'The note about the author is too long (2000 characters at most).';
+  }
+  return null;
 }
 
 function validate(body: Partial<BookInput>): string | null {
@@ -65,7 +97,7 @@ function validate(body: Partial<BookInput>): string | null {
       && (!Number.isInteger(body.stockQuantity) || body.stockQuantity < 0)) {
     return 'Copies left must be a whole number, 0 or more (or empty to not count copies).';
   }
-  return null;
+  return validateDetails(body);
 }
 
 function toRow(body: BookInput) {
@@ -90,7 +122,16 @@ function toRow(body: BookInput) {
     // Only written when sent: the column doesn't exist until stock-quantity.sql has been run,
     // and including it would make every book save fail.
     ...(body.stockQuantity !== undefined ? { stock_quantity: body.stockQuantity } : {}),
-    tags:              Array.isArray(body.tags) ? body.tags : [],
+    // Same rule for the optional details (book-details.sql): blank values are stored as empty.
+    ...(sendsDetails(body) ? {
+      isbn:              body.isbn?.trim() || null,
+      edition:           body.edition?.trim() || null,
+      pages:             body.pages ?? null,
+      publication_year:  body.publicationYear ?? null,
+      table_of_contents: (body.tableOfContents ?? []).map((l) => l.trim()).filter(Boolean),
+      about_authors:     body.aboutAuthors?.trim() || null,
+    } : {}),
+    tags:             Array.isArray(body.tags) ? body.tags : [],
     updated_at:        new Date().toISOString(),
   };
 }

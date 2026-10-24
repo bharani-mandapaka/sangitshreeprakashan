@@ -37,6 +37,13 @@ export interface Book {
   inStock?: boolean;
   /** Copies left when the admin counts them; null/missing means not counted. */
   stockQuantity?: number | null;
+  // Optional extra details, shown on the book's page when present (see book-details.sql).
+  isbn?: string;
+  edition?: string;
+  pages?: number;
+  publicationYear?: number;
+  tableOfContents?: string[];
+  aboutAuthors?: string;
   tags: string[];
 }
 
