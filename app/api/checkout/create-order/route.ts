@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRazorpayOrder } from '@/lib/razorpay';
-import { computeVerifiedSubtotal } from '@/lib/books-data';
+import { computeVerifiedSubtotal, OutOfStockError } from '@/lib/books-data';
 import { validateCheckoutDetails } from '@/lib/checkout-validation';
 import { lookupPincode } from '@/lib/pincode-lookup';
 
@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
     // computed here — never the client-supplied subtotal (Story 1, AC3).
     const { subtotal } = await computeVerifiedSubtotal(
       items.map((i: { bookId: string; qty: number }) => ({ bookId: i.bookId, qty: i.qty })),
+      { requireInStock: true },
     );
 
     const amountPaise = Math.round(subtotal * 100);
@@ -65,6 +66,10 @@ export async function POST(req: NextRequest) {
       keyId:           process.env.RAZORPAY_KEY_ID,
     });
   } catch (err) {
+    // A sold-out book is the customer's to fix (remove it), not a server fault.
+    if (err instanceof OutOfStockError) {
+      return NextResponse.json({ error: err.message, outOfStock: err.titles }, { status: 409 });
+    }
     // Story 1, AC4 — a clear failure the customer sees, never a silent
     // proceed-as-if-it-worked.
     console.error('[checkout/create-order] error:', err);

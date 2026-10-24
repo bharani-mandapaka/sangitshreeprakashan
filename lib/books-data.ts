@@ -57,8 +57,21 @@ export function mapDbBookToBook(row: DbBookRow): Book {
     part: row.part ?? undefined,
     isBundle: row.is_bundle,
     isFeatured: row.is_featured,
+    inStock: row.in_stock !== false,
     tags: row.tags ?? [],
   };
+}
+
+/** Thrown by computeVerifiedSubtotal({ requireInStock: true }) so callers can answer 409 instead of 500. */
+export class OutOfStockError extends Error {
+  constructor(public titles: string[]) {
+    super(
+      titles.length === 1
+        ? `“${titles[0]}” is out of stock right now. Please remove it from your cart to continue.`
+        : `These books are out of stock right now: ${titles.map((t) => `“${t}”`).join(', ')}. Please remove them from your cart to continue.`,
+    );
+    this.name = 'OutOfStockError';
+  }
 }
 
 // ── Server-side reads (Server Components, sitemap, generateMetadata) ───────────
@@ -114,9 +127,14 @@ export async function getBooksByIds(ids: string[]): Promise<Book[]> {
  * request body can't under-charge). Throws if any bookId doesn't exist or
  * any qty isn't a positive integer, rather than silently charging a partial
  * amount.
+ *
+ * `requireInStock` is for create-order only: it refuses to start a payment for a book
+ * the admin marked out of stock. verify must NOT set it — a customer who already paid
+ * for a book that sold out a moment later still has to get their order saved.
  */
 export async function computeVerifiedSubtotal(
   items: { bookId: string; qty: number }[],
+  { requireInStock = false }: { requireInStock?: boolean } = {},
 ): Promise<{ subtotal: number; priceByBookId: Record<string, number> }> {
   if (items.length === 0) {
     throw new Error('Cart is empty.');
@@ -124,6 +142,11 @@ export async function computeVerifiedSubtotal(
   const books = await getBooksByIds(items.map((i) => i.bookId));
   const priceByBookId: Record<string, number> = {};
   books.forEach((b) => { priceByBookId[b.id] = b.price; });
+
+  if (requireInStock) {
+    const soldOut = books.filter((b) => b.inStock === false).map((b) => b.titleEnglish);
+    if (soldOut.length > 0) throw new OutOfStockError(soldOut);
+  }
 
   let subtotal = 0;
   for (const item of items) {
