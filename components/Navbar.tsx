@@ -64,6 +64,7 @@ export default function Navbar() {
                   src="/logo.png"
                   alt="Sangit Shree Prakashan Logo"
                   fill
+                  sizes="48px"
                   className="object-contain drop-shadow-[0_0_6px_rgba(201,162,39,0.5)]"
                   priority
                 />
