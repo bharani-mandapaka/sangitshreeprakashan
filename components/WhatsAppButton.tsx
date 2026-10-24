@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { WHATSAPP_URL } from '@/lib/utils';
 
 export default function WhatsAppButton() {

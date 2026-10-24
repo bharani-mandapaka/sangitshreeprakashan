@@ -1,9 +1,9 @@
-import { getSupabase } from './supabase';
+import { loadSupabase } from './supabase-lazy';
 
 // book_id references the static lib/books.ts catalog, not a DB table — see the
 // note in supabase/schema.sql.
 export async function getWishlistBookIds(userId: string): Promise<string[]> {
-  const { data, error } = await getSupabase()
+  const { data, error } = await (await loadSupabase())
     .from('wishlist')
     .select('book_id')
     .eq('user_id', userId);
@@ -16,7 +16,7 @@ export async function getWishlistBookIds(userId: string): Promise<string[]> {
 }
 
 export async function addToWishlist(userId: string, bookId: string) {
-  const { error } = await getSupabase()
+  const { error } = await (await loadSupabase())
     .from('wishlist')
     .insert({ user_id: userId, book_id: bookId });
   if (error) console.error('[wishlist] add error:', error);
@@ -24,7 +24,7 @@ export async function addToWishlist(userId: string, bookId: string) {
 }
 
 export async function removeFromWishlist(userId: string, bookId: string) {
-  const { error } = await getSupabase()
+  const { error } = await (await loadSupabase())
     .from('wishlist')
     .delete()
     .eq('user_id', userId)

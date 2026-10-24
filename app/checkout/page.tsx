@@ -4,11 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Script from 'next/script';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, CheckCircle, Lock, ChevronRight, ShieldCheck, RefreshCw } from 'lucide-react';
 import { useCartStore } from '@/lib/cart-store';
 import { useOrdersStore } from '@/lib/orders-store';
-import { useAnalyticsStore } from '@/lib/analytics-store';
+import { trackEvent } from '@/lib/track';
 import { useAuthStore } from '@/lib/auth-store';
 import { getSupabase } from '@/lib/supabase';
 import { formatPrice, generateOrderId } from '@/lib/utils';
@@ -93,7 +93,10 @@ export default function CheckoutPage() {
   // Books in the cart that sold out (or have fewer copies than asked for) since they were added.
   const { issues: stockIssues, hasIssues: hasStockIssues } = useCartStock();
   const addOrder     = useOrdersStore((s) => s.addOrder);
-  const trackCartAdd = useAnalyticsStore((s) => s.trackCartAdd);
+  // One anonymous "started checkout" event per visit to this page, if there is something to buy.
+  useEffect(() => {
+    if (useCartStore.getState().items.length > 0) trackEvent('checkout_start');
+  }, []);
   const user          = useAuthStore((s) => s.user);
 
   const [step,      setStep]      = useState<CheckoutStep>('details');
@@ -370,7 +373,6 @@ export default function CheckoutPage() {
             paymentMethod: 'razorpay',
             status: 'confirmed',
           });
-          trackCartAdd();
           clearCart();
           setPaying(false);
           setStep('success');
