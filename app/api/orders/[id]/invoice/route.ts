@@ -16,7 +16,7 @@ import { getSupabaseServer } from '@/lib/supabase';
 // explicit ownership check instead keeps this route symmetric with the admin
 // one (same invoice_number-assignment logic) and means the lazy invoice-number
 // write goes through the same server-only path.
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authHeader = req.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 
   const admin = getSupabaseAdmin();
-  const { id } = params;
+  const { id } = await params;
 
   const { data: order, error: fetchError } = await admin
     .from('orders')

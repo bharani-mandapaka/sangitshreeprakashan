@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Download, ArrowLeft } from 'lucide-react';
 import { getSupabase, type DbOrder } from '@/lib/supabase';
@@ -17,9 +17,9 @@ import { InvoiceSheet } from '@/components/admin/InvoiceSheet';
 // exists in this codebase; see the "PDF vs. browser print" open question in
 // order-invoice-user-stories.md.
 //
-// Next.js 14 params are a plain sync object — see CLAUDE.md's note.
-export default function CustomerOrderInvoicePage({ params }: { params: { id: string } }) {
-  const { id } = params;
+// Next.js 15: route params arrive as a Promise, which a client component reads with React's use().
+export default function CustomerOrderInvoicePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [order, setOrder]     = useState<DbOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');

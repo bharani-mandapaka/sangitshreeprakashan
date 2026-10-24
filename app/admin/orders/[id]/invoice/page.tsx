@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { type DbOrder } from '@/lib/supabase';
 import { InvoiceSheet } from '@/components/admin/InvoiceSheet';
 import { Printer, ArrowLeft } from 'lucide-react';
@@ -13,11 +13,9 @@ import Link from 'next/link';
 // markup lives in components/admin/InvoiceSheet.tsx, shared with the bulk
 // print page at app/admin/orders/print-batch/page.tsx.
 //
-// Next.js 14 params are a plain sync object (see CLAUDE.md's "Next.js 14
-// params" note) — but this is a client component reading a route param, so
-// it comes through as a prop here rather than via next/headers.
-export default function AdminOrderInvoicePage({ params }: { params: { id: string } }) {
-  const { id } = params;
+// Next.js 15: route params arrive as a Promise, which a client component reads with React's use().
+export default function AdminOrderInvoicePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [order, setOrder]     = useState<DbOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');

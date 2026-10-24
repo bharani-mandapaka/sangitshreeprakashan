@@ -4,7 +4,7 @@ import { getAllBooks, getBookBySlug, getBooksByCategory } from '@/lib/books-data
 import BookDetailClient from '@/components/BookDetailClient';
 
 interface Props {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 // Without generateStaticParams Next treats /books/[slug] as fully dynamic: every click
@@ -20,7 +20,8 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const book = await getBookBySlug(params.slug);
+  const { slug } = await params;
+  const book = await getBookBySlug(slug);
   if (!book) return {};
   return {
     title: book.titleEnglish,
@@ -34,7 +35,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function BookDetailPage({ params }: Props) {
-  const book = await getBookBySlug(params.slug);
+  const { slug } = await params;
+  const book = await getBookBySlug(slug);
   if (!book) notFound();
 
   // Computed here (server-side) instead of inside BookDetailClient, which is
