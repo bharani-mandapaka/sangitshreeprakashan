@@ -117,7 +117,15 @@ export async function fireNotifications(
   // file without the Supabase/Resend env vars being present at build time.
   // Service-role client: notification_rules/notification_logs have no anon policy.
   const supabase = getSupabaseAdmin();
-  const resend = new Resend(process.env.RESEND_API_KEY);
+  // Only created when an email is actually about to be sent. Creating it up front made a missing
+  // RESEND_API_KEY crash every notification, WhatsApp-only rules and the digests included.
+  let resendClient: Resend | null = null;
+  const getResend = (): Resend => {
+    const key = process.env.RESEND_API_KEY;
+    if (!key) throw new Error('RESEND_API_KEY is not set, so email cannot be sent.');
+    if (!resendClient) resendClient = new Resend(key);
+    return resendClient;
+  };
 
   const { data: rules, error } = await supabase
     .from('notification_rules')
@@ -155,7 +163,7 @@ export async function fireNotifications(
           // { data: null, error: {...} }. Without checking `error` here, a
           // failed send was silently logged as "sent" with no clue why the
           // customer never got the email.
-          const { error: sendError } = await resend.emails.send({
+          const { error: sendError } = await getResend().emails.send({
             from:    `Sangit Shree Prakashan <${process.env.RESEND_FROM_EMAIL || 'orders@sangitshreeprakashan.com'}>`,
             to,
             subject,
