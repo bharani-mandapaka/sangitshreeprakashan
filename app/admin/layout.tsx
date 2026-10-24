@@ -7,6 +7,7 @@ import Image from 'next/image';
 import {
   LayoutDashboard, ShoppingBag, Bell, Users, LogOut, Menu, X, BookOpen,
 } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 
 const NAV = [
   { href: '/admin',               icon: LayoutDashboard, label: 'Dashboard'     },
@@ -20,6 +21,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname          = usePathname();
   const [authed, setAuthed] = useState(false);
   const [pw, setPw]         = useState('');
+  const [showPw, setShowPw] = useState(false);   // "show password" toggle on the login form
   const [error, setError]   = useState('');
   const [loading, setLoading] = useState(false);
   const [sideOpen, setSideOpen] = useState(false);
@@ -98,14 +100,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">
                 Password
               </label>
-              <input
-                type="password"
-                className="input-gold"
-                placeholder="Enter admin password"
-                value={pw}
-                onChange={(e) => setPw(e.target.value)}
-                autoFocus
-              />
+              <div className="relative">
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  className="input-gold pr-11"
+                  placeholder="Enter admin password"
+                  value={pw}
+                  onChange={(e) => setPw(e.target.value)}
+                  autoComplete="current-password"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw((v) => !v)}
+                  aria-label={showPw ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPw}
+                  title={showPw ? 'Hide password' : 'Show password'}
+                  className="absolute inset-y-0 right-0 px-3 text-cream/40 hover:text-gold transition-colors"
+                >
+                  {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
               {error && <p className="text-red-400 text-xs mt-1.5">{error}</p>}
             </div>
             <button
