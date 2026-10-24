@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRazorpayOrder } from '@/lib/razorpay';
-import { computeVerifiedSubtotal, OutOfStockError } from '@/lib/books-data';
+import { computeVerifiedSubtotal, StockError } from '@/lib/books-data';
 import { validateCheckoutDetails } from '@/lib/checkout-validation';
 import { lookupPincode } from '@/lib/pincode-lookup';
 import { logError } from '@/lib/error-log';
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     // A sold-out book is the customer's to fix (remove it), not a server fault.
-    if (err instanceof OutOfStockError) {
+    if (err instanceof StockError) {
       return NextResponse.json({ error: err.message, outOfStock: err.titles }, { status: 409 });
     }
     // Story 1, AC4 — a clear failure the customer sees, never a silent

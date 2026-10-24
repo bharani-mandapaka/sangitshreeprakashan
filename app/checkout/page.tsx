@@ -17,6 +17,8 @@ import { statesMatch, PINCODE_FORMAT } from '@/lib/pincode';
 import { useAddressesStore } from '@/lib/addresses-store';
 import { sameAddress, MAX_SAVED_ADDRESSES, type SavedAddress } from '@/lib/addresses';
 import BookCoverImage from '@/components/BookCoverImage';
+import CartStockNotice from '@/components/CartStockNotice';
+import { useCartStock } from '@/lib/use-cart-stock';
 
 type CheckoutStep = 'details' | 'payment' | 'success';
 
@@ -88,6 +90,8 @@ async function lookupPin(code: string): Promise<PinInfo> {
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, clearCart } = useCartStore();
+  // Books in the cart that sold out (or have fewer copies than asked for) since they were added.
+  const { issues: stockIssues, hasIssues: hasStockIssues } = useCartStock();
   const addOrder     = useOrdersStore((s) => s.addOrder);
   // One anonymous "started checkout" event per visit to this page, if there is something to buy.
   useEffect(() => {
@@ -210,6 +214,7 @@ export default function CheckoutPage() {
 
   const handleDetailsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (hasStockIssues) return;   // the notice above the form says what to fix
 
     // Catch bad details (e.g. a 5-digit phone, a 2-digit PIN) before anyone
     // reaches payment — the server re-checks the same rules before charging.
@@ -513,6 +518,8 @@ export default function CheckoutPage() {
                 >
                   <h2 className="font-cinzel text-cream text-xl font-bold mb-6">Shipping Details</h2>
 
+                  <CartStockNotice issues={stockIssues} />
+
                   {/* Returning customers: pick a saved address instead of retyping it. */}
                   {user && savedAddresses.length > 0 && (
                     <div>
@@ -668,7 +675,8 @@ export default function CheckoutPage() {
 
                   <button
                     type="submit"
-                    className="w-full bg-gold hover:bg-gold-300 text-dark font-cinzel font-bold py-4 rounded-xl transition-colors text-base mt-2"
+                    disabled={hasStockIssues}
+                    className="w-full bg-gold hover:bg-gold-300 text-dark font-cinzel font-bold py-4 rounded-xl transition-colors text-base mt-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gold"
                   >
                     Continue to Payment
                   </button>

@@ -46,6 +46,8 @@ interface BookInput {
   isBundle?: boolean;
   isFeatured?: boolean;
   inStock?: boolean;
+  /** Copies left; null = not counted; omitted = leave as is (and don't touch the column). */
+  stockQuantity?: number | null;
   tags: string[];
 }
 
@@ -59,6 +61,10 @@ function validate(body: Partial<BookInput>): string | null {
   if (!body.language || !LANGUAGES.includes(body.language)) return `Language must be one of: ${LANGUAGES.join(', ')}.`;
   if (!Array.isArray(body.authors) || body.authors.length === 0) return 'At least one author is required.';
   if (!body.description || typeof body.description !== 'string') return 'A description is required.';
+  if (body.stockQuantity !== undefined && body.stockQuantity !== null
+      && (!Number.isInteger(body.stockQuantity) || body.stockQuantity < 0)) {
+    return 'Copies left must be a whole number, 0 or more (or empty to not count copies).';
+  }
   return null;
 }
 
@@ -79,7 +85,11 @@ function toRow(body: BookInput) {
     part:              body.part ?? null,
     is_bundle:         !!body.isBundle,
     is_featured:       !!body.isFeatured,
-    in_stock:          body.inStock ?? true,
+    // A counted book is in stock exactly when copies are left; that overrides the switch.
+    in_stock:          typeof body.stockQuantity === 'number' ? body.stockQuantity > 0 : (body.inStock ?? true),
+    // Only written when sent: the column doesn't exist until stock-quantity.sql has been run,
+    // and including it would make every book save fail.
+    ...(body.stockQuantity !== undefined ? { stock_quantity: body.stockQuantity } : {}),
     tags:              Array.isArray(body.tags) ? body.tags : [],
     updated_at:        new Date().toISOString(),
   };

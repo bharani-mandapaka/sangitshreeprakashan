@@ -174,6 +174,10 @@ export default function BookDetailClient({ book, related }: { book: Book; relate
               </p>
             )}
 
+            {!soldOut && typeof book.stockQuantity === 'number' && book.stockQuantity <= 5 && (
+              <p className="text-amber-400/90 text-sm">Only {book.stockQuantity} cop{book.stockQuantity === 1 ? 'y' : 'ies'} left.</p>
+            )}
+
             {/* CTA */}
             <div className="flex flex-col sm:flex-row gap-3">
               <button
