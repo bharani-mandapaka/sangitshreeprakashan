@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { ShoppingBag, MessageCircle } from 'lucide-react';
 import { WHATSAPP_URL } from '@/lib/utils';
 

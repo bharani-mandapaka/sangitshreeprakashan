@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { MapPin, Phone, Mail, Clock, CheckCircle, Instagram, Facebook, Smartphone } from 'lucide-react';
 import { WHATSAPP_URL, CONTACT } from '@/lib/utils';
 
