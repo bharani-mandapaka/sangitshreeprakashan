@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Printer, ArrowLeft } from 'lucide-react';
@@ -22,7 +22,7 @@ function PrintBatchContent() {
   const [orders, setOrders]   = useState<DbOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
-  const [printed, setPrinted] = useState(false);
+  const printedRef            = useRef(false);
 
   useEffect(() => {
     if (ids.length === 0) {
@@ -60,13 +60,18 @@ function PrintBatchContent() {
   // "Print Selected" really does go straight to one print preview covering
   // all of them — the manual Print button below is just a fallback in case
   // the browser blocks the automatic call.
+  //
+  // "Already printed" lives in a ref, set only once the print actually fires.
+  // It used to be state set right here, which re-ran this effect and let the
+  // cleanup cancel the timer before it fired, so the dialog never opened.
   useEffect(() => {
-    if (!loading && !error && orders.length > 0 && !printed) {
-      setPrinted(true);
-      const t = setTimeout(() => window.print(), 300);
-      return () => clearTimeout(t);
-    }
-  }, [loading, error, orders, printed]);
+    if (loading || error || orders.length === 0 || printedRef.current) return;
+    const t = setTimeout(() => {
+      printedRef.current = true;
+      window.print();
+    }, 300);
+    return () => clearTimeout(t);
+  }, [loading, error, orders]);
 
   if (loading) {
     return <div className="min-h-screen bg-white flex items-center justify-center text-black/40 font-sans text-sm">Loading {ids.length} invoice{ids.length !== 1 ? 's' : ''}…</div>;
