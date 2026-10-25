@@ -44,6 +44,8 @@ export interface Book {
   publicationYear?: number;
   tableOfContents?: string[];
   aboutAuthors?: string;
+  /** "Look inside" page images, in order (see book-sample-pages.sql). */
+  samplePages?: string[];
   tags: string[];
 }
 
