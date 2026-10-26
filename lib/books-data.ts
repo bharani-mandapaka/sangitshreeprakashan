@@ -42,6 +42,7 @@ export interface DbBookRow {
   publication_year?: number | null;
   table_of_contents?: string[] | null;
   about_authors?: string | null;
+  sample_pages?: string[] | null;
   tags: string[];
   created_at?: string;
   updated_at?: string;
@@ -75,6 +76,7 @@ export function mapDbBookToBook(row: DbBookRow): Book {
     publicationYear: row.publication_year ?? undefined,
     tableOfContents: row.table_of_contents?.length ? row.table_of_contents : undefined,
     aboutAuthors: row.about_authors || undefined,
+    samplePages: row.sample_pages?.length ? row.sample_pages : undefined,
     tags: row.tags ?? [],
   };
 }

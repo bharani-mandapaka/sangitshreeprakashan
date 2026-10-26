@@ -466,6 +466,12 @@ alter table books
   add column if not exists table_of_contents text[],      -- one entry per line
   add column if not exists about_authors    text;
 
+-- ── Book sample pages ──────────────────────────────────────────────────────
+-- (see book-sample-pages.sql) up to 8 "Look inside" images per book.
+
+alter table books
+  add column if not exists sample_pages text[];
+
 -- ── Error log ──────────────────────────────────────────────────────────────
 -- (see error-logs.sql) server and browser errors, reviewed in Admin -> System.
 
