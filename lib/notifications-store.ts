@@ -8,7 +8,8 @@ export type NotificationTrigger =
   | 'order_returned'
   | 'daily_digest'
   | 'weekly_digest'
-  | 'cart_abandoned';
+  | 'cart_abandoned'
+  | 'critical_error';
 
 export type NotificationChannel = 'email' | 'whatsapp' | 'both';
 
@@ -171,6 +172,29 @@ Consider following up if contact info is available.
 Regards,
 Sangit Shree Prakashan`,
   },
+  critical_error: {
+    subject: 'URGENT: {{source}} problem on Sangit Shree Prakashan',
+    body: `Dear Admin,
+
+Something needs your attention on the website.
+
+WHAT HAPPENED
+-------------
+{{message}}
+
+Where : {{source}}
+When  : {{time}}
+
+DETAILS (who to help, what to check)
+------------------------------------
+{{details}}
+
+Open Admin > System to see it and mark it resolved:
+https://sangit-shree-prakashan.vercel.app/admin/system
+
+Regards,
+Sangit Shree Prakashan`,
+  },
 };
 
 // ── WhatsApp templates (uses *bold* and _italic_ markdown) ─────────────────────
@@ -245,6 +269,16 @@ View analytics: https://sangit-shree-prakashan.vercel.app/admin`,
 *Time:* {{abandoned_at}}
 
 A visitor left without completing their purchase.`,
+
+  critical_error: `*⚠ Needs attention*
+{{message}}
+
+*Where:* {{source}}
+*When:* {{time}}
+
+{{details}}
+
+Open: https://sangit-shree-prakashan.vercel.app/admin/system`,
 };
 
 // ── NLP parser ────────────────────────────────────────────────────────────────
@@ -270,7 +304,9 @@ export function parseDescription(desc: string): {
 
   // Detect trigger
   let trigger: NotificationTrigger = 'order_placed';
-  if (lower.includes('weekly'))                             trigger = 'weekly_digest';
+  if (lower.includes('critical') || lower.includes('error') || lower.includes('problem') || lower.includes('failure'))
+                                                           trigger = 'critical_error';
+  else if (lower.includes('weekly'))                       trigger = 'weekly_digest';
   else if (lower.includes('daily'))                        trigger = 'daily_digest';
   else if (lower.includes('abandon') || (lower.includes('cart') && !lower.includes('order')))
                                                            trigger = 'cart_abandoned';
@@ -294,6 +330,7 @@ export function parseDescription(desc: string): {
     daily_digest:    'Daily Digest',
     weekly_digest:   'Weekly Digest',
     cart_abandoned:  'Abandoned Cart',
+    critical_error:  'Critical Error',
   };
   const channelLabels: Record<NotificationChannel, string> = {
     email:     'Email',

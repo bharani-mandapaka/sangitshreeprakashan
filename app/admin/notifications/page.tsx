@@ -23,6 +23,7 @@ const TRIGGER_LABELS: Record<NotificationTrigger, string> = {
   daily_digest:    'Daily at 8:00 AM',
   weekly_digest:   'Every Monday 8:00 AM',
   cart_abandoned:  'Cart abandoned (1 h)',
+  critical_error:  'Critical error logged',
 };
 
 const TRIGGER_COLORS: Record<NotificationTrigger, string> = {
@@ -33,6 +34,7 @@ const TRIGGER_COLORS: Record<NotificationTrigger, string> = {
   daily_digest:    'bg-blue-500/15 text-blue-300 border-blue-500/30',
   weekly_digest:   'bg-purple-500/15 text-purple-300 border-purple-500/30',
   cart_abandoned:  'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
+  critical_error:  'bg-red-500/15 text-red-300 border-red-500/30',
 };
 
 const CHANNEL_META: Record<NotificationChannel, { label: string; icon: React.ReactNode; color: string }> = {
