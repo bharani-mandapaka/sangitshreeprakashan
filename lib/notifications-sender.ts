@@ -58,7 +58,7 @@ function buildAdminEmailHtml(subject: string, body: string): string {
 <html>
 <body style="margin:0;padding:0;background:#f0f0f0;font-family:Georgia,serif;">
 <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e0e0e0;">
-  <div style="background:#040000;padding:20px 24px;">
+  <div style="background:#0C0102;padding:20px 24px;">
     <h1 style="margin:0;color:#C9A84C;font-size:14px;letter-spacing:2px;font-weight:normal;">
       SANGIT SHREE PRAKASHAN
     </h1>
@@ -88,7 +88,7 @@ function buildCustomerEmailHtml(subject: string, body: string): string {
 <html>
 <body style="margin:0;padding:0;background:#f0f0f0;font-family:Georgia,serif;">
 <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e0e0e0;">
-  <div style="background:#040000;padding:20px 24px;">
+  <div style="background:#0C0102;padding:20px 24px;">
     <h1 style="margin:0;color:#C9A84C;font-size:14px;letter-spacing:2px;font-weight:normal;">
       SANGIT SHREE PRAKASHAN
     </h1>

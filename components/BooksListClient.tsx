@@ -92,7 +92,7 @@ function BooksListContent({ initialBooks }: { initialBooks: Book[] }) {
   return (
     <div className="min-h-screen bg-dark pt-20 lg:pt-24">
       {/* Page header */}
-      <div className="bg-gradient-to-b from-[#0F0000] to-dark py-14 px-4 sm:px-6 lg:px-8 border-b border-gold/10">
+      <div className="bg-[radial-gradient(ellipse_65%_110%_at_50%_0%,_rgba(110,0,0,0.38)_0%,_rgba(60,0,0,0.15)_55%,_transparent_80%)] py-14 px-4 sm:px-6 lg:px-8 border-b border-gold/10">
         <div className="max-w-7xl mx-auto text-center">
           <p className="font-cinzel text-gold/70 text-xs uppercase tracking-[0.3em] mb-3">
             Our Library
@@ -169,7 +169,7 @@ function BooksListContent({ initialBooks }: { initialBooks: Book[] }) {
               transition={{ duration: 0.25 }}
               className="overflow-hidden"
             >
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 p-5 rounded-xl border border-gold/10 bg-[#0A0000]">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 p-5 rounded-xl border border-gold/10 bg-[#130304]">
                 {/* Category */}
                 <div>
                   <p className="text-cream/50 text-xs uppercase tracking-widest mb-2 font-cinzel">Category</p>

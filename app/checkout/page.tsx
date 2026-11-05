@@ -432,7 +432,7 @@ export default function CheckoutPage() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
             <h1 className="font-cinzel text-3xl font-bold text-cream mb-2">Order Confirmed!</h1>
             <p className="font-devanagari text-gold/70 text-lg mb-4">आपका ऑर्डर सफलतापूर्वक प्राप्त हुआ</p>
-            <div className="bg-[#0A0000] border border-gold/15 rounded-2xl p-6 mb-6 text-left space-y-3">
+            <div className="bg-[#130304] border border-gold/15 rounded-2xl p-6 mb-6 text-left space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-cream/50">Order ID</span>
                 <span className="font-cinzel text-gold font-bold">{orderId}</span>
@@ -690,7 +690,7 @@ export default function CheckoutPage() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
                 >
-                  <div className="bg-[#0A0000] border border-gold/15 rounded-2xl p-6 sm:p-8 text-center">
+                  <div className="bg-[#130304] border border-gold/15 rounded-2xl p-6 sm:p-8 text-center">
                     <div className="w-16 h-16 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center mx-auto mb-5">
                       <ShieldCheck size={28} className="text-gold" />
                     </div>
@@ -740,7 +740,7 @@ export default function CheckoutPage() {
 
           {/* Right: Order Summary */}
           <div className="lg:col-span-2">
-            <div className="bg-[#0A0000] border border-gold/10 rounded-2xl p-5 sticky top-28">
+            <div className="bg-[#130304] border border-gold/10 rounded-2xl p-5 sticky top-28">
               <h3 className="font-cinzel text-cream font-semibold text-sm uppercase tracking-widest mb-4">
                 Order Summary
               </h3>

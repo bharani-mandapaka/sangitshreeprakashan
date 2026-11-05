@@ -104,7 +104,7 @@ export default function SystemPage() {
       </div>
 
       {/* ── Errors ───────────────────────────────────────────────── */}
-      <section className="gold-border rounded-xl bg-[#0F0000] p-5">
+      <section className="gold-border rounded-xl bg-[#1D0607] p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
             <h2 className="font-cinzel text-cream font-semibold">Errors</h2>
@@ -145,7 +145,7 @@ export default function SystemPage() {
 
         <ul className="space-y-2">
           {visible.map((e) => (
-            <li key={e.id} className={`rounded-lg border ${e.resolved ? 'border-gold/5 opacity-60' : 'border-gold/15'} bg-[#060000]`}>
+            <li key={e.id} className={`rounded-lg border ${e.resolved ? 'border-gold/5 opacity-60' : 'border-gold/15'} bg-[#0C0102]`}>
               <button
                 type="button"
                 onClick={() => setOpenId(openId === e.id ? null : e.id)}
@@ -190,7 +190,7 @@ export default function SystemPage() {
       </section>
 
       {/* ── Backup ───────────────────────────────────────────────── */}
-      <section className="gold-border rounded-xl bg-[#0F0000] p-5">
+      <section className="gold-border rounded-xl bg-[#1D0607] p-5">
         <h2 className="font-cinzel text-cream font-semibold">Backup</h2>
         <p className="text-cream/50 text-sm mt-1 mb-4">
           Download a copy of your orders, books, notification rules, saved addresses and wishlists as one file. Keep it somewhere

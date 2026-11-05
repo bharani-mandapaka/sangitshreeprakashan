@@ -310,7 +310,7 @@ function BookFormModal({
     <div className="fixed inset-0 bg-black/70 z-50 overflow-y-auto p-4">
       <form
         onSubmit={handleSubmit}
-        className="bg-[#0A0000] border border-gold/15 rounded-2xl w-full max-w-2xl mx-auto my-8 p-6 space-y-5"
+        className="bg-[#130304] border border-gold/15 rounded-2xl w-full max-w-2xl mx-auto my-8 p-6 space-y-5"
       >
         <div className="flex items-center justify-between">
           <h2 className="font-cinzel text-gold font-bold text-lg">
@@ -756,7 +756,7 @@ export default function AdminBooksPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-[#0A0000] border border-gold/10 rounded-2xl overflow-hidden">
+      <div className="bg-[#130304] border border-gold/10 rounded-2xl overflow-hidden">
         {loading ? (
           <div className="py-16 text-center">
             <RefreshCw size={22} className="text-gold/40 animate-spin mx-auto mb-3" />
@@ -876,7 +876,7 @@ export default function AdminBooksPage() {
       {/* Delete confirmation */}
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/70 z-50 overflow-y-auto p-4">
-          <div className="bg-[#0A0000] border border-gold/15 rounded-2xl w-full max-w-sm mx-auto my-8 p-6 space-y-4">
+          <div className="bg-[#130304] border border-gold/15 rounded-2xl w-full max-w-sm mx-auto my-8 p-6 space-y-4">
             <h2 className="font-cinzel text-cream font-bold text-base">Delete this book?</h2>
             <p className="text-cream/50 text-sm">
               <span className="text-cream">{deleteTarget.title_english}</span> will be permanently removed from the catalog. This can&apos;t be undone.
