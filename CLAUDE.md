@@ -47,8 +47,11 @@ Key Tailwind classes in use: `text-gold`, `text-cream`, `bg-dark`, `input-gold`,
 
 ## Known issues
 
+- **Razorpay is in TEST mode on Vercel** (since 2026-10-26): `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` hold `rzp_test_` keys for Production and Preview. A test payment saved an order correctly. Real money needs the live pair (Bharani's GST/PAN verification) swapped into Production at the domain cutover. The account refuses international cards, so test with Razorpay's Indian test cards or `success@razorpay` / `failure@razorpay` UPI.
+- **Customer emails only reach the owner address** until a domain is verified on Resend (checked 2026-10-26: "You can only send testing emails to your own email address"). Admin WhatsApp alerts do send.
+
 - **Resend domain not currently verified — on hold.** `sangitshreeprakashan.com` shows as unverified on Resend's side (`https://resend.com/domains`), even though earlier notes said it was verified — something changed (DNS records dropped, or a different Resend account/key now in use). Every customer email (order placed/shipped/delivered) fails silently-ish today: `fireNotifications()` catches the error and logs it, but the customer never receives anything. Needs whoever owns the domain's DNS (Bharani) to re-verify it in Resend. Complication: `sangitshreeprakashan.com` already has an existing website live on it, so this is paused pending a closer look at the domain's current DNS setup before adding records — see the Notifications section in `tasks.md`. Until then, emails can be tested by temporarily sending `from` Resend's built-in `onboarding@resend.dev` test address.
-- **`notification_rules`/`notification_logs` are still open to the anon key on the live database.** The code no longer needs that access — every read/write goes through the service-role client (`app/api/admin/notifications`, `lib/notifications-sender.ts`, `app/api/notifications/test`) and `supabase/schema.sql` no longer creates the anon policies — but the live database still has them: checked 2026-10-24, the public anon key can read both tables, including log recipients (customer emails/phone numbers). Fix: run `drop policy if exists "anon_all_notification_rules" on notification_rules; drop policy if exists "anon_all_notification_logs" on notification_logs;` in the Supabase SQL editor. Safe now that every deployment is on the new code. See Security & maintenance in `tasks.md`.
+- **`notification_rules`/`notification_logs` were locked on the live database on 2026-11-05** (the two anon policies were dropped; verified: the public key reads 0 rows and cannot write, the service-role client still works). Nothing left to do here; the drop statements stay in `supabase/schema.sql` as documentation.
 
 ---
 
@@ -311,7 +314,7 @@ all been run on the live database (checked 2026-10-24). Each is also folded into
 - `wishlist` — properly scoped to the owning user (select/insert/delete all check `auth.uid() = user_id`).
 - `phone_otps` — no policies whatsoever; service role only.
 - `books` — public SELECT (`for select using (true)`); no insert/update/delete policy for anon at all, so writes only happen through the service-role admin route.
-- `notification_rules`/`notification_logs` — `schema.sql` enables RLS with no policies (service role only), and the code relies only on that — but the old permissive anon policies are **still live** until the drop statements in Known issues are run.
+- `notification_rules`/`notification_logs` — `schema.sql` enables RLS with no policies (service role only), and the live database now matches: the old permissive anon policies were dropped on 2026-11-05.
 - `saved_addresses` — scoped to the owning user (select/insert/update/delete all check `auth.uid() = user_id`).
 - `error_logs`, `analytics_events`, `rate_limit_hits` — RLS on, no policies; service role only.
 - `take_stock()` RPC — execute revoked from `public`/`anon`/`authenticated`, granted to `service_role` only.
@@ -446,7 +449,7 @@ the layout's own route.
 - Founder timeline — real photos, refined content (mobile scroll fix done in PR #4)
 - Final copy for book descriptions, table of contents, author bios (the fields exist since PR #28; the content is the owner's to write)
 - Sample pages on book detail pages (not built)
-- Run the notification-policy drop SQL (see Known issues)
+- ~~Run the notification-policy drop SQL~~ — done 2026-11-05
 - A logged-in pass on the live site after the Next 15 / React 19 upgrade — PR #30 was tested locally, but not with real sign-in, payments or real-order invoices
 
 ---
@@ -465,7 +468,7 @@ the layout's own route.
 | WhatsApp | Meta Cloud API | Code already calls it in `fireNotifications()`; start business verification early — approval takes 2–4 weeks |
 
 ### Remaining Phase 2 work
-- ~~Tighten RLS on `notification_rules`/`notification_logs`~~ code done — only the live-database drop SQL is left (see Known issues)
+- ~~Tighten RLS on `notification_rules`/`notification_logs`~~ — done, code and live database (2026-11-05)
 - Real Google OAuth + role-based access for admin (staff vs admin)
 - ~~Catalog management from admin: edit/create books, create/edit bundles, migrate `lib/books.ts` to a Supabase `books` table~~ ✓ done — see "Book catalog" above and `/admin/books`
 - ~~Real cover-image upload to Supabase Storage~~ ✓ done — see "Book catalog" above

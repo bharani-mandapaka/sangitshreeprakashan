@@ -3,6 +3,8 @@
 > This file tracks overall project status across all branches/PRs. As of 2026-10-24 every PR up
 > to #33 is merged to `master` and none are open. Branch names mentioned below are where each
 > piece was built; they are all on `master` now.
+>
+> Updated 2026-11-05: two more features are built but **not merged yet** (PRs open: `feature/critical-error-alerts`, `feature/book-sample-pages`), Razorpay TEST keys are now live on Vercel, and see "Since 2026-10-24" below.
 
 ## Done
 
@@ -93,6 +95,23 @@ was ruled out — no GSTIN/HSN/tax fields, just a plain Bill of Supply.
 
 ---
 
+## Since 2026-10-24
+
+### Built, PR open, not merged yet
+- [ ] **Critical-error alerts** — `feature/critical-error-alerts`. New trigger `critical_error` (`lib/critical-alert.ts`, max 5 alerts an hour) so a paid-but-not-saved order alerts the admin. `critical-error-alert-migration.sql` seeds a rule that is **off with no recipients**; it has been run on the live database. Switch the rule on and add recipients in Admin → Notifications.
+- [ ] **Book sample pages ("Look inside")** — `feature/book-sample-pages`. Up to 8 page images per book, uploaded in Admin → Catalog, shown as thumbnails and a full-screen viewer (`components/SamplePages.tsx`). `book-sample-pages.sql` has been run on the live database.
+
+### Found on 2026-10-26 while testing Razorpay
+- [ ] **Customer confirmation email is rejected by Resend** — until a domain is verified it only sends to the owner address (`sangitshreeprakashan@gmail.com`), so no outside customer gets an email. Order WhatsApp to the admin number did send. Test emails with the owner address as the customer email until the domain is verified.
+- [ ] **Local testing writes to the live `error_logs`.** The preview server posted "hideName is not defined" to the real table; resolve those on Admin → System. Do not point local tests at the live database when avoidable.
+- [x] **Notification tables locked on the live database (2026-11-05).** The two `drop policy` lines were run; the public key now reads 0 rows from `notification_rules` and `notification_logs` and its writes are refused (401), while the service-role client still reads both. Customer emails and phone numbers in the logs are no longer exposed. Still worth confirming with the next real order that the admin and customer notifications arrive.
+
+### Home page redesign (design work, **not committed**, on local branch `feature/home-banner-library`)
+- Decided: the curved-library photo (Unsplash, free licence) as the home banner, text on the left, the existing content kept but the WhatsApp button removed and the line "Our platform is dedicated to providing authentic and comprehensive books on theory, practical, and history of Hindustani Classical music." added; a tiny publisher line under the extra-bold title; no logo in the banner; the navbar name hides on the home page until the visitor scrolls; tabs are plain regular-weight capitals with a gold underline on the current page; search, account and cart are round dark glass buttons.
+- Theme: kept Royal Crimson & Gold, with a deeper, shaded maroon and a soft crimson glow behind every page (lighter in the middle, darker at the sides) instead of near-black. Other themes were previewed (Midnight Indigo, Sandalwood & Peacock) and rejected; the preview sheets live in `design-options/` outside the repo.
+- Lesson: the Tailwind colour settings only reload after restarting the dev server with `.next` cleared; a stale server previews the old colours.
+- Still to check before committing: phone view, cart drawer, checkout, About, admin and invoice with the new colours.
+
 ## Remaining work (as of 2026-10-24)
 
 > Consolidated list, grouped by who can move each item. Details live in the sections below.
@@ -101,15 +120,15 @@ was ruled out — no GSTIN/HSN/tax fields, just a plain Bill of Supply.
 - [~] **Vercel Production environment variables** — **partly done:** on 2026-10-21 the live admin login answered "Admin login is not configured on the server"; by 2026-10-22 it answers "Incorrect password", so `ADMIN_PASSWORD` has been added. Not checked, so assume still missing until someone confirms each one: orders, email, WhatsApp and phone login can't work live without the rest. The full list to have in Production: `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `PHONE_AUTH_SECRET`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_TOKEN`, `CRON_SECRET`, then redeploy (Vercel only applies new variables to new deployments). `.env.local` never reaches Vercel because it is git-ignored.
 - [x] **Merge the open PRs** — done. Saved addresses merged 2026-10-21 (#19; originally #18, which was merged into the already-merged PIN branch and so never reached master). Everything else merged 2026-10-24, in this order: #21, #24, #26, #27, #25, #28, #20, #22, #23, #29, #31, #32, then #33 and #30 (Next 15). #25 was meant to go before #26/#27; GitHub wrongly reported a conflict on it (two merge bases), so master was merged into its branch first. The final code is the same either way, and the combined result was built and checked before anything was merged.
 - [ ] **Supabase Site URL** — still localhost, so Google sign-in on the live site redirects to localhost. Set it to the live address (Authentication → URL Configuration) and add preview addresses to the Redirect URLs if previews need Google sign-in.
-- [ ] **Razorpay keys on Vercel** — payments fail without them. Test keys work immediately; live keys need Bharani's GST/PAN verification.
+- [~] **Razorpay keys on Vercel** — **TEST keys are in and working** (Bharani added them to Production on 2026-10-26; Preview should also use test keys, never live). **Live keys** still need Bharani's GST/PAN verification; at cutover swap both Production values for the real live pair (the same live key the old site uses — never regenerate the Live key) and redeploy. Env-var changes only apply to deployments made after saving.
 - [ ] **Email domain** — the three DNS records for `mail.sangitshreeprakashan.com` (see Notifications below), and a decision on which Resend account owns production email.
 - [ ] **Meta Business Verification** (2–4 weeks) — gates WhatsApp to real customers, WhatsApp login codes and the admin users-page code.
 - [ ] **Domain cutover plan** — the old site still serves `sangitshreeprakashan.com`.
 - [ ] **Vercel preview protection** — preview deployments sit behind a Vercel login (team `meetbharani91-5980s-projects`), so nobody outside the team can open a PR preview. Settings → Deployment Protection → "Only Production Deployments" opens them.
 
 ### Before launch, mostly quick
-- [ ] End-to-end payment test once test keys exist (including replay and cart-tamper attempts).
-- [ ] **Run the notification-policy drop SQL — do this first.** Checked 2026-10-24: the public anon key can still read `notification_rules` and `notification_logs` on the live database, and the logs hold customers' emails and phone numbers. All code is now on the version that doesn't need that access, so it is safe to run (see Security below).
+- [~] End-to-end payment test — **partly done 2026-10-26:** `create-order` returned a test order; one successful test payment saved order `SSP-LKMH4B7C` (status confirmed, ₹1,420, Razorpay order and payment ids stored); a failed attempt (an international test card is refused by the account, which is correct) created no order. **Still to do:** the cancelled-payment path, replay and cart-tamper attempts, and what cancelling a paid order does (refund or status only — not yet checked).
+- [x] ~~Run the notification-policy drop SQL~~ — done 2026-11-05 (see the Since 2026-10-24 section above).
 - [ ] **Revert the temporary admin alert number** to +917408452828 (currently +918874592121 for testing) — only when the owner says so.
 - [ ] Reset the invoice counter to 1 and clear the test orders and test accounts.
 - [ ] Google sign-in branding (needs Supabase Custom Domain, plus the Google consent-screen name).
@@ -204,8 +223,8 @@ All three stories in `razorpay-integration-user-stories.md` are built:
 - [x] ~~Rotate or remove the hardcoded admin password~~ — done. `ADMIN_PASSWORD` is now a server-only env var, never committed; the old `ssp@admin` value documented in `CLAUDE.md`/`HANDOVER.md` is stale and no longer the real password.
 - [x] ~~Lock down `orders`/`order_items` RLS~~ — done (see Security hardening above).
 - [x] ~~Phone-login OTP leaked to anyone who asked for it~~ — done, see Security hardening above.
-- [~] **Tighten `notification_rules`/`notification_logs` RLS** — code done, **live-database step deliberately not run yet.** Both tables were open to the public anon key (anyone could rewrite recipients/templates or read logs). Now: new `app/api/admin/notifications` route (GET/POST/PATCH/DELETE, admin-cookie gated, field-whitelisted); the admin Notifications page uses it instead of the browser Supabase client; `lib/notifications-sender.ts` and `app/api/notifications/test` use the service-role client; and `/api/notifications/test` — which sent real emails/WhatsApp to a rule's recipients with **no login check at all** — now requires the admin session. `schema.sql` no longer creates the anon policies.
-  - **Still to do — now safe, and urgent:** every deployment is on the new code, and on 2026-10-24 the public anon key could still read both tables (the logs include customers' emails and phone numbers). Run `drop policy if exists "anon_all_notification_rules" on notification_rules; drop policy if exists "anon_all_notification_logs" on notification_logs;` in the Supabase SQL editor. Running it earlier breaks any deployment still on the old code (admin Notifications page and every order notification use the anon key there).
+- [x] **Tighten `notification_rules`/`notification_logs` RLS** — code done, **live-database step run 2026-11-05.** Both tables were open to the public anon key (anyone could rewrite recipients/templates or read logs). Now: new `app/api/admin/notifications` route (GET/POST/PATCH/DELETE, admin-cookie gated, field-whitelisted); the admin Notifications page uses it instead of the browser Supabase client; `lib/notifications-sender.ts` and `app/api/notifications/test` use the service-role client; and `/api/notifications/test` — which sent real emails/WhatsApp to a rule's recipients with **no login check at all** — now requires the admin session. `schema.sql` no longer creates the anon policies.
+  - **Done 2026-11-05:** ran `drop policy if exists "anon_all_notification_rules" on notification_rules; drop policy if exists "anon_all_notification_logs" on notification_logs;` in the Supabase SQL editor. Verified afterwards: the public anon key reads 0 rows from both tables and cannot write; the service-role key still reads them.
   - Also fixed: the daily/weekly digest cron routes read `orders` with the anon key, which `orders` RLS blocks, so every digest would have reported 0 orders. They now use `getSupabaseAdmin()` and return a 500 (instead of sending a false "0 orders" digest) if the query fails. No digest rules exist in the live DB yet, so nothing was being sent; tested both routes locally (200, sent 0).
   - **Heads-up:** `CRON_SECRET` is optional and unset locally — when unset, `/api/cron/*` is callable by anyone. Set it in Vercel (Production) so only Vercel Cron can trigger digests.
 - [x] **Repo hygiene: scratch folders** (noted 2026-10-15) — done: line endings in PR #16 (`.gitattributes`), scratch folders git-ignored in #29. Original notes:
