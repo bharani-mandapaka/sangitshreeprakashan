@@ -3,6 +3,8 @@
 > This file tracks overall project status across all branches/PRs. As of 2026-10-24 every PR up
 > to #33 is merged to `master` and none are open. Branch names mentioned below are where each
 > piece was built; they are all on `master` now.
+>
+> Updated 2026-11-05: two more features are built but **not merged yet** (PRs open: `feature/critical-error-alerts`, `feature/book-sample-pages`), Razorpay TEST keys are now live on Vercel, and see "Since 2026-10-24" below.
 
 ## Done
 
@@ -93,6 +95,23 @@ was ruled out — no GSTIN/HSN/tax fields, just a plain Bill of Supply.
 
 ---
 
+## Since 2026-10-24
+
+### Built, PR open, not merged yet
+- [ ] **Critical-error alerts** — `feature/critical-error-alerts`. New trigger `critical_error` (`lib/critical-alert.ts`, max 5 alerts an hour) so a paid-but-not-saved order alerts the admin. `critical-error-alert-migration.sql` seeds a rule that is **off with no recipients**; it has been run on the live database. Switch the rule on and add recipients in Admin → Notifications.
+- [ ] **Book sample pages ("Look inside")** — `feature/book-sample-pages`. Up to 8 page images per book, uploaded in Admin → Catalog, shown as thumbnails and a full-screen viewer (`components/SamplePages.tsx`). `book-sample-pages.sql` has been run on the live database.
+
+### Found on 2026-10-26 while testing Razorpay
+- [ ] **Customer confirmation email is rejected by Resend** — until a domain is verified it only sends to the owner address (`sangitshreeprakashan@gmail.com`), so no outside customer gets an email. Order WhatsApp to the admin number did send. Test emails with the owner address as the customer email until the domain is verified.
+- [ ] **Local testing writes to the live `error_logs`.** The preview server posted "hideName is not defined" to the real table; resolve those on Admin → System. Do not point local tests at the live database when avoidable.
+- [ ] **Public key can still read `notification_rules` and `notification_logs`** (re-checked 2026-11-05). `lock-notification-tables.sql` (in the project folder, not the repo) contains the two `drop policy` lines and a check query. Safe: all code uses the service-role client.
+
+### Home page redesign (design work, **not committed**, on local branch `feature/home-banner-library`)
+- Decided: the curved-library photo (Unsplash, free licence) as the home banner, text on the left, the existing content kept but the WhatsApp button removed and the line "Our platform is dedicated to providing authentic and comprehensive books on theory, practical, and history of Hindustani Classical music." added; a tiny publisher line under the extra-bold title; no logo in the banner; the navbar name hides on the home page until the visitor scrolls; tabs are plain regular-weight capitals with a gold underline on the current page; search, account and cart are round dark glass buttons.
+- Theme: kept Royal Crimson & Gold, with a deeper, shaded maroon and a soft crimson glow behind every page (lighter in the middle, darker at the sides) instead of near-black. Other themes were previewed (Midnight Indigo, Sandalwood & Peacock) and rejected; the preview sheets live in `design-options/` outside the repo.
+- Lesson: the Tailwind colour settings only reload after restarting the dev server with `.next` cleared; a stale server previews the old colours.
+- Still to check before committing: phone view, cart drawer, checkout, About, admin and invoice with the new colours.
+
 ## Remaining work (as of 2026-10-24)
 
 > Consolidated list, grouped by who can move each item. Details live in the sections below.
@@ -101,14 +120,14 @@ was ruled out — no GSTIN/HSN/tax fields, just a plain Bill of Supply.
 - [~] **Vercel Production environment variables** — **partly done:** on 2026-10-21 the live admin login answered "Admin login is not configured on the server"; by 2026-10-22 it answers "Incorrect password", so `ADMIN_PASSWORD` has been added. Not checked, so assume still missing until someone confirms each one: orders, email, WhatsApp and phone login can't work live without the rest. The full list to have in Production: `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `PHONE_AUTH_SECRET`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_TOKEN`, `CRON_SECRET`, then redeploy (Vercel only applies new variables to new deployments). `.env.local` never reaches Vercel because it is git-ignored.
 - [x] **Merge the open PRs** — done. Saved addresses merged 2026-10-21 (#19; originally #18, which was merged into the already-merged PIN branch and so never reached master). Everything else merged 2026-10-24, in this order: #21, #24, #26, #27, #25, #28, #20, #22, #23, #29, #31, #32, then #33 and #30 (Next 15). #25 was meant to go before #26/#27; GitHub wrongly reported a conflict on it (two merge bases), so master was merged into its branch first. The final code is the same either way, and the combined result was built and checked before anything was merged.
 - [ ] **Supabase Site URL** — still localhost, so Google sign-in on the live site redirects to localhost. Set it to the live address (Authentication → URL Configuration) and add preview addresses to the Redirect URLs if previews need Google sign-in.
-- [ ] **Razorpay keys on Vercel** — payments fail without them. Test keys work immediately; live keys need Bharani's GST/PAN verification.
+- [~] **Razorpay keys on Vercel** — **TEST keys are in and working** (Bharani added them to Production on 2026-10-26; Preview should also use test keys, never live). **Live keys** still need Bharani's GST/PAN verification; at cutover swap both Production values for the real live pair (the same live key the old site uses — never regenerate the Live key) and redeploy. Env-var changes only apply to deployments made after saving.
 - [ ] **Email domain** — the three DNS records for `mail.sangitshreeprakashan.com` (see Notifications below), and a decision on which Resend account owns production email.
 - [ ] **Meta Business Verification** (2–4 weeks) — gates WhatsApp to real customers, WhatsApp login codes and the admin users-page code.
 - [ ] **Domain cutover plan** — the old site still serves `sangitshreeprakashan.com`.
 - [ ] **Vercel preview protection** — preview deployments sit behind a Vercel login (team `meetbharani91-5980s-projects`), so nobody outside the team can open a PR preview. Settings → Deployment Protection → "Only Production Deployments" opens them.
 
 ### Before launch, mostly quick
-- [ ] End-to-end payment test once test keys exist (including replay and cart-tamper attempts).
+- [~] End-to-end payment test — **partly done 2026-10-26:** `create-order` returned a test order; one successful test payment saved order `SSP-LKMH4B7C` (status confirmed, ₹1,420, Razorpay order and payment ids stored); a failed attempt (an international test card is refused by the account, which is correct) created no order. **Still to do:** the cancelled-payment path, replay and cart-tamper attempts, and what cancelling a paid order does (refund or status only — not yet checked).
 - [ ] **Run the notification-policy drop SQL — do this first.** Checked 2026-10-24: the public anon key can still read `notification_rules` and `notification_logs` on the live database, and the logs hold customers' emails and phone numbers. All code is now on the version that doesn't need that access, so it is safe to run (see Security below).
 - [ ] **Revert the temporary admin alert number** to +917408452828 (currently +918874592121 for testing) — only when the owner says so.
 - [ ] Reset the invoice counter to 1 and clear the test orders and test accounts.
