@@ -32,7 +32,7 @@ export default function CartDrawer() {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-[#0F0000] border-l border-gold/15 flex flex-col shadow-2xl"
+            className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-[#1D0607] border-l border-gold/15 flex flex-col shadow-2xl"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-5 border-b border-gold/10">
@@ -71,7 +71,7 @@ export default function CartDrawer() {
                 items.map(({ book, quantity }) => (
                   <div
                     key={book.id}
-                    className="flex gap-3 p-3 rounded-xl bg-white/3 border border-gold/8 hover:border-gold/20 transition-colors"
+                    className="flex gap-3 p-3 rounded-xl bg-white/3 border border-gold/[0.08] hover:border-gold/20 transition-colors"
                   >
                     {/* Cover thumbnail */}
                     <div className="relative w-14 h-20 flex-shrink-0 rounded-lg overflow-hidden">

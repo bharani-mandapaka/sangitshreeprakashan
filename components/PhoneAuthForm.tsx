@@ -95,7 +95,7 @@ export default function PhoneAuthForm({ mode, next }: { mode: Mode; next: string
           </h1>
         </div>
 
-        <div className="gold-border rounded-2xl p-6 sm:p-8 bg-[#0A0000]">
+        <div className="gold-border rounded-2xl p-6 sm:p-8 bg-[#130304]">
           <button
             onClick={handleGoogle}
             disabled={googleLoading}

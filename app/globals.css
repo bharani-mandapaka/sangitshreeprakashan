@@ -15,8 +15,8 @@
   --gold-light:    #F5D060;
   --gold-dark:     #8B6914;
   --cream:         #FFF8E7;
-  --dark:          #0A0000;
-  --dark-2:        #150000;
+  --dark:          #130304;
+  --dark-2:        #180405;
 }
 
 /* ── Base ───────────────────────────────────────────────────────────── */
@@ -35,6 +35,12 @@ html, body {
 
 body {
   background-color: var(--dark);
+  /* A deep crimson glow behind the top of every page that fades into near-black at the edges and bottom,
+     so each page has the same light-to-dark variation as the hero sections, not one flat colour. */
+  background-image:
+    radial-gradient(ellipse 65% 55% at 50% 0%, rgba(120, 0, 0, 0.50) 0%, rgba(70, 0, 0, 0.22) 50%, transparent 80%),
+    radial-gradient(ellipse 70% 40% at 50% 100%, rgba(90, 0, 0, 0.22) 0%, transparent 70%);
+  background-attachment: fixed;
   color: var(--cream);
   font-family: var(--font-inter), sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -148,7 +154,7 @@ select.input-gold {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  background-color: #0F0000;
+  background-color: #1D0607;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23C9A84C' stroke-width='2'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
@@ -156,6 +162,9 @@ select.input-gold {
   padding-right: 2.5rem;
 }
 select.input-gold option {
-  background-color: #0F0000;
+  background-color: #1D0607;
   color: var(--cream);
 }
+
+/* Page wrappers painted opaque bg-dark would hide the crimson glow behind the page, so let it show through. */
+.min-h-screen.bg-dark { background-color: transparent; }

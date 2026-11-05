@@ -48,7 +48,7 @@ export default function GallerySlideshow() {
   }, [paused, next]);
 
   return (
-    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#0A0000] to-dark">
+    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#130304] to-dark">
       <div className="max-w-6xl mx-auto">
 
         {/* Header */}
@@ -66,7 +66,7 @@ export default function GallerySlideshow() {
 
         {/* Slideshow — fixed height, object-contain so images are never cropped */}
         <div
-          className="relative w-full rounded-2xl overflow-hidden border border-gold/20 bg-[#040000] shadow-[0_0_60px_rgba(0,0,0,0.8),0_0_30px_rgba(201,162,39,0.08)]"
+          className="relative w-full rounded-2xl overflow-hidden border border-gold/20 bg-[#0C0102] shadow-[0_0_60px_rgba(0,0,0,0.8),0_0_30px_rgba(201,162,39,0.08)]"
           style={{ height: '560px' }}
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => setPaused(false)}
@@ -91,7 +91,7 @@ export default function GallerySlideshow() {
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 90vw, 1200px"
               />
               {/* Subtle vignette at very bottom only */}
-              <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#040000]/60 to-transparent pointer-events-none" />
+              <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0C0102]/60 to-transparent pointer-events-none" />
             </motion.div>
           </AnimatePresence>
 

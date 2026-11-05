@@ -98,7 +98,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   /* ── Auth gate ──────────────────────────────────────────────────────────── */
   if (!authed) {
     return (
-      <div className="min-h-screen bg-[#040000] flex items-center justify-center px-4">
+      <div className="min-h-screen bg-[#0C0102] flex items-center justify-center px-4">
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
             <div className="relative w-14 h-14 mx-auto mb-4">
@@ -107,7 +107,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <h1 className="font-cinzel text-gold font-bold text-xl">Admin Panel</h1>
             <p className="text-cream/40 text-xs mt-1 font-cinzel">Sangit Shree Prakashan</p>
           </div>
-          <form onSubmit={handleLogin} className="bg-[#0A0000] border border-gold/15 rounded-2xl p-7 space-y-4">
+          <form onSubmit={handleLogin} className="bg-[#130304] border border-gold/15 rounded-2xl p-7 space-y-4">
             <div>
               <label className="block text-cream/50 text-xs uppercase tracking-widest mb-1.5 font-cinzel">
                 Password
@@ -150,7 +150,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   /* ── Admin shell ────────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen bg-[#040000] flex">
+    <div className="min-h-screen bg-[#0C0102] flex">
 
       {/* Mobile overlay */}
       {sideOpen && (
@@ -162,7 +162,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full w-60 bg-[#070000] border-r border-gold/10 z-40 flex flex-col transition-transform duration-300
+        className={`fixed top-0 left-0 h-full w-60 bg-[#0C0102] border-r border-gold/10 z-40 flex flex-col transition-transform duration-300
           ${sideOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:flex`}
       >
         {/* Logo */}
@@ -229,7 +229,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile topbar */}
-        <header className="lg:hidden flex items-center gap-3 px-4 py-3 border-b border-gold/10 bg-[#070000]">
+        <header className="lg:hidden flex items-center gap-3 px-4 py-3 border-b border-gold/10 bg-[#0C0102]">
           <button onClick={() => setSideOpen(true)} className="text-cream/60">
             <Menu size={20} />
           </button>

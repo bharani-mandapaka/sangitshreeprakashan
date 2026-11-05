@@ -20,8 +20,8 @@ const config: Config = {
           600: '#6B0000',
           700: '#4A0000',
           800: '#2A0000',
-          900: '#0D0000',
-          950: '#050000',
+          900: '#180405',
+          950: '#0C0102',
         },
         gold: {
           DEFAULT: '#C9A227',
@@ -37,7 +37,7 @@ const config: Config = {
           900: '#281F04',
         },
         cream: '#FFF8E7',
-        dark: '#0A0000',
+        dark: '#130304',
       },
       fontFamily: {
         cinzel:     ['var(--font-cinzel)', 'serif'],
@@ -47,7 +47,7 @@ const config: Config = {
       backgroundImage: {
         'gold-gradient': 'linear-gradient(135deg, #C9A227 0%, #F5D060 40%, #E8B820 60%, #C9A227 100%)',
         'crimson-gradient': 'linear-gradient(135deg, #5C0000 0%, #8B0000 50%, #5C0000 100%)',
-        'dark-gradient': 'linear-gradient(180deg, #0A0000 0%, #1A0000 100%)',
+        'dark-gradient': 'linear-gradient(180deg, #130304 0%, #2A0A0A 100%)',
       },
       keyframes: {
         shimmer: {

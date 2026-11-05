@@ -98,7 +98,7 @@ export default function BookDetailClient({ book, related }: { book: Book; relate
                 { icon: <Globe size={14} />,    label: 'Language', value: langLabels[book.language] ?? book.language },
                 { icon: <Package size={14} />,  label: 'Type',     value: book.isBundle ? 'Complete Set' : 'Individual Book' },
               ].map((spec) => (
-                <div key={spec.label} className="p-3 rounded-xl bg-[#0A0000] border border-gold/10">
+                <div key={spec.label} className="p-3 rounded-xl bg-[#130304] border border-gold/10">
                   <div className="flex items-center gap-1.5 text-gold/60 mb-1">
                     {spec.icon}
                     <p className="text-[10px] uppercase tracking-widest font-cinzel">{spec.label}</p>

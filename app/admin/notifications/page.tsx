@@ -182,7 +182,7 @@ function UserPicker({ mode, onSelect }: { mode: PickerMode; onSelect: (value: st
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-64 bg-[#0F0000] border border-gold/20 rounded-xl shadow-2xl overflow-hidden">
+        <div className="absolute right-0 top-full mt-1 z-50 w-64 bg-[#1D0607] border border-gold/20 rounded-xl shadow-2xl overflow-hidden">
           <div className="px-3 py-2 border-b border-gold/10">
             <p className="text-[10px] font-cinzel text-cream/40 uppercase tracking-widest">
               Select {mode === 'email' ? 'email recipient' : 'WhatsApp number'}
@@ -295,7 +295,7 @@ function RuleCard({
   const showWhatsApp = rule.channel === 'whatsapp' || rule.channel === 'both';
 
   return (
-    <div className={`bg-[#0A0000] border rounded-2xl transition-colors ${rule.active ? 'border-gold/15' : 'border-white/5 opacity-60'}`}>
+    <div className={`bg-[#130304] border rounded-2xl transition-colors ${rule.active ? 'border-gold/15' : 'border-white/5 opacity-60'}`}>
       {/* Summary row */}
       <div className="flex items-start gap-3 px-4 py-4">
         <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${rule.active ? 'bg-gold/15' : 'bg-white/5'}`}>
@@ -349,7 +349,7 @@ function RuleCard({
 
       {/* Expanded content */}
       {expanded && (
-        <div className="px-5 pb-5 border-t border-gold/8 pt-4 space-y-5">
+        <div className="px-5 pb-5 border-t border-gold/[0.08] pt-4 space-y-5">
           {!editing ? (
             <>
               {showEmail && (
@@ -415,7 +415,7 @@ function RuleCard({
 
               {/* Test results */}
               {testResults.length > 0 && (
-                <div className="bg-[#060000] border border-gold/10 rounded-xl p-3 space-y-1">
+                <div className="bg-[#0C0102] border border-gold/10 rounded-xl p-3 space-y-1">
                   <p className="text-cream/35 text-[10px] font-cinzel uppercase tracking-widest mb-2">Test Result</p>
                   {testResults.map((r, i) => (
                     <p key={i} className={`text-xs font-mono ${
@@ -721,7 +721,7 @@ export default function NotificationsPage() {
       )}
 
       {/* ── Creator card ──────────────────────────────────────────────────────── */}
-      <div className="bg-[#0A0000] border border-gold/15 rounded-2xl p-6 space-y-5">
+      <div className="bg-[#130304] border border-gold/15 rounded-2xl p-6 space-y-5">
         <div className="flex items-center gap-2">
           <Plus size={15} className="text-gold" />
           <h2 className="font-cinzel text-cream font-semibold text-sm">Create a Notification</h2>
@@ -910,7 +910,7 @@ export default function NotificationsPage() {
             {[1, 2].map((i) => <div key={i} className="h-16 rounded-2xl bg-white/3 animate-pulse" />)}
           </div>
         ) : rules.length === 0 ? (
-          <div className="bg-[#0A0000] border border-gold/8 rounded-2xl p-12 text-center">
+          <div className="bg-[#130304] border border-gold/[0.08] rounded-2xl p-12 text-center">
             <Bell size={32} className="text-cream/15 mx-auto mb-3" />
             <p className="font-cinzel text-cream/30 text-sm">No notifications configured yet.</p>
             <p className="text-cream/20 text-xs mt-1">Use the form above to create your first notification.</p>
@@ -954,13 +954,13 @@ export default function NotificationsPage() {
             {[1, 2, 3].map((i) => <div key={i} className="h-10 rounded-xl bg-white/3 animate-pulse" />)}
           </div>
         ) : logs.length === 0 ? (
-          <div className="bg-[#0A0000] border border-gold/8 rounded-2xl p-10 text-center">
+          <div className="bg-[#130304] border border-gold/[0.08] rounded-2xl p-10 text-center">
             <History size={28} className="text-cream/10 mx-auto mb-2" />
             <p className="font-cinzel text-cream/25 text-sm">No notifications sent yet.</p>
             <p className="text-cream/15 text-xs mt-1">Logs appear here after a rule fires.</p>
           </div>
         ) : (
-          <div className="bg-[#0A0000] border border-gold/10 rounded-2xl overflow-hidden">
+          <div className="bg-[#130304] border border-gold/10 rounded-2xl overflow-hidden">
 
             {/* Mobile: card list */}
             <div className="sm:hidden divide-y divide-gold/5">

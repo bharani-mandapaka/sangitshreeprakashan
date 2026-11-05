@@ -138,14 +138,14 @@ export default function AboutPage() {
     <div className="min-h-screen bg-dark pt-20 lg:pt-24">
 
       {/* ── Page Header ─────────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-b from-[#0F0000] to-dark py-16 px-4 sm:px-6 lg:px-8 border-b border-gold/10 text-center">
+      <div className="bg-[radial-gradient(ellipse_65%_110%_at_50%_0%,_rgba(110,0,0,0.38)_0%,_rgba(60,0,0,0.15)_55%,_transparent_80%)] py-16 px-4 sm:px-6 lg:px-8 border-b border-gold/10 text-center">
         <p className="font-cinzel text-gold/70 text-xs uppercase tracking-[0.3em] mb-3">Our Story</p>
         <h1 className="font-cinzel text-4xl sm:text-5xl font-bold text-cream mb-3">About Us</h1>
         <p className="font-devanagari text-gold/60 text-xl">हमारे बारे में</p>
       </div>
 
       {/* ── Stats Bar ───────────────────────────────────────────────────── */}
-      <div className="border-b border-gold/10 bg-[#0A0000]">
+      <div className="border-b border-gold/10 bg-[#130304]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-2 lg:grid-cols-4 gap-6">
           {stats.map((s) => (
             <div key={s.label} className="text-center flex flex-col items-center gap-2">
@@ -194,7 +194,7 @@ export default function AboutPage() {
               </p>
             </div>
 
-            <div className="bg-[#0A0000] border border-gold/15 rounded-2xl p-5">
+            <div className="bg-[#130304] border border-gold/15 rounded-2xl p-5">
               <p className="font-cinzel text-gold text-xs uppercase tracking-widest mb-3 flex items-center gap-2">
                 <Award size={14} /> Honours & Recognition
               </p>
@@ -263,7 +263,7 @@ export default function AboutPage() {
       {/* ══════════════════════════════════════════════════════════════════
           HORIZONTAL LIFE TIMELINE
       ══════════════════════════════════════════════════════════════════ */}
-      <div className="bg-[#060000] border-y border-gold/10 py-16 overflow-x-hidden">
+      <div className="bg-[#0C0102] border-y border-gold/10 py-16 overflow-x-hidden">
 
         {/* Section heading - constrained width */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-12">
@@ -306,7 +306,7 @@ export default function AboutPage() {
                     {isAbove ? (
                       <div className="flex flex-col items-center w-full">
                         {/* Card */}
-                        <div className="w-[calc(var(--tl-item-w)-20px)] bg-[#0D0000] border border-gold/12 hover:border-gold/35 rounded-xl p-3.5 transition-all duration-300 group shadow-lg">
+                        <div className="w-[calc(var(--tl-item-w)-20px)] bg-[#180405] border border-gold/12 hover:border-gold/35 rounded-xl p-3.5 transition-all duration-300 group shadow-lg">
                           <span className={`inline-block text-[9px] font-cinzel font-bold uppercase tracking-widest px-2 py-0.5 rounded-full mb-2 ${item.tagClass}`}>
                             {item.tag}
                           </span>
@@ -345,7 +345,7 @@ export default function AboutPage() {
                         {/* Connector down from dot */}
                         <div className="w-px flex-1 min-h-[12px] bg-gradient-to-b from-gold/55 to-gold/20" />
                         {/* Card */}
-                        <div className="w-[calc(var(--tl-item-w)-20px)] bg-[#0D0000] border border-gold/12 hover:border-gold/35 rounded-xl p-3.5 transition-all duration-300 group shadow-lg">
+                        <div className="w-[calc(var(--tl-item-w)-20px)] bg-[#180405] border border-gold/12 hover:border-gold/35 rounded-xl p-3.5 transition-all duration-300 group shadow-lg">
                           <span className={`inline-block text-[9px] font-cinzel font-bold uppercase tracking-widest px-2 py-0.5 rounded-full mb-2 ${item.tagClass}`}>
                             {item.tag}
                           </span>
@@ -437,7 +437,7 @@ export default function AboutPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-left">
-            <div className="gold-border rounded-2xl p-6 bg-[#0A0000]">
+            <div className="gold-border rounded-2xl p-6 bg-[#130304]">
               <h3 className="font-cinzel text-gold font-semibold text-base mb-3 flex items-center gap-2">
                 <Target size={17} className="text-gold/70 flex-shrink-0" /> Our Mission
               </h3>
@@ -447,7 +447,7 @@ export default function AboutPage() {
                 of Hindustani Classical Music.
               </p>
             </div>
-            <div className="gold-border rounded-2xl p-6 bg-[#0A0000]">
+            <div className="gold-border rounded-2xl p-6 bg-[#130304]">
               <h3 className="font-cinzel text-gold font-semibold text-base mb-3 flex items-center gap-2">
                 <Eye size={17} className="text-gold/70 flex-shrink-0" /> Our Vision
               </h3>
@@ -459,7 +459,7 @@ export default function AboutPage() {
             </div>
           </div>
 
-          <blockquote className="relative border border-gold/20 rounded-2xl p-8 bg-[#0A0000]">
+          <blockquote className="relative border border-gold/20 rounded-2xl p-8 bg-[#130304]">
             <Quote size={32} className="text-gold/20 absolute top-4 left-4" />
             <p className="font-cinzel text-cream/80 text-lg leading-relaxed italic">
               &ldquo;Join us in our mission to keep the timeless art of Hindustani Classical Music
