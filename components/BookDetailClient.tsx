@@ -11,6 +11,7 @@ import { categoryMeta } from '@/lib/books';
 import { formatPrice, WHATSAPP_NUMBER } from '@/lib/utils';
 import BookCoverImage from '@/components/BookCoverImage';
 import BookCard from '@/components/BookCard';
+import SamplePages from '@/components/SamplePages';
 import type { Book } from '@/lib/books';
 
 const levelLabels: Record<string, string> = {
@@ -247,6 +248,11 @@ export default function BookDetailClient({ book, related }: { book: Book; relate
                   </div>
                 )}
               </dl>
+            )}
+
+            {/* "Look inside": only when the admin has uploaded sample pages for this book. */}
+            {book.samplePages && book.samplePages.length > 0 && (
+              <SamplePages pages={book.samplePages} title={book.titleEnglish} />
             )}
 
             {book.tableOfContents && book.tableOfContents.length > 0 && (

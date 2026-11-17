@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import {
-  RefreshCw, Search, Plus, Pencil, Trash2, X, Package, BookOpen, Upload,
+  RefreshCw, Search, Plus, Pencil, Trash2, X, Package, BookOpen, Upload, ArrowLeft, ArrowRight,
 } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase';
 import type { DbBookRow } from '@/lib/books-data';
@@ -44,6 +44,7 @@ interface BookFormState {
   publicationYear: string;
   tocText: string;        // one table-of-contents entry per line
   aboutAuthors: string;
+  samplePages: string[];  // "Look inside" image addresses, in order
   tagsText: string;
 }
 
@@ -72,6 +73,7 @@ const EMPTY_FORM: BookFormState = {
   publicationYear: '',
   tocText: '',
   aboutAuthors: '',
+  samplePages: [],
   tagsText: '',
 };
 
@@ -101,6 +103,7 @@ function rowToForm(row: DbBookRow): BookFormState {
     publicationYear: row.publication_year != null ? String(row.publication_year) : '',
     tocText: (row.table_of_contents ?? []).join('\n'),
     aboutAuthors: row.about_authors ?? '',
+    samplePages: row.sample_pages ?? [],
     tagsText: (row.tags ?? []).join(', '),
   };
 }
@@ -131,6 +134,7 @@ function formToPayload(form: BookFormState) {
     publicationYear: form.publicationYear.trim() ? Number(form.publicationYear) : null,
     tableOfContents: form.tocText.split('\n').map((l) => l.trim()).filter(Boolean),
     aboutAuthors: form.aboutAuthors.trim() || null,
+    samplePages: form.samplePages,
     tags: form.tagsText.split(',').map((t) => t.trim()).filter(Boolean),
   };
 }
@@ -222,6 +226,94 @@ function CoverImageField({
 }
 
 // ── Create/edit form (modal) ─────────────────────────────────────────────────
+// ── Sample pages ("Look inside"): up to 8 page images, uploaded one by one through the same
+// route as covers (app/api/admin/books/upload-cover/route.ts), reorderable and removable.
+// Shown on the book's page as a gallery once there is at least one. ─────────────────────
+const MAX_SAMPLE_PAGES = 8;
+
+function SamplePagesField({
+  form,
+  onChange,
+}: {
+  form: BookFormState;
+  onChange: (f: BookFormState) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const pages = form.samplePages;
+
+  const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    if (files.length === 0) return;
+    setUploadError('');
+    const room = MAX_SAMPLE_PAGES - pages.length;
+    if (files.length > room) setUploadError(`Only ${room} more page${room === 1 ? '' : 's'} fit (the limit is ${MAX_SAMPLE_PAGES}); the first ${room} will be added.`);
+    setUploading(true);
+    const added: string[] = [];
+    for (const file of files.slice(0, Math.max(room, 0))) {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/admin/books/upload-cover', { method: 'POST', body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setUploadError(`${file.name}: ${data.error ?? 'Upload failed.'}`); break; }
+      added.push(data.url as string);
+    }
+    setUploading(false);
+    if (added.length > 0) onChange({ ...form, samplePages: [...pages, ...added] });
+  };
+
+  const move = (from: number, to: number) => {
+    const next = [...pages];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    onChange({ ...form, samplePages: next });
+  };
+
+  return (
+    <div className="space-y-3 border-t border-gold/10 pt-5">
+      <p className="font-cinzel text-gold text-sm font-semibold">
+        Sample pages <span className="text-cream/35 text-xs font-normal">(optional — a “Look inside” gallery on the book’s page, up to {MAX_SAMPLE_PAGES})</span>
+      </p>
+      {pages.length > 0 && (
+        <ul className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+          {pages.map((url, i) => (
+            <li key={url} className="rounded-lg border border-gold/15 bg-black/30 p-1.5">
+              <div className="relative aspect-[3/4] rounded overflow-hidden bg-black/40">
+                <Image src={url} alt={`Sample page ${i + 1}`} fill sizes="120px" className="object-cover" />
+                <span className="absolute top-1 left-1 bg-black/70 text-cream/80 text-[10px] font-cinzel px-1.5 rounded">{i + 1}</span>
+              </div>
+              <div className="flex items-center justify-between mt-1.5 text-cream/50">
+                <button type="button" onClick={() => move(i, i - 1)} disabled={i === 0 || uploading} aria-label={`Move page ${i + 1} earlier`} className="p-1 hover:text-gold disabled:opacity-25"><ArrowLeft size={13} /></button>
+                <button type="button" onClick={() => onChange({ ...form, samplePages: pages.filter((_, j) => j !== i) })} disabled={uploading} aria-label={`Remove page ${i + 1}`} className="p-1 hover:text-red-400 disabled:opacity-25"><Trash2 size={13} /></button>
+                <button type="button" onClick={() => move(i, i + 1)} disabled={i === pages.length - 1 || uploading} aria-label={`Move page ${i + 1} later`} className="p-1 hover:text-gold disabled:opacity-25"><ArrowRight size={13} /></button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <label className={`inline-flex items-center gap-2 border font-cinzel text-xs px-3 py-2 rounded-lg transition-all w-fit ${
+        uploading || pages.length >= MAX_SAMPLE_PAGES
+          ? 'border-gold/15 text-cream/30 cursor-not-allowed'
+          : 'border-gold/25 hover:border-gold/50 text-gold/80 hover:text-gold cursor-pointer'
+      }`}>
+        <Upload size={13} />
+        {uploading ? 'Uploading…' : pages.length >= MAX_SAMPLE_PAGES ? 'Limit reached' : 'Add page images'}
+        <input
+          type="file"
+          multiple
+          accept="image/jpeg,image/png,image/webp,image/avif"
+          className="hidden"
+          onChange={handleFiles}
+          disabled={uploading || pages.length >= MAX_SAMPLE_PAGES}
+        />
+      </label>
+      <p className="text-cream/35 text-xs">JPG, PNG or WebP, 5 MB each. They show in the order above. Save the book to publish them.</p>
+      {uploadError && <p className="text-red-400 text-xs">{uploadError}</p>}
+    </div>
+  );
+}
+
 function BookFormModal({
   form,
   onChange,
@@ -229,6 +321,7 @@ function BookFormModal({
   onSaved,
   stockSupported,
   detailsSupported,
+  samplePagesSupported,
 }: {
   form: BookFormState;
   onChange: (f: BookFormState) => void;
@@ -238,6 +331,8 @@ function BookFormModal({
   stockSupported: boolean;
   /** False until book-details.sql has been run: the details fields are then hidden and never sent. */
   detailsSupported: boolean;
+  /** False until book-sample-pages.sql has been run: the sample pages section is then hidden and never sent. */
+  samplePagesSupported: boolean;
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -249,7 +344,7 @@ function BookFormModal({
     setError('');
     // Without the stock_quantity column, sending it would make every save fail.
     // The same goes for the optional details columns (book-details.sql).
-    const { stockQuantity, isbn, edition, pages, publicationYear, tableOfContents, aboutAuthors, ...rest } = formToPayload(form);
+    const { stockQuantity, isbn, edition, pages, publicationYear, tableOfContents, aboutAuthors, samplePages, ...rest } = formToPayload(form);
     const payload = rest;
     const details = { isbn, edition, pages, publicationYear, tableOfContents, aboutAuthors };
     const counted = stockSupported && stockQuantity !== null;
@@ -260,6 +355,7 @@ function BookFormModal({
         ...payload,
         ...(stockSupported ? { stockQuantity } : {}),
         ...(detailsSupported ? details : {}),
+        ...(samplePagesSupported ? { samplePages } : {}),
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -298,6 +394,7 @@ function BookFormModal({
         table_of_contents: tableOfContents,
         about_authors: aboutAuthors,
       } : {}),
+      ...(samplePagesSupported ? { sample_pages: samplePages } : {}),
       tags: payload.tags,
     };
     onSaved(row);
@@ -559,6 +656,8 @@ function BookFormModal({
             </div>
           </div>
         )}
+
+        {samplePagesSupported && <SamplePagesField form={form} onChange={onChange} />}
 
         {error && (
           <p className="text-red-400 text-xs font-cinzel bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
@@ -870,6 +969,7 @@ export default function AdminBooksPage() {
           onSaved={handleSaved}
           stockSupported={books.some((b) => 'stock_quantity' in b)}
           detailsSupported={books.some((b) => 'isbn' in b)}
+          samplePagesSupported={books.some((b) => 'sample_pages' in b)}
         />
       )}
 

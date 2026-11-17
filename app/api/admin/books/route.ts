@@ -55,7 +55,23 @@ interface BookInput {
   publicationYear?: number | null;
   tableOfContents?: string[] | null;
   aboutAuthors?: string | null;
+  /** "Look inside" page images; omitted = leave as is (the column exists only after book-sample-pages.sql). */
+  samplePages?: string[] | null;
   tags: string[];
+}
+
+const MAX_SAMPLE_PAGES = 8;
+// Only images the site can actually show: our own Supabase Storage (the upload route returns these)
+// or a file in /public. Anything else would be a broken image or an arbitrary outside address.
+const SAMPLE_PAGE_URL = /^(\/[A-Za-z0-9._\-\/]+|https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/[A-Za-z0-9._\-\/]+)$/;
+
+function validateSamplePages(b: Partial<BookInput>): string | null {
+  if (b.samplePages == null) return null;
+  if (!Array.isArray(b.samplePages) || b.samplePages.length > MAX_SAMPLE_PAGES
+      || b.samplePages.some((u) => typeof u !== 'string' || u.length > 500 || !SAMPLE_PAGE_URL.test(u))) {
+    return `Sample pages: up to ${MAX_SAMPLE_PAGES} images, each uploaded from the admin form.`;
+  }
+  return null;
 }
 
 const sendsDetails = (b: Partial<BookInput>) =>
@@ -97,7 +113,7 @@ function validate(body: Partial<BookInput>): string | null {
       && (!Number.isInteger(body.stockQuantity) || body.stockQuantity < 0)) {
     return 'Copies left must be a whole number, 0 or more (or empty to not count copies).';
   }
-  return validateDetails(body);
+  return validateDetails(body) ?? validateSamplePages(body);
 }
 
 function toRow(body: BookInput) {
@@ -131,6 +147,8 @@ function toRow(body: BookInput) {
       table_of_contents: (body.tableOfContents ?? []).map((l) => l.trim()).filter(Boolean),
       about_authors:     body.aboutAuthors?.trim() || null,
     } : {}),
+    // Same rule again for sample pages (book-sample-pages.sql).
+    ...(body.samplePages !== undefined ? { sample_pages: body.samplePages ?? [] } : {}),
     tags:             Array.isArray(body.tags) ? body.tags : [],
     updated_at:        new Date().toISOString(),
   };
