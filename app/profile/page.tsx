@@ -156,7 +156,7 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-dark pt-20 lg:pt-24">
       {/* Header */}
-      <div className="bg-gradient-to-b from-[#0F0000] to-dark py-12 px-4 sm:px-6 lg:px-8 border-b border-gold/10">
+      <div className="bg-[radial-gradient(ellipse_65%_110%_at_50%_0%,_rgba(110,0,0,0.38)_0%,_rgba(60,0,0,0.15)_55%,_transparent_80%)] py-12 px-4 sm:px-6 lg:px-8 border-b border-gold/10">
         <div className="max-w-5xl mx-auto flex items-center gap-4">
           <div className="w-16 h-16 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center flex-shrink-0">
             <User size={28} className="text-gold" />
@@ -189,7 +189,7 @@ export default function ProfilePage() {
         {/* Overview */}
         {tab === 'overview' && (
           <div className="max-w-md space-y-6">
-            <form onSubmit={handleSaveProfile} className="gold-border rounded-2xl p-6 bg-[#0A0000] space-y-4">
+            <form onSubmit={handleSaveProfile} className="gold-border rounded-2xl p-6 bg-[#130304] space-y-4">
               {isPhoneAccount && (
                 <div>
                   <p className="text-cream/40 text-xs uppercase tracking-widest font-cinzel mb-1">Phone Number</p>
@@ -286,7 +286,7 @@ export default function ProfilePage() {
               <p className="text-cream/40 text-xs mb-4">You can save up to {MAX_SAVED_ADDRESSES} addresses. The default one fills in automatically at checkout.</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {addresses.map((a) => (
-                  <div key={a.id} className="gold-border rounded-2xl p-5 bg-[#0A0000]">
+                  <div key={a.id} className="gold-border rounded-2xl p-5 bg-[#130304]">
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <p className="font-cinzel text-gold text-sm font-bold">{a.label || 'Address'}</p>
                       {a.is_default && <span className="text-[10px] uppercase tracking-widest text-gold/80 border border-gold/30 rounded-full px-2 py-0.5">Default</span>}
@@ -343,7 +343,7 @@ export default function ProfilePage() {
             ) : (
               <div className="space-y-4">
                 {orders.map((order) => (
-                  <div key={order.id} className="gold-border rounded-2xl p-5 bg-[#0A0000]">
+                  <div key={order.id} className="gold-border rounded-2xl p-5 bg-[#130304]">
                     <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                       <div>
                         <p className="font-cinzel text-gold text-sm font-bold">{order.id}</p>

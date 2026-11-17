@@ -165,7 +165,7 @@ function OrderRow({
       </tr>
 
       {expanded && (
-        <tr className="bg-[#060000]">
+        <tr className="bg-[#0C0102]">
           <td colSpan={8} className="px-4 py-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 text-sm">
 
@@ -565,7 +565,7 @@ export default function OrdersPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-[#0A0000] border border-gold/10 rounded-2xl overflow-hidden">
+      <div className="bg-[#130304] border border-gold/10 rounded-2xl overflow-hidden">
         {loading ? (
           <div className="py-16 text-center">
             <RefreshCw size={22} className="text-gold/40 animate-spin mx-auto mb-3" />

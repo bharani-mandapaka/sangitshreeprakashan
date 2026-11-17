@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, Menu, X, Search, User } from 'lucide-react';
@@ -14,6 +15,10 @@ const navLinks = [
   { href: '/about',   label: 'About' },
   { href: '/contact', label: 'Contact' },
 ];
+
+// Round dark glass button with a thin gold ring: the icon stays visible over a bright photo.
+const iconBtn =
+  'w-10 h-10 items-center justify-center flex rounded-full bg-dark/65 backdrop-blur-md border border-gold/50 text-white hover:text-gold hover:border-gold transition-colors';
 
 export default function Navbar() {
   const [scrolled,   setScrolled]   = useState(false);
@@ -43,6 +48,9 @@ export default function Navbar() {
 
   useEffect(() => { setMounted(true); }, []);
 
+  const pathname = usePathname();
+  const hideName = pathname === '/' && !scrolled;
+
   return (
     <>
       <motion.nav
@@ -69,8 +77,13 @@ export default function Navbar() {
                   priority
                 />
               </div>
-              <div className="hidden sm:block">
-                <p className="font-cinzel text-gold font-bold text-sm lg:text-base leading-tight">
+              {/* On the home page the banner already shows the name, so this stays hidden until the
+                  visitor scrolls past it. Hidden with opacity, not removed, so the links don't shift. */}
+              <div
+                className={`hidden sm:block transition-opacity duration-500 ${hideName ? 'opacity-0' : 'opacity-100'}`}
+                aria-hidden={hideName}
+              >
+                <p className="font-cinzel text-gold font-black text-sm lg:text-base leading-tight">
                   Sangit Shree Prakashan
                 </p>
                 <p className="font-devanagari text-cream/50 text-[10px] leading-tight">
@@ -81,42 +94,51 @@ export default function Navbar() {
 
             {/* Desktop links */}
             <div className="hidden md:flex items-center gap-8">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="font-cinzel text-sm text-cream/80 hover:text-gold transition-colors relative group"
-                >
-                  {link.label}
-                  <span className="absolute -bottom-1 left-0 w-0 h-px bg-gold group-hover:w-full transition-all duration-300" />
-                </Link>
-              ))}
+              {navLinks.map((link) => {
+                const active = link.href === '/' ? pathname === '/' : pathname.startsWith(link.href);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    aria-current={active ? 'page' : undefined}
+                    className={`font-cinzel text-[12px] font-normal uppercase tracking-[0.16em] relative group [text-shadow:0_1px_4px_rgba(0,0,0,0.9)] transition-colors hover:text-gold ${
+                      active ? 'text-gold' : 'text-white'
+                    }`}
+                  >
+                    {link.label}
+                    <span className={`absolute -bottom-1.5 left-0 h-0.5 bg-gold transition-all duration-300 ${active ? 'w-full' : 'w-0 group-hover:w-full'}`} />
+                  </Link>
+                );
+              })}
             </div>
 
             {/* Right actions */}
             <div className="flex items-center gap-3">
               <Link
                 href="/books"
-                className="hidden md:flex items-center gap-1.5 text-cream/60 hover:text-gold transition-colors"
+                className={`hidden md:flex ${iconBtn}`}
                 title="Search books"
+                aria-label="Search books"
               >
-                <Search size={18} />
+                <Search size={18} strokeWidth={2.2} />
               </Link>
 
               <Link
                 href={user ? '/profile' : '/login'}
-                className="p-2 text-cream/80 hover:text-gold transition-colors"
+                className={iconBtn}
                 title={user ? 'My Profile' : 'Login'}
+                aria-label={user ? 'My Profile' : 'Login'}
               >
-                <User size={20} />
+                <User size={18} strokeWidth={2.2} />
               </Link>
 
               <button
                 onClick={toggleCart}
-                className="relative p-2 text-cream/80 hover:text-gold transition-colors"
+                className={`relative ${iconBtn}`}
                 title="Cart"
+                aria-label="Cart"
               >
-                <ShoppingCart size={20} />
+                <ShoppingCart size={18} strokeWidth={2.2} />
                 {mounted && itemCount > 0 && (
                   <motion.span
                     key={itemCount}
@@ -130,7 +152,7 @@ export default function Navbar() {
               </button>
 
               <button
-                className="md:hidden p-2 text-cream/80 hover:text-gold transition-colors"
+                className={`md:hidden ${iconBtn}`}
                 onClick={() => setMobileOpen(!mobileOpen)}
                 aria-label="Toggle menu"
               >

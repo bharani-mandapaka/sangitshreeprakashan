@@ -53,7 +53,7 @@ export default function BookCard({ book }: BookCardProps) {
       transition={{ duration: 0.5, ease: 'easeOut' }}
       className="h-full"
     >
-      <div className="gold-border rounded-xl overflow-hidden bg-[#0F0000] hover:bg-[#150000] transition-all duration-300 hover:shadow-gold-sm flex flex-col h-full group">
+      <div className="gold-border rounded-xl overflow-hidden bg-[#1D0607] hover:bg-[#180405] transition-all duration-300 hover:shadow-gold-sm flex flex-col h-full group">
 
         {/* Cover — clicking navigates to detail page */}
         <Link href={`/books/${book.slug}`} className="block relative aspect-[3/4] overflow-hidden bg-black flex-shrink-0">

@@ -156,7 +156,7 @@ export default function AdminDashboard() {
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((s) => (
-          <div key={s.label} className="bg-[#0A0000] border border-gold/10 rounded-2xl p-5">
+          <div key={s.label} className="bg-[#130304] border border-gold/10 rounded-2xl p-5">
             <div className="flex items-start justify-between mb-3">
               <div className={`w-9 h-9 rounded-xl ${s.bg} flex items-center justify-center`}>
                 <s.icon size={18} className={s.color} />
@@ -172,7 +172,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Visits chart */}
-        <div className="lg:col-span-2 bg-[#0A0000] border border-gold/10 rounded-2xl p-5">
+        <div className="lg:col-span-2 bg-[#130304] border border-gold/10 rounded-2xl p-5">
           <h2 className="font-cinzel text-cream font-semibold text-sm mb-6">Daily Page Views (Last {days} Days)</h2>
           {!summary ? (
             <div className="h-36 rounded-lg bg-white/5 animate-pulse" />
@@ -206,7 +206,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Order status breakdown */}
-        <div className="bg-[#0A0000] border border-gold/10 rounded-2xl p-5">
+        <div className="bg-[#130304] border border-gold/10 rounded-2xl p-5">
           <h2 className="font-cinzel text-cream font-semibold text-sm mb-6">Order Status</h2>
           {loading ? (
             <div className="space-y-3">
@@ -248,7 +248,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Top books by clicks */}
-        <div className="bg-[#0A0000] border border-gold/10 rounded-2xl p-5">
+        <div className="bg-[#130304] border border-gold/10 rounded-2xl p-5">
           <h2 className="font-cinzel text-cream font-semibold text-sm mb-5">Most Viewed Books ({period})</h2>
           {topBooks.length === 0 ? (
             <p className="text-cream/25 text-sm font-cinzel text-center py-6">{summary ? 'No book views recorded yet' : 'Loading…'}</p>
@@ -276,7 +276,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Recent orders */}
-        <div className="bg-[#0A0000] border border-gold/10 rounded-2xl p-5">
+        <div className="bg-[#130304] border border-gold/10 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-5">
             <h2 className="font-cinzel text-cream font-semibold text-sm">Recent Orders</h2>
             <Link href="/admin/orders" className="text-gold/60 hover:text-gold text-xs font-cinzel flex items-center gap-1 transition-colors">

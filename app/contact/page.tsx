@@ -56,7 +56,7 @@ export default function ContactPage() {
     <div className="min-h-screen bg-dark pt-20 lg:pt-24">
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-b from-[#0F0000] to-dark py-16 px-4 sm:px-6 lg:px-8 border-b border-gold/10 text-center">
+      <div className="bg-[radial-gradient(ellipse_65%_110%_at_50%_0%,_rgba(110,0,0,0.38)_0%,_rgba(60,0,0,0.15)_55%,_transparent_80%)] py-16 px-4 sm:px-6 lg:px-8 border-b border-gold/10 text-center">
         <p className="font-cinzel text-gold/70 text-xs uppercase tracking-[0.3em] mb-3">Get in Touch</p>
         <h1 className="font-cinzel text-4xl sm:text-5xl font-bold text-cream mb-3">Contact Us</h1>
         <p className="font-devanagari text-gold/60 text-xl">हमसे संपर्क करें</p>
@@ -104,7 +104,7 @@ export default function ContactPage() {
             <div className="divider-gold" />
 
             {/* WhatsApp CTA */}
-            <div className="gold-border rounded-2xl p-6 bg-[#0A0000]">
+            <div className="gold-border rounded-2xl p-6 bg-[#130304]">
               <h3 className="font-cinzel text-cream font-semibold mb-2">Fastest via WhatsApp</h3>
               <p className="text-cream/50 text-sm leading-relaxed mb-4">
                 For quick enquiries about books, pricing, or bulk orders - WhatsApp is the fastest
@@ -266,10 +266,10 @@ export default function ContactPage() {
       </div>
 
       {/* ── Map placeholder ──────────────────────────────────────────────── */}
-      <div className="border-t border-gold/10 bg-[#050000] py-10 px-4 sm:px-6 lg:px-8">
+      <div className="border-t border-gold/10 bg-[#0C0102] py-10 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <p className="font-cinzel text-gold/60 text-xs uppercase tracking-widest mb-4 text-center">Find Us</p>
-          <div className="w-full h-64 rounded-2xl bg-[#0A0000] border border-gold/10 flex flex-col items-center justify-center gap-3 text-center">
+          <div className="w-full h-64 rounded-2xl bg-[#130304] border border-gold/10 flex flex-col items-center justify-center gap-3 text-center">
             <MapPin size={32} className="text-gold/30" />
             <div>
               <p className="font-cinzel text-cream/60 text-sm font-semibold">Shop No. 116, Nagar Nigam Market</p>

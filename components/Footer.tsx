@@ -26,7 +26,7 @@ const legalLinks = [
 
 export default function Footer() {
   return (
-    <footer className="bg-[#050000] border-t border-gold/10 mt-auto">
+    <footer className="bg-[#0C0102] border-t border-gold/10 mt-auto">
       {/* Top decorative line */}
       <div className="h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" />
 

@@ -55,7 +55,7 @@ export default async function HomePage() {
       <div className="h-px bg-gradient-to-r from-transparent via-gold/30 to-transparent" />
 
       {/* ── Categories ─────────────────────────────────────────────────── */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-dark to-[#0F0000]">
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-dark to-[#1D0607]">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <p className="font-cinzel text-gold/70 text-xs uppercase tracking-[0.3em] mb-3">
@@ -75,7 +75,7 @@ export default async function HomePage() {
                 <Link
                   key={cat}
                   href={`/books?category=${cat}`}
-                  className="group relative overflow-hidden rounded-2xl p-6 border border-gold/15 bg-[#0A0000] hover:border-gold/40 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center text-center gap-3"
+                  className="group relative overflow-hidden rounded-2xl p-6 border border-gold/15 bg-[#130304] hover:border-gold/40 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center text-center gap-3"
                 >
                   {/* Per-category color wash, revealed on hover */}
                   <div
@@ -112,7 +112,7 @@ export default async function HomePage() {
           {/* Bundle CTA */}
           <Link
             href="/books?category=bundle"
-            className="mt-6 flex items-center justify-between p-5 rounded-2xl border border-gold/25 bg-gradient-to-r from-crimson-900/40 to-[#0A0000] hover:border-gold/50 transition-all duration-300 group"
+            className="mt-6 flex items-center justify-between p-5 rounded-2xl border border-gold/25 bg-gradient-to-r from-crimson-900/40 to-[#130304] hover:border-gold/50 transition-all duration-300 group"
           >
             <div className="flex items-center gap-4">
               <Package size={24} className="text-gold/70 group-hover:text-gold transition-colors flex-shrink-0" />
@@ -131,7 +131,7 @@ export default async function HomePage() {
       <div className="divider-gold mx-8" />
 
       {/* ── Featured Books ─────────────────────────────────────────────── */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-[#0F0000]">
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-[#1D0607]">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-end justify-between mb-12">
             <div>
@@ -175,7 +175,7 @@ export default async function HomePage() {
       <div className="divider-gold mx-8" />
 
       {/* ── About Snippet ──────────────────────────────────────────────── */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#0F0000] to-dark">
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#1D0607] to-dark">
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           {/* Founder portrait — grounds "Our Story" in a real, specific person
               rather than leaving it as text-only. Framed with a gold border
@@ -191,7 +191,7 @@ export default async function HomePage() {
                 className="object-cover object-[65%_20%] saturate-[0.9]"
                 sizes="(max-width: 1024px) 90vw, 420px"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0A0000] via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#130304] via-transparent to-transparent" />
               <div className="absolute bottom-0 inset-x-0 p-5">
                 <p className="font-cinzel text-cream font-semibold text-sm">पं० सतीश चन्द्र श्रीवास्तव</p>
                 <p className="text-cream/50 text-xs mt-0.5">Founder, Sangit Shree Prakashan</p>
@@ -243,7 +243,7 @@ export default async function HomePage() {
             {testimonials.map((t) => (
               <div
                 key={t.name}
-                className="gold-border rounded-2xl p-6 bg-[#0A0000] flex flex-col gap-4"
+                className="gold-border rounded-2xl p-6 bg-[#130304] flex flex-col gap-4"
               >
                 <div className="flex gap-1">
                   {[...Array(5)].map((_, i) => (
