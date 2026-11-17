@@ -47,6 +47,11 @@ const TEST_VARS: Record<string, string> = {
   cart_items:       'Raag Parichay Part 1',
   cart_total:       '₹550',
   abandoned_at:     new Date().toLocaleTimeString('en-IN'),
+  // "Critical error logged" alerts (lib/critical-alert.ts): clearly a sample, never a real problem.
+  source:           'test/sample',
+  message:          'THIS IS A TEST: this is how an alert looks when a customer has paid but the order could not be saved.',
+  details:          'orderId: TEST-001\ncustomer: Test Customer, +919999999999, test@example.com\nitems: swar-vadan-part-1 x 2; malhar-darshan x 1\nsubtotal: 1670',
+  time:             `${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })} IST`,
 };
 
 export async function POST(req: NextRequest) {
@@ -56,7 +61,12 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = getSupabaseAdmin();
-  const resend = new Resend(process.env.RESEND_API_KEY);
+  // Created only when an email is actually sent, so a missing RESEND_API_KEY fails that one email
+  // (shown in the results) and no longer breaks testing a WhatsApp-only rule.
+  const getResend = () => {
+    if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is not set, so email cannot be sent.');
+    return new Resend(process.env.RESEND_API_KEY);
+  };
 
   const { ruleId } = await req.json();
   if (!ruleId) return NextResponse.json({ error: 'ruleId required' }, { status: 400 });
@@ -84,7 +94,7 @@ export async function POST(req: NextRequest) {
 
     for (const to of resolvedTo) {
       try {
-        await resend.emails.send({
+        await getResend().emails.send({
           from:    `Sangit Shree Prakashan <${process.env.RESEND_FROM_EMAIL || 'orders@sangitshreeprakashan.com'}>`,
           to,
           subject: `[TEST] ${subject}`,

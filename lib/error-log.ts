@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { sendCriticalAlert } from '@/lib/critical-alert';
 
 // Records server and browser errors in Supabase (table: error_logs, see error-logs.sql)
 // so they can be reviewed in Admin -> System. Vercel's own function logs are kept only
@@ -106,4 +107,8 @@ export async function logError(
     // Most likely the table hasn't been created yet, or Supabase is down.
     console.error('[error-log] could not store the error:', describeError(storeErr));
   }
+
+  // A critical error is someone who needs help now: tell the admin by whatever rule is set up
+  // (see lib/critical-alert.ts). Done even if the log table is missing.
+  if (severity === 'critical') await sendCriticalAlert(source, message, opts.details);
 }

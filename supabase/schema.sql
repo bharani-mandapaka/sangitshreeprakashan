@@ -206,7 +206,7 @@ alter table notification_rules add constraint notification_rules_audience_check
 -- that's what gets dropped and recreated here.
 alter table notification_rules drop constraint if exists notification_rules_trigger_check;
 alter table notification_rules add constraint notification_rules_trigger_check
-  check (trigger in ('order_placed','order_shipped','order_delivered','order_returned','daily_digest','weekly_digest','cart_abandoned'));
+  check (trigger in ('order_placed','order_shipped','order_delivered','order_returned','daily_digest','weekly_digest','cart_abandoned','critical_error'));
 
 -- Returns: an admin marks a delivered order "returned" once the book is back. The
 -- status check is widened here for databases created before 'returned' existed
