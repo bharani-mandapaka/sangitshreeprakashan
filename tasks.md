@@ -89,7 +89,8 @@ was ruled out — no GSTIN/HSN/tax fields, just a plain Bill of Supply.
 - [ ] **Before this goes live:** `invoice-number-column.sql` has been run in Supabase and works. The owner decided the website's invoices start at **1** (a separate series from the business's earlier manual invoices), and the SQL files now say so. Because test invoices consume numbers (assigned on first print), once the test orders are cleared run `alter sequence orders_invoice_number_seq restart with 1; update orders set invoice_number = null;`. Still to confirm with the accountant: one running series, or a fresh series each financial year.
 - [x] Customer-facing "Download Invoice" — `/profile` Orders tab only (logged-in customers). `GET /api/orders/[id]/invoice` (bearer-token auth, ownership-checked, 404s rather than 403s on mismatch) + `/orders/[id]/invoice` page, both reusing `InvoiceSheet`.
 - [x] Customer invoice page header-overlap fix (found while testing) — the page had no top padding accounting for the site's fixed Navbar, and its own toolbar was `sticky top-0`, both fighting for the same spot at the top of the viewport.
-- [ ] Checkout-success-screen "Download Invoice" and guest-checkout access — deliberately not built yet (only order-history access was in scope for this round), see Open Questions in `order-invoice-user-stories.md`
+- [x] Checkout-success-screen "Download Invoice" — built (`feature/confirmation-invoice-link`): a private, 90-day link code (`lib/invoice-link.ts`) returned by `/api/checkout/verify`, so guests get their invoice right after paying; no SQL to run.
+- [ ] Guest invoice later on: put the same link in the order-confirmation email/WhatsApp (needs the Resend domain), or build an order-lookup-by-ID-and-phone page — deliberately not built yet.
 
 ---
 

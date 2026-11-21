@@ -23,6 +23,8 @@ export default function CustomerOrderInvoicePage({ params }: { params: Promise<{
   const [order, setOrder]     = useState<DbOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
+  // A private link code (?t=...) lets a guest, or the "Order Confirmed" screen, open this invoice without signing in.
+  const [linkToken, setLinkToken] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,8 +32,10 @@ export default function CustomerOrderInvoicePage({ params }: { params: Promise<{
       setLoading(true);
       setError('');
       try {
-        const { data: { session } } = await getSupabase().auth.getSession();
-        if (!session) {
+        const t = new URLSearchParams(window.location.search).get('t');
+        if (!cancelled) setLinkToken(t);
+        const { data: { session } } = t ? { data: { session: null } } : await getSupabase().auth.getSession();
+        if (!session && !t) {
           if (!cancelled) {
             setError('Please sign in to view this invoice.');
             setLoading(false);
@@ -39,7 +43,7 @@ export default function CustomerOrderInvoicePage({ params }: { params: Promise<{
           return;
         }
         const res = await fetch(`/api/orders/${id}/invoice`, {
-          headers: { Authorization: `Bearer ${session.access_token}` },
+          headers: t ? { 'X-Invoice-Token': t } : { Authorization: `Bearer ${session!.access_token}` },
         });
         const body = await res.json().catch(() => ({}));
         if (cancelled) return;
@@ -64,7 +68,7 @@ export default function CustomerOrderInvoicePage({ params }: { params: Promise<{
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-3 text-black font-sans">
         <p className="text-sm text-red-600">{error || 'Order not found.'}</p>
-        <Link href="/profile" className="text-sm underline">Back to My Orders</Link>
+        <Link href={linkToken ? '/' : '/profile'} className="text-sm underline">{linkToken ? 'Back to the shop' : 'Back to My Orders'}</Link>
       </div>
     );
   }
@@ -77,8 +81,8 @@ export default function CustomerOrderInvoicePage({ params }: { params: Promise<{
           since the Navbar is transparent until scrolled and this page (unlike
           every other page) had no top padding accounting for it. */}
       <div className="print:hidden sticky top-16 lg:top-20 bg-white border-b border-black/10 px-6 py-3 flex items-center justify-between z-10">
-        <Link href="/profile" className="flex items-center gap-1.5 text-black/60 hover:text-black text-sm">
-          <ArrowLeft size={15} /> Back to My Orders
+        <Link href={linkToken ? '/' : '/profile'} className="flex items-center gap-1.5 text-black/60 hover:text-black text-sm">
+          <ArrowLeft size={15} /> {linkToken ? 'Back to the shop' : 'Back to My Orders'}
         </Link>
         <button
           onClick={() => window.print()}
