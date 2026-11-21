@@ -6,6 +6,7 @@ import { verifyRazorpaySignature, getRazorpayOrder } from '@/lib/razorpay';
 import { computeVerifiedSubtotal } from '@/lib/books-data';
 import { logError } from '@/lib/error-log';
 import { takeStockForOrder } from '@/lib/stock';
+import { createInvoiceLinkToken } from '@/lib/invoice-link';
 
 // Story 2 (razorpay-integration-user-stories.md): the ONLY place an order
 // actually gets written to Supabase and a customer notified. The old
@@ -255,5 +256,7 @@ export async function POST(req: NextRequest) {
       details: { orderId: id },
     }));
 
-  return NextResponse.json({ success: true, orderId: id });
+  // A private code so the "Order Confirmed" screen can offer this order's invoice, guests included.
+  // Null (no button shown) if signing isn't possible; the order itself is already saved either way.
+  return NextResponse.json({ success: true, orderId: id, invoiceToken: createInvoiceLinkToken(id) });
 }

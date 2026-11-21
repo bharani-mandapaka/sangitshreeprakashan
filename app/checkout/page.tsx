@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Script from 'next/script';
 import { m as motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, CheckCircle, Lock, ChevronRight, ShieldCheck, RefreshCw } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Lock, ChevronRight, ShieldCheck, RefreshCw, Download } from 'lucide-react';
 import { useCartStore } from '@/lib/cart-store';
 import { useOrdersStore } from '@/lib/orders-store';
 import { trackEvent } from '@/lib/track';
@@ -101,6 +101,8 @@ export default function CheckoutPage() {
 
   const [step,      setStep]      = useState<CheckoutStep>('details');
   const [orderId,   setOrderId]   = useState('');
+  // Private code for this order's invoice link, handed back by /api/checkout/verify (null if unavailable).
+  const [invoiceToken, setInvoiceToken] = useState<string | null>(null);
   const [paying,       setPaying]       = useState(false);
   const [paymentError, setPaymentError] = useState('');
 
@@ -364,6 +366,7 @@ export default function CheckoutPage() {
             setPaying(false);
             return;
           }
+          setInvoiceToken(typeof verifyBody.invoiceToken === 'string' ? verifyBody.invoiceToken : null);
           addOrder({
             id, createdAt,
             customer: { name: form.name, email: form.email, phone: form.phone },
@@ -451,6 +454,16 @@ export default function CheckoutPage() {
               Your books will be dispatched within 2–4 business days.
             </p>
             <div className="flex flex-col gap-3">
+              {invoiceToken && (
+                <a
+                  href={`/orders/${encodeURIComponent(orderId)}/invoice?t=${encodeURIComponent(invoiceToken)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full text-center border border-gold/40 hover:border-gold text-gold font-cinzel font-bold py-3 rounded-xl transition-colors text-sm"
+                >
+                  <Download size={16} /> Download Invoice
+                </a>
+              )}
               <Link
                 href="/books"
                 className="block w-full text-center bg-gold hover:bg-gold-300 text-dark font-cinzel font-bold py-3.5 rounded-xl transition-colors"

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getSupabaseServer } from '@/lib/supabase';
+import { isValidInvoiceLinkToken } from '@/lib/invoice-link';
 
-// Customer-facing "Download Invoice" route — /profile's Orders tab, logged-in
-// customers only (guest orders aren't listed there today, so there's nothing
-// to link from for them yet; see order-invoice-user-stories.md Story 8 for
-// that separate, still-open problem).
+// Customer-facing "Download Invoice" route — /profile's Orders tab for logged-in
+// customers, and the "Order Confirmed" screen for anyone who just paid (guests
+// included) via a private link code, see below.
 //
 // Deliberately NOT admin-cookie gated like app/api/admin/orders/[id]/invoice
 // — this checks the *customer's* own Supabase Auth session instead, the same
@@ -16,19 +16,33 @@ import { getSupabaseServer } from '@/lib/supabase';
 // explicit ownership check instead keeps this route symmetric with the admin
 // one (same invoice_number-assignment logic) and means the lazy invoice-number
 // write goes through the same server-only path.
+//
+// A second way in, for guests and the "Order Confirmed" screen: a private link code for that one
+// order (lib/invoice-link.ts), sent in the X-Invoice-Token header. Either proof is enough.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const authHeader = req.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
-  }
-  const token = authHeader.slice('Bearer '.length);
-  const { data: { user } } = await getSupabaseServer().auth.getUser(token);
-  if (!user) {
-    return NextResponse.json({ error: 'Your session has expired — please sign in again.' }, { status: 401 });
+  const { id } = await params;
+  const linkToken = req.headers.get('x-invoice-token');
+  const hasValidLink = isValidInvoiceLinkToken(id, linkToken);
+
+  let userId: string | null = null;
+  if (!hasValidLink) {
+    if (linkToken) {
+      // A link code was sent but is wrong or expired. Same 404 as an unknown order: no hints.
+      return NextResponse.json({ error: 'This invoice link is not valid or has expired.' }, { status: 404 });
+    }
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
+    }
+    const token = authHeader.slice('Bearer '.length);
+    const { data: { user } } = await getSupabaseServer().auth.getUser(token);
+    if (!user) {
+      return NextResponse.json({ error: 'Your session has expired — please sign in again.' }, { status: 401 });
+    }
+    userId = user.id;
   }
 
   const admin = getSupabaseAdmin();
-  const { id } = await params;
 
   const { data: order, error: fetchError } = await admin
     .from('orders')
@@ -41,7 +55,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
   // Same 404 whether the order doesn't exist or belongs to someone else —
   // doesn't leak which orders exist to a customer poking at other ids.
-  if (!order || order.user_id !== user.id) {
+  if (!order || (!hasValidLink && order.user_id !== userId)) {
     return NextResponse.json({ error: 'Order not found.' }, { status: 404 });
   }
 
